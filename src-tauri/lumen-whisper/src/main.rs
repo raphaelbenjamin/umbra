@@ -34,7 +34,7 @@ use whisper_rs::{
 };
 
 mod timing;
-use timing::{assemble, dtw_name, refine, resample, Envelope, Tok, TARGET_RATE};
+use timing::{assemble, dtw_name, initial_prompt, refine, resample, Envelope, Tok, TARGET_RATE};
 
 // Windows : Vulkan chargé seulement s'il est là (le même fichier que l'app)
 #[cfg(windows)]
@@ -224,6 +224,9 @@ fn run() -> Result<()> {
     let mut params = FullParams::new(strategy);
     params.set_n_threads(threads);
     params.set_language(Some(lang.as_str()));
+    if let Some(p) = initial_prompt(&lang) {
+        params.set_initial_prompt(p);
+    }
     params.set_translate(false);
     params.set_print_special(false);
     params.set_print_progress(false);

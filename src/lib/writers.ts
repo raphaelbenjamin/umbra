@@ -1,7 +1,7 @@
 import type { ModelRow } from "./types";
 
 /** Langues où Qwen3-ASR écrit le texte (miroir de `asr::writes`). */
-const QWEN = new Set(["en", "it", "de", "pt", "ru", "es", "fr", "nl", "tr", "ar", "hi", "id", "vi", "ko", "ja"]);
+const QWEN = new Set(["en", "it", "de", "pt", "ru", "es", "fr", "nl", "tr", "ar", "hi", "id", "vi", "ko", "ja", "zh"]);
 
 /** Langues où Parakeet écrit le texte (miroir de `parakeet::knows`). */
 const PARAKEET = new Set(["en", "it", "de", "pt", "ru", "es", "fr", "nl", "pl", "cs", "hu", "et", "lt", "sk", "sl", "hr", "bg", "uk"]);

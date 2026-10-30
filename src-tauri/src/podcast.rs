@@ -83,16 +83,28 @@ fn ix(level: u8) -> usize {
     (level.clamp(1, 5) - 1) as usize
 }
 
-/// Mots visés pour une durée (caractères en japonais, découpé caractère par
-/// caractère ; un mot coréen et une syllabe vietnamienne ne pèsent pas pareil).
+/// Mots visés pour une durée (caractères en japonais et en chinois ; un mot
+/// coréen et une syllabe vietnamienne ne pèsent pas pareil).
 pub fn target_units(lang: &str, level: u8, minutes: u32) -> usize {
     let factor = match lang {
         "ja" => 2.1,
+        // le mandarin se dit à 250 caractères par minute environ, contre 150 mots en anglais
+        "zh" => 1.7,
         "ko" => 0.8,
         "vi" => 1.3,
         _ => 1.0,
     };
     (WPM[ix(level)] * factor * minutes.clamp(1, 30) as f64).round() as usize
+}
+
+/// Longueur d'un texte dans l'unité de `target_units` : en chinois, découpé en mots,
+/// les caractères ; ailleurs les mots (caractère par caractère en japonais).
+fn units_of(text: &str, lang: &str) -> usize {
+    if lang == "zh" {
+        text.chars().filter(|c| crate::text::is_han(*c)).count()
+    } else {
+        crate::text::word_count(text, lang)
+    }
 }
 
 const LEVELS: [&str; 5] = [
@@ -114,9 +126,13 @@ fn format_rules(format: &str) -> &'static str {
 /// La commande passée à Gemini. En anglais (consignes mieux suivies) ; le podcast
 /// lui-même est dans la langue étudiée.
 pub fn script_prompt(lang: &str, r: &Request, words: &[String]) -> String {
-    let language = crate::ai::lang_name_en(lang);
+    let language = if lang == "zh" { "Mandarin Chinese, written in simplified characters" } else { crate::ai::lang_name_en(lang) };
     let units = target_units(lang, r.level, r.minutes);
-    let length = if lang == "ja" { format!("about {units} Japanese characters") } else { format!("about {units} words") };
+    let length = match lang {
+        "ja" => format!("about {units} Japanese characters"),
+        "zh" => format!("about {units} Chinese characters"),
+        _ => format!("about {units} words"),
+    };
     let mut p = format!(
         "Write the script of an audio podcast in {language} for {}\n\nTopic: {}\nFormat: {}\nLength: {length} in total (about {} minutes when spoken at the right pace). Do not stop early.\n",
         LEVELS[ix(r.level)],
@@ -317,7 +333,7 @@ pub fn chunks(lines: &[Line], lang: &str, level: u8) -> Vec<Range<usize>> {
     let mut out = Vec::new();
     let (mut start, mut secs) = (0usize, 0.0f64);
     for (i, l) in lines.iter().enumerate() {
-        let s = crate::text::word_count(&l.text, lang) as f64 / per_sec;
+        let s = units_of(&l.text, lang) as f64 / per_sec;
         if i > start && secs + s > CHUNK_SECS {
             out.push(start..i);
             start = i;
@@ -813,6 +829,8 @@ mod tests {
         assert!(p.contains("exactly two"));
         // japonais : en caractères
         assert!(script_prompt("ja", &req("story", 1, 3), &[]).contains("Japanese characters"));
+        let zh = script_prompt("zh", &req("talk", 2, 5), &[]);
+        assert!(zh.contains("Chinese characters") && zh.contains("simplified"), "{zh}");
         assert!(script_prompt("de", &req("story", 1, 3), &[]).contains("exactly one host"));
     }
 

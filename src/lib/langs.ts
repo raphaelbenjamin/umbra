@@ -16,9 +16,9 @@ export interface LangInfo {
 }
 
 /**
- * Langues proposées : toutes celles de la voix naturelle (Supertonic 3), chacune avec un
- * dictionnaire hors ligne dans la langue de l'interface. Les six premières sont les plus
- * étudiées (en grand à l'accueil).
+ * Langues proposées : toutes celles de la voix naturelle (Supertonic 3), et le chinois (dit
+ * par la voix du système), chacune avec un dictionnaire hors ligne dans la langue de
+ * l'interface. Les six premières sont les plus étudiées (en grand à l'accueil).
  */
 const RAW: (Omit<LangInfo, "name"> & { fr: string; en: string })[] = [
   { code: "en", fr: "Anglais", en: "English", native: "English", badge: "EN", color: "#3b5bdb", tts: ["en-GB", "en-US", "en"], hello: "Hello" },
@@ -52,6 +52,7 @@ const RAW: (Omit<LangInfo, "name"> & { fr: string; en: string })[] = [
   { code: "vi", fr: "Vietnamien", en: "Vietnamese", native: "Tiếng Việt", badge: "VI", color: "#c0392b", tts: ["vi-VN", "vi"], hello: "Xin chào" },
   { code: "ko", fr: "Coréen", en: "Korean", native: "한국어", badge: "KO", color: "#5f3dc4", tts: ["ko-KR", "ko"], hello: "안녕하세요" },
   { code: "ja", fr: "Japonais", en: "Japanese", native: "日本語", badge: "JA", color: "#e64980", tts: ["ja-JP", "ja"], hello: "こんにちは" },
+  { code: "zh", fr: "Chinois", en: "Chinese", native: "中文", badge: "ZH", color: "#b23a2e", tts: ["zh-CN", "zh-TW", "zh"], hello: "你好" },
 ];
 
 export const LANGS: LangInfo[] = RAW.map((l) => ({
@@ -418,6 +419,16 @@ Tối hôm đó, cô viết một lá thư hồi âm và để lại ở đúng 
 マルタは腰を下ろし、もう一度手紙を読んだ。誰が書いたのだろう。どれくらいのあいだ、ここにあったのだろう。まるで次の波と一緒に答えがやって来るかのように、彼女は海を見つめた。
 
 その晩、彼女は返事を書いて、同じ場所に置いた。いつか誰かがそれを見つけるかどうかはわからなかった。それでも何年ぶりかで、灯台はがらんとしているようには感じなかった。`,
+  },
+  zh: {
+    title: "守灯塔的人",
+    text: `每天早上，玛尔塔都会爬上旧灯塔那道狭窄的楼梯。从塔顶望去，大海无边无际，平静安宁。太阳从云层后面慢慢升起的时候，她喜欢听着风的声音。
+
+有一天，她在两块石头之间发现了一封藏起来的信。纸已经湿了，但上面的字还能看清：“如果你正在读这封信，你并不孤单。”
+
+玛尔塔坐下来，又把信读了一遍。是谁写的呢？它在这里放了多久了？她望着大海，好像答案会随着下一道海浪一起到来。
+
+那天晚上，她写了一封回信，放在同一个地方。她不知道会不会有人发现它。但是这么多年来第一次，灯塔不再让她觉得空荡荡的。`,
   },
 };
 

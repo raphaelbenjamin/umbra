@@ -6,11 +6,28 @@ use serde::Serialize;
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Langues proposées par Lumen : toutes celles de la voix naturelle (Supertonic 3).
+/// Langues proposées par Lumen : toutes celles de la voix naturelle (Supertonic 3), et le chinois.
 pub const LANGS: &[&str] = &[
+    "en", "it", "de", "pt", "ru", "es", "fr", "nl", "sv", "da", "fi", "et", "lv", "lt", "pl", "cs", "sk", "sl", "hr", "hu", "ro", "bg", "uk",
+    "el", "tr", "ar", "hi", "id", "vi", "ko", "ja", "zh",
+];
+
+/// Langues de la voix naturelle (Supertonic 3) : toutes celles de Lumen sauf le chinois,
+/// que dit la voix du système.
+pub const VOICE_LANGS: &[&str] = &[
     "en", "it", "de", "pt", "ru", "es", "fr", "nl", "sv", "da", "fi", "et", "lv", "lt", "pl", "cs", "sk", "sl", "hr", "hu", "ro", "bg", "uk",
     "el", "tr", "ar", "hi", "id", "vi", "ko", "ja",
 ];
+
+/// Langues écrites sans espace entre les mots.
+pub fn unspaced(lang: &str) -> bool {
+    matches!(lang, "ja" | "zh")
+}
+
+/// Idéogramme chinois (hanzi, kanji).
+pub fn is_han(c: char) -> bool {
+    matches!(c, '\u{4e00}'..='\u{9fff}' | '\u{3400}'..='\u{4dbf}' | '\u{f900}'..='\u{faff}' | '\u{20000}'..='\u{2ebef}' | '\u{3007}')
+}
 
 /// Clé de recherche d'un mot ou d'une expression (accents aigu et grave retirés).
 pub fn normalize(s: &str) -> String {
@@ -91,6 +108,42 @@ fn splits_elision(lang: &str) -> bool {
     matches!(lang, "it" | "fr" | "pt" | "ca")
 }
 
+/// Découpe du chinois en mots : jieba, sur son seul dictionnaire (sans le modèle qui
+/// devine les mots inconnus, pour que le même texte donne toujours les mêmes mots ;
+/// un caractère absent du dictionnaire reste seul). Chargé au premier texte chinois.
+fn jieba() -> &'static jieba_rs::Jieba {
+    static J: std::sync::OnceLock<jieba_rs::Jieba> = std::sync::OnceLock::new();
+    J.get_or_init(jieba_rs::Jieba::new)
+}
+
+/// Morceaux de UAX 29 ; en chinois, les idéogrammes (un par morceau) sont regroupés
+/// en mots par jieba.
+fn pieces<'a>(text: &'a str, lang: &str) -> Vec<&'a str> {
+    if lang != "zh" {
+        return text.split_word_bounds().collect();
+    }
+    let mut out = Vec::new();
+    // début (en octets) de la suite d'idéogrammes en cours
+    let mut run: Option<usize> = None;
+    let mut at = 0;
+    for piece in text.split_word_bounds() {
+        let han = piece.chars().next().is_some_and(is_han);
+        if !han {
+            if let Some(a) = run.take() {
+                out.extend(jieba().cut(&text[a..at], false).into_iter().map(|w| w.word));
+            }
+            out.push(piece);
+        } else if run.is_none() {
+            run = Some(at);
+        }
+        at += piece.len();
+    }
+    if let Some(a) = run {
+        out.extend(jieba().cut(&text[a..at], false).into_iter().map(|w| w.word));
+    }
+    out
+}
+
 pub fn tokenize(text: &str, lang: &str) -> Vec<Token> {
     let mut out = Vec::new();
     let mut utf16_pos = 0usize;
@@ -106,7 +159,7 @@ pub fn tokenize(text: &str, lang: &str) -> Vec<Token> {
         });
         *pos += len16;
     };
-    for piece in text.split_word_bounds() {
+    for piece in pieces(text, lang) {
         if splits_elision(lang) && is_learnable(piece) {
             if let Some(idx) = piece.find(|c| c == '\'' || c == '’') {
                 let (head, rest) = piece.split_at(idx);
@@ -155,6 +208,21 @@ mod tests {
         assert_eq!(s, ["Hello there.", "How are you?", "Fine…", "Yes"]);
         let j = tokenize("毎朝、海を見た。手紙を見つけた。", "ja");
         assert_eq!(sentences(&j).len(), 2);
+        let z = tokenize("我们是学生！你呢？", "zh");
+        assert_eq!(sentences(&z).len(), 2);
+    }
+
+    #[test]
+    fn chinese_words() {
+        let keys = |s: &str| tokenize(s, "zh").into_iter().filter(|t| t.w).map(|t| t.k).collect::<Vec<_>>();
+        assert_eq!(keys("我们是学生。"), ["我们", "是", "学生"]);
+        // chiffres et mots latins à part, positions continues
+        let t = tokenize("我有3个iPhone手机，很好。", "zh");
+        assert_eq!(t.iter().filter(|t| t.w).map(|t| t.t.as_str()).collect::<Vec<_>>(), ["我", "有", "个", "iPhone", "手机", "很", "好"]);
+        assert_eq!(t.iter().map(|t| t.t.as_str()).collect::<String>(), "我有3个iPhone手机，很好。");
+        assert!(t.windows(2).all(|w| w[0].e == w[1].s));
+        // le japonais reste découpé caractère par caractère
+        assert_eq!(tokenize("学生", "ja").iter().filter(|t| t.w).count(), 2);
     }
 
     #[test]

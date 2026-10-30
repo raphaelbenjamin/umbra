@@ -275,7 +275,7 @@ export function createMockApi(): Api {
     { id: "parakeet-v3", kind: "asrtext", name: "Parakeet V3", get detail() { return t("Texte des transcriptions plus juste que Whisper et bien ponctué, rapide et léger, dans 18 langues européennes ; Whisper garde le minutage des mots", "More accurate, well-punctuated transcripts than Whisper, fast and light, in 18 European languages; Whisper still times the words"); }, size: 1038682448, url: "", file: "", ram_gb: 8 },
     { id: "whisper-small", kind: "asr", name: "Whisper Small", get detail() { return t("Transcription légère et rapide", "Light and fast transcription"); }, size: 190e6, url: "", file: "", ram_gb: 8 },
     { id: "whisper-turbo", kind: "asr", name: "Whisper Large v3 Turbo", get detail() { return t("Transcription et minutage des mots, très précis, 99 langues", "Transcription and word timing, very precise, 99 languages"); }, size: 574e6, url: "", file: "", ram_gb: 8 },
-    { id: "supertonic-3", kind: "tts", name: "Supertonic 3", get detail() { return t("Voix naturelle pour les mots, les expressions et l'audio des leçons, dans les 31 langues", "Natural voice for words, phrases and lesson audio, in all 31 languages"); }, size: 149e6, url: "", file: "", ram_gb: 8 },
+    { id: "supertonic-3", kind: "tts", name: "Supertonic 3", get detail() { return t("Voix naturelle pour les mots, les expressions et l'audio des leçons, dans 31 langues, toutes sauf le chinois", "Natural voice for words, phrases and lesson audio, in 31 languages, all but Chinese"); }, size: 149e6, url: "", file: "", ram_gb: 8 },
   ];
 
   // miroir de new_share (db.rs)
@@ -1007,8 +1007,10 @@ export function createMockApi(): Api {
       const u = page.toLowerCase();
       const empty: LinkInfo = { url: page, title: "", site: "", image: "", html: "", media: [], list: false, via: "", note: "" };
       const day = (i: number) => new Date(Date.now() - i * 7 * 86400e3).toISOString().slice(0, 10);
-      const episodes = (show: string): LinkMedia[] =>
-        ["The lighthouse keeper", "A night at sea", "Back to the village", "The storm", "Morning fishermen", "Last light"].map((title, i) => ({
+      // un podcast quotidien de longue date : plus d'un millier d'épisodes
+      const titles = ["The lighthouse keeper", "A night at sea", "Back to the village", "The storm", "Morning fishermen", "Last light"];
+      const episodes = (show: string, n = titles.length): LinkMedia[] =>
+        Array.from({ length: n }, (_, i) => (i < titles.length ? titles[i] : `${titles[i % titles.length]} · ${n - i}`)).map((title, i) => ({
           url: `https://cdn.example/ep${i}.mp3`,
           title,
           duration: 1260 + i * 137,
@@ -1026,7 +1028,7 @@ export function createMockApi(): Api {
       if (u.includes("spotify")) return { ...empty, title: "The lighthouse keeper", site: "Slow Stories", media: episodes("Slow Stories").slice(0, 1), via: "rss" };
       if (u.includes("youtu"))
         return { ...empty, title: "A walk by the lighthouse", site: "Easy Stories", media: [{ url: page, title: "A walk by the lighthouse", duration: 754, video: true, direct: false, image: "", date: day(1), page, collection: "" }] };
-      if (/podcast|rss|feed|apple/.test(u)) return { ...empty, title: "Slow Stories", site: "Slow Stories", media: episodes("Slow Stories"), list: true };
+      if (/podcast|rss|feed|apple/.test(u)) return { ...empty, title: "Slow Stories", site: "Slow Stories", media: episodes("Slow Stories", 1250), list: true };
       const body = STARTERS_MOCK.split("\n\n").map((p) => `<p>${p}</p>`).join("");
       return {
         ...empty,

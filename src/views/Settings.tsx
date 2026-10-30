@@ -17,7 +17,7 @@ import { useLingq } from "../lib/lingq";
 import { isIOS, isWindows } from "../lib/platform";
 import { PROFILES, useRecommendedProfile } from "../lib/profiles";
 import { formatBytes, useApp, type SettingsTab } from "../lib/store";
-import { naturalVoiceFor, naturalVoices, pronounce } from "../lib/pronounce";
+import { naturalVoiceFor, naturalVoices, naturalVoiceSpeaks, pronounce } from "../lib/pronounce";
 import { loadVoices, sayWord, voicesFor } from "../lib/tts";
 import { useUpdate } from "../lib/updater";
 import { panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
@@ -858,7 +858,15 @@ function VoicePane() {
             .map((m) => (
               <ModelLine key={m.id} m={m} />
             ))}
-          {models.some((m) => m.kind === "tts" && m.installed) && (
+          {!naturalVoiceSpeaks(lang) && (
+            <div className="set-row">
+              <div className="grow">
+                <strong>{t(`Pas encore de voix naturelle pour ${theLang(lang)}`, `No natural voice for ${langLower(lang)} yet`)}</strong>
+                <span>{t("La voix du système prononce les mots et lit les leçons, ci-dessous.", "The system voice pronounces words and reads lessons, below.")}</span>
+              </div>
+            </div>
+          )}
+          {models.some((m) => m.kind === "tts" && m.installed) && naturalVoiceSpeaks(lang) && (
             <div className="set-row">
               <div className="grow">
                 <strong>{t(`Voix pour ${theLang(lang)}`, `Voice for ${theLang(lang)}`)}</strong>
@@ -984,6 +992,11 @@ function LevelExplained({ lang, forms }: { lang: LangCode; forms: string }) {
   let how: string;
   if (e.unit === "kanji") how = t("En japonais, Lumen compte les kanji que vous connaissez : c'est eux qui ouvrent les textes.", "In Japanese, Lumen counts the kanji you know: they are what opens up texts.");
   else if (e.unit === "syllables") how = t("En vietnamien, Lumen compte les syllabes que vous connaissez : un mot en compte une ou deux.", "In Vietnamese, Lumen counts the syllables you know: a word has one or two.");
+  else if (lang === "zh")
+    how = t(
+      "En chinois, les mots ne changent pas de forme : chacun de vos mots connus compte une fois. Les paliers suivent ceux du HSK (environ 1 300 mots au niveau 2, 4 300 au niveau 5).",
+      "In Chinese, words never change form: each word you know counts once. The steps follow the HSK (about 1,300 words at level 2, 4,300 at level 5).",
+    );
   else if (e.exact)
     how = t(
       `Vos ${forms} sont regroupés par mot de base grâce au dictionnaire, comme « parle », « parlait » et « parlé » ne comptent qu'une fois. Les mots que le dictionnaire ignore (noms propres) comptent pour moitié.`,

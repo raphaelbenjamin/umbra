@@ -350,6 +350,7 @@ const IDEAS: Partial<Record<LangCode, string[]>> = {
   vi: ["nấu ăn", "du lịch", "lịch sử", "khoa học", "truyện cổ tích", "phỏng vấn đường phố", "podcast", "tin tức"],
   ko: ["요리", "여행", "역사", "과학", "동화", "길거리 인터뷰", "팟캐스트", "뉴스"],
   ja: ["料理", "旅行", "歴史", "科学", "昔話", "街頭インタビュー", "ポッドキャスト", "ニュース"],
+  zh: ["做饭", "旅行", "历史", "科学", "童话", "街头采访", "播客", "新闻"],
 };
 
 export function searchIdeas(lang: LangCode): string[] {

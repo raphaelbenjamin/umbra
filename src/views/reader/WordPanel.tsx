@@ -35,7 +35,7 @@ const SENSE_MAX_WORDS = 5;
 
 /** Une sélection de quelques mots peut être une entrée du dictionnaire (« zum Beispiel »,
  *  « học sinh ») ; en japonais, découpé caractère par caractère, un mot entier. */
-const dictLookable = (lang: LangCode, sel: Selection) => !sel.isPhrase || sel.words <= (lang === "ja" ? 10 : 4);
+const dictLookable = (lang: LangCode, sel: Selection) => !sel.isPhrase || sel.words <= (lang === "ja" ? 10 : lang === "zh" ? 6 : 4);
 
 const statusOpts = (): { s: Status; label: string; sw: string }[] => [
   { s: 1, label: "1", sw: "var(--w-l1)" },
@@ -308,8 +308,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
   const entries = dict?.entries ?? [];
   const lemma = dict?.lemma;
   // japonais, vietnamien : la première entrée peut être un mot plus long que le caractère
-  // ou la syllabe touchés ; sa lecture et sa nature restent alors dans son propre titre
-  const spans = (lang === "ja" || lang === "vi") && !!entries[0] && entries[0].word.toLowerCase() !== sel.surface.toLowerCase();
+  // ou la syllabe touchés ; chinois : les parties d'un mot que le dictionnaire n'a pas. Sa
+  // lecture et sa nature restent alors dans son propre titre
+  const spans = (lang === "ja" || lang === "vi" || lang === "zh") && !!entries[0] && entries[0].word.toLowerCase() !== sel.surface.toLowerCase();
   const firstIpa = spans ? undefined : entries.find((e) => e.ipa)?.ipa;
   const firstPos = spans ? undefined : entries[0]?.pos;
   const statusLabel =
@@ -348,7 +349,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
             </div>
             <div className="wp-sub">
               {sel.isPhrase && <span className="chip">{term ? t("Expression", "Phrase") : t(`${sel.words} mots sélectionnés`, `${sel.words} words selected`)}</span>}
-              {firstIpa && <span className="ipa">{lang === "ja" ? firstIpa : `/${firstIpa}/`}</span>}
+              {firstIpa && <span className="ipa">{lang === "ja" || lang === "zh" ? firstIpa : `/${firstIpa}/`}</span>}
               {firstPos && <span>{firstPos}</span>}
               {lemma && (
                 <span>
@@ -465,7 +466,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
                     {(entries.length > 1 || e.word !== sel.surface.toLowerCase()) && (
                       <div className="pos">
                         {e.word}
-                        {lang === "ja" && e.ipa && e.ipa !== e.word ? `【${e.ipa}】` : ""} · {e.pos}
+                        {lang === "ja" && e.ipa && e.ipa !== e.word ? `【${e.ipa}】` : ""}
+                        {lang === "zh" && e.ipa ? ` ${e.ipa}` : ""}
+                        {e.pos && ` · ${e.pos}`}
                       </div>
                     )}
                     {e.glosses.slice(0, 3).map((g, j) => (

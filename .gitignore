@@ -15,6 +15,7 @@ publication.log
 public
 src-tauri/resources/dicts-en
 src-tauri/resources/dicts-v2
+src-tauri/resources/dicts-zh
 __pycache__
 # le dépôt est public : jamais de secret ni de donnée personnelle
 .env

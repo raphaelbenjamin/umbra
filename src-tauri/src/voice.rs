@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 use crate::models::{self, ModelInfo};
 
 /// Les langues de Lumen portent le même code chez Supertonic.
-use crate::text::LANGS;
+use crate::text::VOICE_LANGS;
 
 /// Locuteur du modèle : 0 à 4 = voix féminines F1 à F5, 5 à 9 = masculines M1 à M5
 /// (ordre de voice.bin). « f » et « m » (premiers réglages) valent F1 et M1.
@@ -86,7 +86,7 @@ async fn run_engine(data_dir: &Path, m: &ModelInfo, lang: &str, text: &str, voic
 
 /// Prononce `text` et renvoie le chemin du fichier WAV (déjà en cache, ou créé).
 pub async fn say(data_dir: &Path, m: &ModelInfo, lang: &str, text: &str, voice: &str) -> Result<PathBuf> {
-    if !LANGS.contains(&lang) {
+    if !VOICE_LANGS.contains(&lang) {
         return Err(anyhow!(crate::i18n::t("Cette langue n'a pas encore de voix naturelle.", "This language has no natural voice yet.")));
     }
     let dest = cached_path(data_dir, m, lang, text, voice);
@@ -267,7 +267,7 @@ pub async fn lesson_audio(
 ) -> Result<LessonAudio> {
     use futures_util::StreamExt;
     use std::sync::atomic::Ordering;
-    if !LANGS.contains(&lang) {
+    if !VOICE_LANGS.contains(&lang) {
         return Err(anyhow!(crate::i18n::t("Cette langue n'a pas encore de voix naturelle.", "This language has no natural voice yet.")));
     }
     let chunks = chunks_of(text, lang);

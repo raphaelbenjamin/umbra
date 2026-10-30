@@ -65,6 +65,8 @@ int lw_full(void * ctx, const float * pcm, int n, const char * lang, int threads
     if (beam > 0) p.beam_search.beam_size = beam;
     p.n_threads = threads;
     p.language = lang;
+    // chinois : en caractères simplifiés (miroir de initial_prompt, lumen-whisper/src/timing.rs)
+    if (strcmp(lang, "zh") == 0) p.initial_prompt = "以下是普通话的句子。";
     p.translate = false;
     p.print_special = false;
     p.print_progress = false;

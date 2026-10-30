@@ -27,10 +27,16 @@ use crate::media::{self, ImportEvent};
 
 const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
 
-/// Éléments au plus dans une liste (podcast, playlist, chaîne).
-const MAX_ITEMS: usize = 300;
-/// Taille au plus d'une page ou d'un flux lu en entier.
-const PAGE_MAX: usize = 15_000_000;
+/// Épisodes au plus dans un podcast (flux RSS ou Atom, pages suivantes comprises) :
+/// les plus anciens d'une émission quotidienne aussi.
+const MAX_ITEMS: usize = 5000;
+/// Éléments au plus d'une liste lue par yt-dlp (playlist, chaîne) ; miroir de `media::yt_info`.
+const MAX_YTDLP: usize = 2000;
+/// Pages au plus d'un flux découpé en pages (RFC 5005).
+const MAX_FEED_PAGES: usize = 60;
+/// Taille au plus d'une page ou d'un flux lu en entier (un flux de milliers
+/// d'épisodes aux longues notes dépasse 15 Mo).
+const PAGE_MAX: usize = 60_000_000;
 
 const AUDIO_EXT: &[&str] = &["mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac"];
 const VIDEO_EXT: &[&str] = &["mp4", "m4v", "mov", "webm"];
@@ -343,7 +349,8 @@ pub async fn probe(data_dir: &Path, input: &str, browser: Option<&str>, on_event
 
     let body = body_text(resp).await?;
     if is_feed(&ctype, &body) {
-        return feed_info(&body, final_url.as_str())
+        return feed_pages(&c, &body, final_url.as_str())
+            .await
             .ok_or_else(|| anyhow!(t("Ce flux ne contient aucun épisode à écouter.", "This feed has no episode to listen to.")));
     }
 
@@ -378,7 +385,7 @@ pub async fn probe(data_dir: &Path, input: &str, browser: Option<&str>, on_event
     if (info.media.is_empty() || info.list) && page.kind != "article" {
         for feed in page.feeds.iter().take(2) {
             let Ok(xml) = get_text(&c, feed).await else { continue };
-            if let Some(f) = feed_info(&xml, feed) {
+            if let Some(f) = feed_pages(&c, &xml, feed).await {
                 info.media = f.media;
                 info.list = true;
                 if info.image.is_empty() {
@@ -512,7 +519,7 @@ fn from_ytdlp(v: &Value, url: &str, video_site: bool) -> LinkInfo {
             }
             return info;
         }
-        let media = entries.iter().filter_map(|e| ytdlp_entry(e, &title, video_site)).take(MAX_ITEMS).collect();
+        let media = entries.iter().filter_map(|e| ytdlp_entry(e, &title, video_site)).take(MAX_YTDLP).collect();
         return LinkInfo { url: url.into(), title, site, image, media, list: true, ..Default::default() };
     }
     let page = ["webpage_url", "original_url"].iter().map(|k| str_of(v, k)).find(|s| s.starts_with("http")).unwrap_or_else(|| url.to_string());
@@ -1165,7 +1172,44 @@ async fn itunes_shows(c: &reqwest::Client, name: &str) -> Vec<Show> {
 }
 
 async fn read_feed(c: &reqwest::Client, url: &str) -> Option<LinkInfo> {
-    feed_info(&get_text(c, url).await.ok()?, url)
+    feed_pages(c, &get_text(c, url).await.ok()?, url).await
+}
+
+/// Page suivante d'un flux découpé en pages (RFC 5005 : `<atom:link rel="next">`
+/// en tête du flux, avant le premier épisode).
+fn next_page(xml: &str, feed_url: &str) -> Option<String> {
+    let first = tags(xml).find(|t| t.name == "item" || t.name == "entry").map(|t| t.end).unwrap_or(xml.len());
+    let href = tags(&xml[..first]).find(|t| (t.name == "atom:link" || t.name == "link") && t.attr("rel") == Some("next"))?.attr("href")?.trim().to_string();
+    let u = Url::parse(feed_url).ok()?.join(&href).ok()?;
+    matches!(u.scheme(), "http" | "https").then(|| u.to_string())
+}
+
+/// Tous les épisodes d'un flux : sa première page (déjà lue), puis les suivantes
+/// s'il est découpé en pages, jusqu'à `MAX_ITEMS` épisodes.
+async fn feed_pages(c: &reqwest::Client, xml: &str, url: &str) -> Option<LinkInfo> {
+    let mut info = feed_info(xml, url)?;
+    let mut seen: HashSet<String> = info.media.iter().map(|m| m.url.clone()).collect();
+    let mut visited: HashSet<String> = HashSet::from([url.to_string()]);
+    let mut next = next_page(xml, url);
+    while let Some(page) = next.take() {
+        if info.media.len() >= MAX_ITEMS || visited.len() >= MAX_FEED_PAGES || !visited.insert(page.clone()) {
+            break;
+        }
+        // une page illisible arrête la lecture : on garde ce qui est déjà là
+        let Ok(more) = get_text(c, &page).await else { break };
+        let Some(f) = feed_info(&more, &page) else { break };
+        let before = info.media.len();
+        for m in f.media {
+            if info.media.len() < MAX_ITEMS && seen.insert(m.url.clone()) {
+                info.media.push(m);
+            }
+        }
+        if info.media.len() == before {
+            break;
+        }
+        next = next_page(&more, &page);
+    }
+    Some(info)
 }
 
 /// Flux public d'un podcast d'après son nom.
@@ -1693,6 +1737,50 @@ mod tests {
         let hit = best_episode(&f.media, "E179 La France est-elle anti-enfants ?", 1872.1, "2025-09-10").unwrap();
         assert_eq!(hit.url, "https://cdn.example/e179.mp3");
         assert!(best_episode(&f.media, "Un tout autre épisode", 0.0, "").is_none());
+    }
+
+    /// Un flux de `n` épisodes à partir de `from`, avec sa page suivante s'il en a une.
+    fn paged_feed(from: usize, n: usize, next: Option<&str>) -> String {
+        let link = next.map(|h| format!(r#"<atom:link rel="next" href="{h}"/>"#)).unwrap_or_default();
+        let items: String = (from..from + n).map(|i| format!(r#"<item><title>Épisode {i}</title><enclosure url="https://cdn.example/{i}.mp3" type="audio/mpeg"/></item>"#)).collect();
+        format!(r#"<?xml version="1.0"?><rss xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Quotidien</title><atom:link rel="self" href="/feed"/>{link}{items}</channel></rss>"#)
+    }
+
+    #[tokio::test]
+    async fn long_and_paged_feeds() {
+        // plus de 300 épisodes : tous (une émission quotidienne en a des milliers)
+        let f = feed_info(&paged_feed(0, 1200, None), "https://podcast.example/feed").unwrap();
+        assert_eq!(f.media.len(), 1200);
+        assert_eq!(f.media[1199].title, "Épisode 1199");
+        assert_eq!(next_page(&paged_feed(0, 2, Some("/feed?page=2")), "https://podcast.example/feed").as_deref(), Some("https://podcast.example/feed?page=2"));
+        assert_eq!(next_page(&paged_feed(0, 2, None), "https://podcast.example/feed"), None);
+
+        // flux découpé en pages : la première, puis les suivantes ; une page déjà lue ne fait pas boucler
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = vec![0u8; 4096];
+                let n = sock.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                let body = if req.starts_with("GET /feed?page=2 ") {
+                    paged_feed(400, 400, Some("/feed?page=3"))
+                } else if req.starts_with("GET /feed?page=3 ") {
+                    // la dernière renvoie à la deuxième : on s'arrête
+                    paged_feed(800, 100, Some("/feed?page=2"))
+                } else {
+                    paged_feed(0, 400, Some("/feed?page=2"))
+                };
+                let head = format!("HTTP/1.1 200 OK\r\nContent-Type: application/rss+xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                let _ = sock.write_all(head.as_bytes()).await;
+                let _ = sock.write_all(body.as_bytes()).await;
+            }
+        });
+        let c = client().unwrap();
+        let f = read_feed(&c, &format!("{base}/feed")).await.unwrap();
+        assert_eq!(f.media.len(), 900);
+        assert_eq!(f.media[899].title, "Épisode 899");
     }
 
     #[test]

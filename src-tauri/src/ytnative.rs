@@ -558,6 +558,12 @@ fn collect(v: &Value, approx: bool, channel: &str, out: &mut Vec<Value>, token: 
     }
 }
 
+/// Pages de suite au plus pour `want` vidéos (une page en porte 20 à 30) : une longue
+/// playlist ou une grande chaîne se lit jusqu'au bout, une recherche s'arrête vite.
+fn max_pages(want: usize) -> usize {
+    (want / 20).clamp(12, 100)
+}
+
 /// Parcourt une liste (recherche ou page) jusqu'à `want` vidéos, page après page.
 async fn walk_list(c: &reqwest::Client, endpoint: &str, first: Value, hl: &str, want: usize, approx: bool, channel: &str) -> Result<(Value, Vec<Value>)> {
     let head = web(c, endpoint, first, hl).await?;
@@ -565,7 +571,7 @@ async fn walk_list(c: &reqwest::Client, endpoint: &str, first: Value, hl: &str, 
     let mut token = None;
     collect(&head, approx, channel, &mut out, &mut token);
     let mut pages = 0;
-    while out.len() < want && pages < 12 {
+    while out.len() < want && pages < max_pages(want) {
         let Some(tk) = token.take() else { break };
         pages += 1;
         let more = web(c, endpoint, json!({ "continuation": tk }), hl).await?;
@@ -629,7 +635,7 @@ async fn listing(target: Target, a: &Args) -> Result<Value> {
             let mut token = None;
             collect(&head, approx, &name, &mut out, &mut token);
             let mut pages = 0;
-            while out.len() < want && pages < 12 {
+            while out.len() < want && pages < max_pages(want) {
                 let Some(tk) = token.take() else { break };
                 pages += 1;
                 let more = web(&c, "browse", json!({ "continuation": tk }), &hl).await?;

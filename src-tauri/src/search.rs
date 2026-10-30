@@ -523,6 +523,7 @@ pub fn country(lang: &str) -> &'static str {
         "vi" => "vn",
         "ko" => "kr",
         "ja" => "jp",
+        "zh" => "cn",
         _ => "us",
     }
 }
@@ -725,6 +726,12 @@ pub async fn song_url(data_dir: &Path, artist: &str, title: &str) -> Result<Stri
 
 // ---------- articles (Wikipédia, Vikidia) ----------
 
+/// Wikipédia en chinois mêle les deux écritures : tout en caractères simplifiés, comme
+/// les leçons et le dictionnaire de jieba.
+fn variant_of(base: &str) -> Option<(&'static str, &'static str)> {
+    base.starts_with("https://zh.").then_some(("variant", "zh-cn"))
+}
+
 /// Encyclopédies où chercher, de la plus simple à la plus riche : (adresse, nom, niveaux).
 fn encyclopedias(lang: &str) -> Vec<(String, &'static str, u8, u8)> {
     let mut out = Vec::new();
@@ -753,7 +760,7 @@ async fn wiki_site(c: &reqwest::Client, base: &str, name: &str, lo: u8, hi: u8, 
     };
     let url = Url::parse_with_params(
         &format!("{base}/w/api.php"),
-        &[
+        variant_of(base).into_iter().chain([
             ("action", "query"),
             ("generator", "search"),
             ("gsrsearch", q),
@@ -771,7 +778,7 @@ async fn wiki_site(c: &reqwest::Client, base: &str, name: &str, lo: u8, hi: u8, 
             ("pithumbsize", "640"),
             ("format", "json"),
             ("formatversion", "2"),
-        ],
+        ]),
     )?;
     let v = link::get_json(c, url.as_str()).await?;
     // une encyclopédie qui ne connaît pas ce tri : sans tri
@@ -869,7 +876,7 @@ pub async fn wiki_article(url: &Url) -> Option<(String, Vec<String>)> {
     let title = percent(title).replace('_', " ");
     let api = Url::parse_with_params(
         &format!("https://{host}/w/api.php"),
-        &[
+        variant_of(&format!("https://{host}")).into_iter().chain([
             ("action", "query"),
             ("prop", "extracts"),
             ("explaintext", "1"),
@@ -878,7 +885,7 @@ pub async fn wiki_article(url: &Url) -> Option<(String, Vec<String>)> {
             ("titles", title.as_str()),
             ("format", "json"),
             ("formatversion", "2"),
-        ],
+        ]),
     )
     .ok()?;
     let c = lyrics::client().ok()?;

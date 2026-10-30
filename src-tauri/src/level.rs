@@ -5,7 +5,8 @@
 //! on compte donc les lemmes (mots de base), grâce aux formes fléchies des
 //! dictionnaires hors ligne, et les seuils sont les mêmes pour toutes les langues.
 //! Japonais (découpé caractère par caractère) : les kanji ; vietnamien (syllabe
-//! par syllabe) : les syllabes.
+//! par syllabe) : les syllabes ; chinois (découpé en mots, qui ne se fléchissent
+//! pas) : chaque mot connu est son propre lemme.
 
 use std::collections::HashMap;
 
@@ -53,10 +54,6 @@ pub fn forms_per_lemma(lang: &str) -> f64 {
     }
 }
 
-fn is_han(c: char) -> bool {
-    matches!(c, '\u{4e00}'..='\u{9fff}' | '\u{3400}'..='\u{4dbf}' | '\u{f900}'..='\u{faff}')
-}
-
 fn place(units: i64, steps: &[i64; 4]) -> (u8, i64, i64) {
     let reached = steps.iter().filter(|s| units >= **s).count();
     let floor = if reached == 0 { 0 } else { steps[reached - 1] };
@@ -69,12 +66,14 @@ pub fn estimate(lang: &str, known: &[(String, String)], lemmatizer: Option<&Lemm
     let forms = known.len() as i64;
     let (units, unit, exact, steps) = match lang {
         "ja" => {
-            let mut kanji: Vec<char> = known.iter().flat_map(|(w, _)| w.chars()).filter(|c| is_han(*c)).collect();
+            let mut kanji: Vec<char> = known.iter().flat_map(|(w, _)| w.chars()).filter(|c| crate::text::is_han(*c)).collect();
             kanji.sort_unstable();
             kanji.dedup();
             (kanji.len() as i64, "kanji", true, &KANJI)
         }
         "vi" => (forms, "syllables", true, &SYLLABLES),
+        // repères du HSK 3.0 : 1 272 mots au niveau 2, 2 245 au 3, 4 316 au 5
+        "zh" => (forms, "lemmas", true, &LEMMAS),
         _ => match lemmatizer {
             Some(lem) => {
                 // lemme → au moins une de ses formes est connue du dictionnaire
@@ -126,6 +125,8 @@ mod tests {
         let e = estimate("ru", &many, None);
         assert_eq!((e.units, e.level, e.exact), (1500, 2, false));
         // japonais : les kanji distincts
+        let e = estimate("zh", &words(&["我们", "学生", "的"]), None);
+        assert_eq!((e.units, e.unit.as_str(), e.exact), (3, "lemmas", true));
         let e = estimate("ja", &words(&["日", "本", "日", "の", "カメラ"]), None);
         assert_eq!((e.units, e.unit.as_str()), (2, "kanji"));
     }

@@ -5,7 +5,7 @@ import { Segmented } from "../../components/ui";
 import { api, errorText, isNoModel, isTauri } from "../../lib/api";
 import { confirmAsk } from "../../lib/dialogs";
 import { t } from "../../lib/i18n";
-import { stopPronunciation } from "../../lib/pronounce";
+import { naturalVoiceSpeaks, stopPronunciation } from "../../lib/pronounce";
 import { playbackRates } from "../../lib/reading";
 import { formatDuration, useApp } from "../../lib/store";
 import { RUN_ON_WORDS, longestRun, type PageRange } from "../../lib/tokenize";
@@ -774,7 +774,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
               <span className="dot busy" /> {punctuate ? t(`Ponctuation ${Math.round(resync)} %`, `Punctuating ${Math.round(resync)}%`) : t(`Calage ${Math.round(resync)} %`, `Aligning ${Math.round(resync)}%`)}
             </span>
           ))}
-        {(!hasMedia || lesson.media_path?.includes(".voice.")) && <MakeAudio lesson={lesson} again={hasMedia} onVoiced={onVoiced} />}
+        {(!hasMedia || lesson.media_path?.includes(".voice.")) && naturalVoiceSpeaks(lesson.lang) && <MakeAudio lesson={lesson} again={hasMedia} onVoiced={onVoiced} />}
         {!hasMedia && <span className="player-label">{voiceName ? t(`Voix : ${voiceName}`, `Voice: ${voiceName}`) : ttsAvailable() ? t("Voix du système", "System voice") : t("Synthèse vocale indisponible", "Speech synthesis unavailable")}</span>}
       </div>
     </>

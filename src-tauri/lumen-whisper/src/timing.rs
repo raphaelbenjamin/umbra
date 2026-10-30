@@ -239,6 +239,48 @@ pub struct Tok {
     pub t_dtw: i64,
 }
 
+/// Consigne donnée à Whisper avant d'écouter : en chinois, sans elle, il écrit tantôt
+/// en caractères simplifiés, tantôt en traditionnels (le texte des leçons, le
+/// dictionnaire de jieba et Qwen3-ASR sont en simplifiés). Miroir dans whisper/shim.cpp.
+pub fn initial_prompt(lang: &str) -> Option<&'static str> {
+    (lang == "zh").then_some("以下是普通话的句子。")
+}
+
+/// Écriture sans espaces entre les mots : idéogrammes, kana, ponctuation pleine chasse.
+fn cjk(c: char) -> bool {
+    matches!(c, '\u{3000}'..='\u{30ff}' | '\u{3400}'..='\u{4dbf}' | '\u{4e00}'..='\u{9fff}' | '\u{f900}'..='\u{faff}' | '\u{ff00}'..='\u{ffef}' | '\u{20000}'..='\u{2ebef}')
+}
+
+/// Premier caractère d'un fragment, s'il est entier.
+fn first_char(bytes: &[u8]) -> Option<char> {
+    let len = match bytes.first()? {
+        b if *b < 0x80 => 1,
+        b if *b >= 0xf0 => 4,
+        b if *b >= 0xe0 => 3,
+        b if *b >= 0xc0 => 2,
+        _ => return None,
+    };
+    std::str::from_utf8(bytes.get(..len)?).ok()?.chars().next()
+}
+
+/// Un fragment ouvre un nouveau mot : il commence par une espace ; ou bien, en japonais
+/// et en chinois, qui n'en ont pas, quand le mot en cours est complet et que l'un ou
+/// l'autre est un caractère de ces écritures (chaque fragment garde ainsi son instant,
+/// au lieu d'un seul pour toute la phrase).
+fn opens_word(cur: &[u8], tok: &[u8]) -> bool {
+    if tok.first() == Some(&b' ') {
+        return true;
+    }
+    let Ok(done) = std::str::from_utf8(cur) else { return false };
+    let Some(&lead) = tok.first() else { return false };
+    if (0x80..0xc0).contains(&lead) {
+        return false; // suite d'un caractère commencé dans le fragment précédent
+    }
+    // un idéogramme coupé entre deux fragments : son premier octet le dit (U+3000 à U+9FFF)
+    let next_cjk = first_char(tok).map_or((0xe3..=0xe9).contains(&lead), cjk);
+    next_cjk || done.chars().last().is_some_and(cjk)
+}
+
 /// Mots reconstitués à partir des fragments de chaque segment (un mot commence par
 /// une espace) ; les octets sont assemblés avant décodage, pour le cyrillique notamment.
 /// `eot` : premier jeton spécial (horodatages, fin de texte), écarté.
@@ -265,7 +307,7 @@ pub fn assemble(segments: &[Vec<Tok>], eot: i32, use_dtw: bool) -> Vec<Word> {
                 continue;
             }
             let legacy = tok.t0 as f64 / 100.0;
-            if tok.bytes.first() == Some(&b' ') || cur.is_none() {
+            if cur.as_ref().map_or(true, |(b, _)| opens_word(b, &tok.bytes)) {
                 flush(&mut cur, &mut words, prev_end);
                 let start = if use_dtw { prev_end.unwrap_or(legacy) } else { legacy };
                 cur = Some((tok.bytes.clone(), start.max(0.0)));
@@ -279,4 +321,29 @@ pub fn assemble(segments: &[Vec<Tok>], eot: i32, use_dtw: bool) -> Vec<Word> {
         flush(&mut cur, &mut words, prev_end);
     }
     words
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tok(s: &[u8], t_dtw: i64) -> Tok {
+        Tok { id: 1, bytes: s.to_vec(), t0: 0, t_dtw }
+    }
+
+    #[test]
+    fn words_from_fragments() {
+        // latin : un mot commence par une espace, ses fragments le complètent
+        let w = assemble(&[vec![tok(b" Buon", 40), tok(b"gior", 60), tok(b"no", 80), tok(b" a", 90)]], 1000, true);
+        assert_eq!(w.iter().map(|x| x.w.trim()).collect::<Vec<_>>(), ["Buongiorno", "a"]);
+        // chinois : chaque fragment est un mot, avec son instant ; un caractère coupé en
+        // deux fragments reste entier
+        let wo = "我们".as_bytes();
+        let sheng = "生".as_bytes();
+        let w = assemble(&[vec![tok(wo, 30), tok("是".as_bytes(), 50), tok(&sheng[..1], 60), tok(&sheng[1..], 70), tok("。".as_bytes(), 72)]], 1000, true);
+        assert_eq!(w.iter().map(|x| x.w.as_str()).collect::<Vec<_>>(), ["我们", "是", "生", "。"]);
+        assert_eq!((w[1].t0, w[1].t1), (0.3, 0.5));
+        assert_eq!(initial_prompt("zh"), Some("以下是普通话的句子。"));
+        assert_eq!(initial_prompt("ja"), None);
+    }
 }

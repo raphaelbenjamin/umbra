@@ -1948,6 +1948,33 @@
 .link-list {
   max-height: 260px;
 }
+/* longue liste (podcast de milliers d'épisodes) : plus haute, avec sa recherche */
+.link-list.tall {
+  max-height: 340px;
+}
+.link-list-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -6px;
+}
+.link-list-tools .search {
+  flex: 1;
+  width: auto;
+}
+.link-list-tools .btn {
+  flex: none;
+  gap: 6px;
+}
+.link-list-empty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: 13px;
+}
+.link-list-more {
+  align-self: center;
+  margin: 6px 0 4px;
+}
 .link-item-title {
   flex: 1;
   min-width: 0;

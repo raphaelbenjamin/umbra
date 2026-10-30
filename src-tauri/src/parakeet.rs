@@ -179,7 +179,7 @@ mod tests {
     fn languages() {
         assert!(knows("it") && knows("uk") && knows("hr"));
         // celles que Parakeet ne connaît pas, ou où Whisper fait mieux, restent à Qwen3-ASR et à Whisper
-        for l in ["tr", "ar", "hi", "id", "vi", "ko", "ja", "el", "fi", "sv"] {
+        for l in ["tr", "ar", "hi", "id", "vi", "ko", "ja", "zh", "el", "fi", "sv"] {
             assert!(!knows(l) && !before_qwen(l), "{l}");
         }
         // Parakeet ne passe avant Qwen3-ASR que là où il le connaît

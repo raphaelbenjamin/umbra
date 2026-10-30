@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "lumen"
-version = "1.3.0"
+version = "1.4.0"
 description = "Lumen : apprendre les langues en lisant et en écoutant"
 authors = ["Ulysse Rives"]
 license = "GPL-3.0-or-later"
@@ -34,6 +34,8 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["fs", "io-util", "process", "rt-multi-thread", "macros", "sync", "time"] }
 unicode-segmentation = "1"
 unicode-normalization = "0.1"
+# chinois : découpage en mots (dictionnaire de jieba, licence MIT, compressé dans l'app)
+jieba-rs = "0.11"
 sha2 = "0.11"
 hex = "0.4"
 anyhow = "1"
@@ -117,5 +119,11 @@ lto = "thin"
 opt-level = 3
 strip = true
 
+# Compilation de test plus légère sur le disque : numéros de ligne seulement pour Lumen
+# (les erreurs disent toujours où), rien pour les dépendances (llama.cpp en pesait 250 Mo par copie)
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 opt-level = 2
+debug = false

@@ -5,6 +5,7 @@ import { useChat } from "../lib/chat";
 import { useDictStatus } from "../lib/dicts";
 import { useDiscoverNews } from "../lib/discover";
 import { LANGS, langInfo } from "../lib/langs";
+import { naturalVoiceSpeaks } from "../lib/pronounce";
 import { useApp, type View } from "../lib/store";
 import { useOnline } from "../lib/online";
 import type { LangCode, LessonSummary } from "../lib/types";
@@ -259,14 +260,21 @@ export function Sidebar() {
                 : t(`${asr.name.replace("Large v3 ", "")} · prêt`, `${asr.name.replace("Large v3 ", "")} · ready`)
               : t("Transcription : à installer", "Transcription: to install")}
           </span>
-          <span className="ai-row">
-            <span className={`dot ${voice?.installed ? "ok" : voice && downloads[voice.id] ? "busy" : ""}`} />
-            {voice?.installed
-              ? t("Voix naturelle · prête", "Natural voice · ready")
-              : voice && downloads[voice.id]
-                ? t("Voix : téléchargement…", "Voice: downloading…")
-                : t("Voix naturelle : à installer", "Natural voice: to install")}
-          </span>
+          {naturalVoiceSpeaks(lang) ? (
+            <span className="ai-row">
+              <span className={`dot ${voice?.installed ? "ok" : voice && downloads[voice.id] ? "busy" : ""}`} />
+              {voice?.installed
+                ? t("Voix naturelle · prête", "Natural voice · ready")
+                : voice && downloads[voice.id]
+                  ? t("Voix : téléchargement…", "Voice: downloading…")
+                  : t("Voix naturelle : à installer", "Natural voice: to install")}
+            </span>
+          ) : (
+            <span className="ai-row">
+              <span className="dot ok" />
+              {t("Voix du système", "System voice")}
+            </span>
+          )}
           {dict?.exists !== false && (
             <span className="ai-row">
               <span className={`dot ${!dict || dict.ready ? "ok" : dict.downloading ? "busy" : ""}`} />

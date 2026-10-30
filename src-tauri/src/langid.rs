@@ -108,8 +108,8 @@ pub fn guess(text: &str) -> Option<&'static str> {
         return Some("hi");
     }
     if share(han) > 0.3 {
-        // chinois : aucune langue de Lumen
-        return None;
+        // des idéogrammes sans kana : du chinois
+        return Some("zh");
     }
     let cyrillic = share(cyr) > 0.4;
     if !cyrillic && share(latin) < 0.4 {
@@ -170,6 +170,8 @@ mod tests {
         assert_eq!(guess("Як приготувати борщ удома: рецепт, який завжди виходить і дуже смачний"), Some("uk"));
         assert_eq!(guess("Cách nấu phở bò ngon tại nhà cho cả gia đình"), Some("vi"));
         assert_eq!(guess("ラーメンの作り方を説明します"), Some("ja"));
+        assert_eq!(guess("今天我们来学习怎么做饺子"), Some("zh"));
+        assert_eq!(guess("今天我們來學習怎麼做餃子"), Some("zh"));
         assert_eq!(guess("집에서 김치찌개 만드는 방법을 알려드립니다"), Some("ko"));
         assert_eq!(guess("Πώς να φτιάξετε μουσακά στο σπίτι"), Some("el"));
         // trop court pour trancher

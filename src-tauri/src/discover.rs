@@ -504,6 +504,25 @@ pub static SOURCES: &[Source] = &[
     art("ja-bbc", "ja", "BBC News Japan", "https://feeds.bbci.co.uk/japanese/rss.xml", C1, C1, News),
     yt("ja-easy", "ja", "Easy Japanese", "UCBet5Paucgz8feYQhVd0Y3A", B1, B2, Learn),
     pod("ja-news-easy", "ja", "News In Easy Japanese", "https://feeds.castos.com/241n8", A2, B1, News),
+    // ----- chinois -----
+    yt("zh-corner", "zh", "Mandarin Corner", "UC3B-DH5W60TfVs1AKw_P1kw", A2, B2, Learn),
+    yt("zh-easy", "zh", "Easy Mandarin", "UCw837dYLZNGdhk5G5zjySIg", B1, B2, Learn),
+    yt("zh-dashu", "zh", "Dashu Mandarin 大叔中文", "UCfsNycNoClXZA1FuUJSGT0w", A2, B1, Learn),
+    yt("zh-bean", "zh", "MandarinBean", "UCDGT00hxfI15N4-p_gHgtNg", A1, B1, Learn),
+    yt("zh-zero", "zh", "Chinese Zero to Hero", "UCQ3IlLg5VGeydxtswBoyt6A", A1, B1, Learn).via("en"),
+    pod("zh-stories", "zh", "Learning Chinese through Stories", "https://feeds.libsyn.com/130982/rss", A2, B2, Learn),
+    pod("zh-lazy", "zh", "Lazy Chinese", "https://anchor.fm/s/843fa4ec/podcast/rss", A1, B1, Learn),
+    pod("zh-around", "zh", "Chinese Around You", "https://feeds.redcircle.com/3b2e32f8-b4a2-4572-b48b-206b50742899", A1, B1, Learn),
+    pod("zh-teatime", "zh", "TeaTime Chinese 茶歇中文", "https://feeds.libsyn.com/330782", B1, B2, Learn),
+    pod("zh-haike", "zh", "還可中文 Haike Mandarin", "https://anchor.fm/s/5caa7664/podcast/rss", B1, B2, Learn),
+    pod("zh-news-easy", "zh", "News In Easy Chinese", "https://feeds.castos.com/ozrmk", A2, B1, News),
+    pod("zh-easy-news", "zh", "Easy Mandarin News", "https://rss.buzzsprout.com/2509414.rss", A2, B1, News),
+    yt("zh-bbc", "zh", "BBC News 中文", "UCb3TZ4SD_Ys3j4z0-8o6auA", C1, C1, News),
+    art("zh-bbc-art", "zh", "BBC News 中文", "https://feeds.bbci.co.uk/zhongwen/simp/rss.xml", C1, C1, News),
+    art("zh-dw", "zh", "DW 中文", "https://rss.dw.com/rdf/rss-chi-all", C1, C1, News),
+    art("zh-rfi", "zh", "RFI 华语", "https://www.rfi.fr/cn/rss", C1, C1, News),
+    yt("zh-dw-yt", "zh", "DW 中文", "UC99XkAM3Y82ONvdpwUYmOZg", C1, C1, News),
+    yt("zh-lin", "zh", "小Lin说", "UCilwQlk62k1z7aUEZPOB6yw", C1, C1, Culture),
     // ----- musique : classements de YouTube Music Charts (pays où ils existent) -----
     chart("en-chart-us", "en", "Top 100 · États-Unis", "PL4fGSI1pDJn6O1LS0XSdF3RyO0Rq_LDeI"),
     chart("en-chart-uk", "en", "Top 100 · Royaume-Uni", "PL4fGSI1pDJn6_f5P3MnzXg9l3GDfnSlXa"),
@@ -533,6 +552,7 @@ pub static SOURCES: &[Source] = &[
     chart("vi-chart", "vi", "Top 100 · Viêt Nam", "PL4fGSI1pDJn4bRKr6tjRWaGlqRg_zY_is"),
     chart("ko-chart", "ko", "Top 100 · Corée du Sud", "PL4fGSI1pDJn5S09aId3dUGp40ygUqmPGc"),
     chart("ja-chart", "ja", "Top 100 · Japon", "PL4fGSI1pDJn4-UIb6RKHdxam-oAUULIGB"),
+    chart("zh-chart", "zh", "Top 100 · Taïwan", "PL4fGSI1pDJn68Qgd3kW_hKrqMhxAHz62W"),
 ];
 
 /// Les sources d'une langue pour un apprenant dont l'interface est en `ui`.
@@ -637,6 +657,9 @@ pub(crate) fn title_levels(title: &str) -> Option<(u8, u8)> {
     if let (Some(&lo), Some(&hi)) = (cefr.iter().min(), cefr.iter().max()) {
         return Some((lo, hi));
     }
+    if let Some(levels) = hsk_levels(&low) {
+        return Some(levels);
+    }
     let has = |words: &[&str]| words.iter().any(|w| low.contains(w));
     let mut said: Vec<(u8, u8)> = Vec::new();
     if has(ABSOLUTE) {
@@ -654,6 +677,30 @@ pub(crate) fn title_levels(title: &str) -> Option<(u8, u8)> {
         said.push((A2, B1));
     }
     said.into_iter().reduce(|(a, b), (x, y)| (a.min(x), b.max(y)))
+}
+
+/// Niveaux de l'examen de chinois écrits dans un titre (« HSK 3 », « HSK1-2 »), rapportés
+/// au CECR comme le fait le HSK 3.0 : 1 et 2 pour A1 et A2, 3 et 4 pour B1, 5 et 6 pour
+/// B2, au-delà C1.
+fn hsk_levels(low: &str) -> Option<(u8, u8)> {
+    let rest = &low[low.find("hsk")? + 3..];
+    let number = |s: &str| -> Option<(u8, usize)> {
+        let t = s.trim_start_matches([' ', '.']);
+        let t = t.strip_prefix("level").unwrap_or(t).trim_start();
+        let n: String = t.chars().take_while(char::is_ascii_digit).collect();
+        Some((n.parse().ok().filter(|n| (1..=9).contains(n))?, s.len() - t.len() + n.len()))
+    };
+    let (a, used) = number(rest)?;
+    let after = rest[used..].trim_start();
+    let b = after.strip_prefix(['-', '~', '/']).or_else(|| after.strip_prefix('–')).and_then(number).map_or(a, |(b, _)| b.max(a));
+    let cefr = |n: u8| match n {
+        1 => A1,
+        2 => A2,
+        3 | 4 => B1,
+        5 | 6 => B2,
+        _ => C1,
+    };
+    Some((cefr(a), cefr(b)))
 }
 
 /// « Grammar for Your Level – level 2 » (News in Levels : 1 à 3).
@@ -1726,6 +1773,13 @@ mod tests {
         assert_eq!(grade(german, "Why Germans Love Coffee and Cake (Slow German Conversation)"), (A2, B1));
         // « B2B », « A320 » ne sont pas des niveaux
         assert_eq!(title_levels("B2B sales and the A320"), None);
+        // chinois : les niveaux du HSK
+        assert_eq!(title_levels("颜色和心情 | Intermediate Chinese Reading (HSK 3) | Learn Chinese through News"), Some((B1, B1)));
+        assert_eq!(title_levels("爸爸多少岁？ | Elementary Chinese Reading (HSK 2)"), Some((A2, A2)));
+        assert_eq!(title_levels("HSK 4 第13课 语法4.13.1 大概，也许"), Some((B1, B1)));
+        assert_eq!(title_levels("Chinese Stories HSK1-2"), Some((A1, A2)));
+        assert_eq!(title_levels("Free New HSK Level 1 Lesson 5"), Some((A1, A1)));
+        assert_eq!(title_levels("HSK lessons for everyone"), None);
         // actualités : la source seule, quels que soient les mots du titre
         let bbc = source("en-bbc-art").unwrap();
         assert_eq!(grade(bbc, "Beginner's luck for the advanced economies"), (C1, C1));

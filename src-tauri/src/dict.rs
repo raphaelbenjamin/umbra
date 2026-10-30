@@ -49,6 +49,9 @@ const REMOTE: &[Remote] = &[
     Remote { native: "en", tag: "dictionaries-en-1", version: "1", prefixed: false, langs: &["it", "es", "de", "pt", "ru", "fr"] },
     Remote { native: "en", tag: "dictionaries-2", version: "2", prefixed: true, langs: V2_LANGS },
     Remote { native: "fr", tag: "dictionaries-2", version: "2", prefixed: true, langs: V2_LANGS },
+    // chinois : CC-CEDICT (anglais) et CFDICT (français), pinyin compris
+    Remote { native: "en", tag: "dictionaries-zh-1", version: "1", prefixed: true, langs: &["zh"] },
+    Remote { native: "fr", tag: "dictionaries-zh-1", version: "1", prefixed: true, langs: &["zh"] },
 ];
 const RELEASES: &str = "https://github.com/LivingTwice/lumen/releases/download";
 
@@ -332,6 +335,9 @@ impl Dicts {
                 }
             }
             let mut own = d.find_with_variants(native, lang, surface)?;
+            if lang == "zh" && d.v2 && !own.found() && surface.chars().count() > 1 {
+                own.entries = d.parts_zh(surface)?;
+            }
             if lang == "ja" && d.v2 && surface.chars().count() == 1 {
                 // sens et lectures du kanji, juste après le premier mot
                 let kanji = d.entries(&d.key(surface, lang), true)?;
@@ -384,6 +390,27 @@ impl Dict {
             e.retain(|x| x.pos != "Kanji");
         }
         Ok(e)
+    }
+
+    /// Chinois : un mot que le dictionnaire n'a pas (jieba en connaît davantage : « 我们的 »,
+    /// « 这个人 ») se lit par ses parties, la plus longue d'abord, de gauche à droite.
+    fn parts_zh(&self, word: &str) -> Result<Vec<DictEntry>> {
+        let chars: Vec<char> = word.chars().collect();
+        let mut out: Vec<DictEntry> = Vec::new();
+        let mut i = 0;
+        while i < chars.len() && out.len() < 4 {
+            let mut step = 1;
+            for n in (1..=(chars.len() - i).min(8)).rev() {
+                let piece: String = chars[i..i + n].iter().collect();
+                if let Some(e) = self.entries(&self.key(&piece, "zh"), false)?.into_iter().next() {
+                    out.push(e);
+                    step = n;
+                    break;
+                }
+            }
+            i += step;
+        }
+        Ok(out)
     }
 
     /// Formes de base d'une forme fléchie, avec leur description.
@@ -1162,6 +1189,7 @@ mod tests {
             "pt" => "farol",
             "hu" => "házak",
             "ja" => "家",
+            "zh" => "学校",
             _ => "a",
         };
         let r = d.lookup_in(native, lang, word).unwrap();
@@ -1177,7 +1205,11 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
         for (native, lang) in names {
             let r = remote(native, lang).unwrap();
-            let dir = if r.version == "1" { "resources/dicts-en" } else { "resources/dicts-v2" };
+            let dir = match r.tag {
+                "dictionaries-en-1" => "resources/dicts-en",
+                "dictionaries-zh-1" => "resources/dicts-zh",
+                _ => "resources/dicts-v2",
+            };
             let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(dir).join(r.file(lang));
             if !src.exists() {
                 let _ = std::fs::remove_dir_all(&tmp);
@@ -1206,6 +1238,28 @@ mod tests {
         assert!(!r.form_note.as_deref().unwrap_or("").contains("čit"), "{r:?}");
         let r = d.lookup_in("en", "fr", "phare").unwrap();
         assert!(r.entries.iter().any(|e| e.glosses.iter().any(|g| g.contains("lighthouse"))));
+        let _ = std::fs::remove_dir_all(tmp);
+    }
+
+    /// Chinois : CC-CEDICT et CFDICT (tools/build_dicts.py --zh), pinyin à tons.
+    #[test]
+    fn lookup_chinese_dictionaries() {
+        let Some((d, tmp)) = built("zh", &[("fr", "zh"), ("en", "zh")]) else { return };
+        let r = d.lookup_in("fr", "zh", "学校").unwrap();
+        assert_eq!((r.entries[0].ipa.as_str(), r.entries[0].glosses[0].as_str()), ("xuéxiào", "école"), "{r:?}");
+        // graphie traditionnelle, classificateur à part
+        let r = d.lookup_in("en", "zh", "學校").unwrap();
+        assert_eq!(r.entries[0].glosses[0], "school");
+        assert!(r.entries[0].pos.contains("所"), "{r:?}");
+        // lecture la plus courante d'abord
+        let r = d.lookup_in("en", "zh", "了").unwrap();
+        assert_eq!(r.entries[0].ipa, "le", "{r:?}");
+        let r = d.lookup_in("en", "zh", "行").unwrap();
+        assert_eq!(r.entries[0].ipa, "xíng", "{r:?}");
+        // un mot de jieba absent du dictionnaire : ses parties
+        let r = d.lookup_in("fr", "zh", "我们的").unwrap();
+        let parts: Vec<&str> = r.entries.iter().map(|e| e.word.as_str()).collect();
+        assert_eq!(parts, ["我们", "的"], "{r:?}");
         let _ = std::fs::remove_dir_all(tmp);
     }
 

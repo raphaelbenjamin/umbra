@@ -24,6 +24,13 @@ Sources, dans un dossier hors iCloud (≈ 4 Go, puis ≈ 13 Go une fois découp�
   python3 tools/build_dicts.py --ud <sources>            (corpus Universal Dependencies : ud/)
   python3 tools/build_dicts.py --v2 <sources> <sortie> [fr-hu en-ja …]
 orjson (pip install orjson) accélère beaucoup la lecture, sans être indispensable.
+
+Chinois (version `dictionaries-zh-1`, fichiers en-zh.db.gz et fr-zh.db.gz) : CC-CEDICT
+(définitions anglaises, CC BY-SA 4.0) et CFDICT (définitions françaises, CC BY-SA 3.0),
+même format, pinyin compris :
+  curl -LO https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz
+  curl -LO https://chine.in/assets/cfdict/cfdict.u8
+  python3 tools/build_dicts.py --zh cedict_1_0_ts_utf-8_mdbg.txt.gz cfdict.u8 src-tauri/resources/dicts-zh
 """
 import gzip, json, os, re, shutil, sqlite3, sys, unicodedata
 from collections import defaultdict
@@ -1105,7 +1112,122 @@ def build_ja(src, native, dst):
     write_ja(dst, native, senses_rows, keys,
              "JMdict, KANJIDIC2 (EDRDG, CC BY-SA 4.0)" + (", Wiktionnaire via kaikki.org (CC BY-SA 4.0)" if native == "fr" else ""))
 
-def write_ja(dst, native, senses_rows, keys, source):
+# ---------- chinois : CC-CEDICT et CFDICT ----------
+
+TONES_ZH = {"a": "āáǎà", "e": "ēéěè", "i": "īíǐì", "o": "ōóǒò", "u": "ūúǔù", "ü": "ǖǘǚǜ"}
+# lecture la plus courante des caractères qui en ont plusieurs (rangée en premier)
+ZH_USUAL = {
+    "了": "le5", "的": "de5", "得": "de5", "地": "de5", "着": "zhe5", "过": "guo4", "個": "ge4", "个": "ge4",
+    "么": "me5", "吗": "ma5", "呢": "ne5", "吧": "ba5", "啊": "a5", "都": "dou1", "还": "hai2", "還": "hai2",
+    "行": "xing2", "长": "chang2", "長": "chang2", "好": "hao3", "为": "wei4", "為": "wei4", "和": "he2",
+    "只": "zhi3", "会": "hui4", "會": "hui4", "要": "yao4", "便": "bian4", "重": "zhong4", "种": "zhong3",
+    "種": "zhong3", "少": "shao3", "相": "xiang1", "乐": "le4", "樂": "le4", "发": "fa1", "發": "fa1",
+    "觉": "jue2", "覺": "jue2", "角": "jiao3", "难": "nan2", "難": "nan2", "教": "jiao4", "数": "shu4",
+    "數": "shu4", "调": "diao4", "調": "diao4", "量": "liang4", "空": "kong1", "背": "bei4", "差": "cha4",
+    "处": "chu4", "處": "chu4", "当": "dang1", "當": "dang1", "倒": "dao4", "分": "fen1", "干": "gan4",
+    "幹": "gan4", "将": "jiang1", "將": "jiang1", "结": "jie2", "結": "jie2", "累": "lei4", "朝": "chao2",
+    "传": "chuan2", "傳": "chuan2", "大": "da4", "正": "zheng4", "中": "zhong1", "转": "zhuan3", "轉": "zhuan3",
+    "作": "zuo4", "看": "kan4", "没": "mei2", "沒": "mei2", "一": "yi1", "不": "bu4", "那": "na4", "哪": "na3",
+    "说": "shuo1", "說": "shuo1", "谁": "shei2", "誰": "shei2", "给": "gei3", "給": "gei3", "似": "si4",
+    "系": "xi4", "校": "xiao4", "熟": "shu2", "落": "luo4", "色": "se4", "片": "pian4", "应": "ying1",
+    "應": "ying1", "曾": "ceng2", "省": "sheng3", "参": "can1", "參": "can1", "降": "jiang4", "场": "chang3",
+    "場": "chang3", "期": "qi1", "区": "qu1", "區": "qu1", "冲": "chong1", "衝": "chong1", "内": "nei4",
+    "供": "gong1", "奇": "qi2", "藏": "cang2", "卡": "ka3", "露": "lu4", "盛": "sheng4", "血": "xue4",
+    "薄": "bao2", "似": "si4", "家": "jia1", "子": "zi3", "里": "li3", "裡": "li3", "上": "shang4", "下": "xia4",
+}
+# sens qui ne font que renvoyer ailleurs : rangés après les autres
+ZH_WEAK = re.compile(r"^(?:old |archaic |unofficial |erroneous |Japanese |Korean |\(old\) |\(archaic\) )?(?:variant|variante|surname|nom de famille|used in|utilisé dans|see |voir |abbr\. for|abr\. de)", re.I)
+
+def zh_syllable(s):
+    """« xue2 » -> « xué », « lu:4 » -> « lǜ » ; ce qui n'est pas du pinyin reste tel quel."""
+    m = re.fullmatch(r"([A-Za-zü:]+)([1-5])", s)
+    if not m:
+        return s
+    base, tone = m.group(1).replace("u:", "ü").replace("U:", "Ü"), int(m.group(2))
+    low = base.lower()
+    if tone == 5:
+        return base
+    if "a" in low:
+        i = low.index("a")
+    elif "e" in low:
+        i = low.index("e")
+    elif "ou" in low:
+        i = low.index("o")
+    else:
+        i = max(low.rfind(v) for v in "iouü")
+    if i < 0:
+        return base  # « m2 », « ng4 » : sans voyelle
+    mark = TONES_ZH[low[i]][tone - 1]
+    return base[:i] + (mark.upper() if base[i].isupper() else mark) + base[i + 1:]
+
+def zh_pinyin(numbered):
+    """Pinyin à tons : un mot de trois syllabes au plus s'écrit d'un seul tenant (« xuéxiào »,
+    « Xī'ān »), au-delà syllabe par syllabe (« yī xīn yī yì »)."""
+    parts = [p for p in numbered.replace(",", " , ").split() if p]
+    sylls = [zh_syllable(p) for p in parts]
+    pinyin = [re.fullmatch(r"[A-Za-zü:]+[1-5]", p) is not None for p in parts]
+    if len(parts) > 3 or not all(pinyin):
+        return " ".join(sylls).replace(" , ", ", ")
+    out = sylls[0] if sylls else ""
+    for x in sylls[1:]:
+        # nom propre composé (« Xī'ān Shì ») : une espace avant chaque partie en majuscule
+        out += (" " if x[:1].isupper() else "'" if x[:1].lower() in "aāáǎàeēéěèoōóǒò" else "") + x
+    return out
+
+def zh_refs(g, simp):
+    """Renvois « 個|个[ge4] » et « 得[de2] » : la graphie de la ligne, et son pinyin."""
+    pick = lambda m: m.group(2) if simp else m.group(1)
+    g = re.sub(r"([^\s\[\]/|,;()]+)\|([^\s\[\]/|,;()]+)\[([^\]]+)\]", lambda m: f"{pick(m)} ({zh_pinyin(m.group(3))})", g)
+    g = re.sub(r"([^\s\[\]/|,;()]+)\[([^\]]+)\]", lambda m: f"{m.group(1)} ({zh_pinyin(m.group(2))})", g)
+    return re.sub(r"([^\s\[\]/|,;()]+)\|([^\s\[\]/|,;()]+)", pick, g)
+
+def cedict(path):
+    """(traditionnel, simplifié, pinyin numéroté, [sens]) de chaque ligne."""
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^(\S+) (\S+) \[([^\]]*)\] /(.*)/\s*$", line)
+            if m and not line.startswith("#"):
+                yield m.group(1), m.group(2), m.group(3), [g for g in m.group(4).split("/") if g.strip()]
+
+def zh_entry(glosses, simp, native):
+    """Sens nettoyés (au plus MAX_GLOSS + 1), et les classificateurs à part."""
+    lines, measure = [], ""
+    for g in glosses:
+        g = zh_refs(g.strip(), simp)
+        if g.startswith("CL:"):
+            measure = re.sub(r",\s*", ", ", g[3:].strip())
+            continue
+        g = re.sub(r"^\((?:bound form|forme liée)\) ", "", g)
+        g = clean_gloss(g)
+        if g and g not in lines:
+            lines.append(g)
+    pos = ""
+    if measure:
+        pos = ("classificateur : " if native == "fr" else "measure word: ") + measure
+    return lines[:MAX_GLOSS + 1], pos
+
+def build_zh(path, native, dst, source):
+    senses_rows, keys = [], []
+    for trad, simp, numbered, glosses in cedict(path):
+        if not glosses or numbered.strip() == "":
+            continue
+        pinyin = zh_pinyin(numbered)
+        proper = numbered[:1].isupper()
+        weak = all(ZH_WEAK.search(g.strip()) for g in glosses)
+        usual = ZH_USUAL.get(simp) == numbered.lower() or ZH_USUAL.get(trad) == numbered.lower()
+        rank = (2000 if weak else 0) + (1000 if proper else 0) - (500 if usual else 0)
+        for word, is_simp in ((simp, True),) + (((trad, False),) if trad != simp else ()):
+            lines, pos = zh_entry(glosses, is_simp, native)
+            if not lines:
+                continue
+            eid = len(senses_rows) + 1
+            senses_rows.append((eid, word, pinyin, pos, "␞".join(lines)))
+            # à rang égal, l'ordre du dictionnaire ; un sens riche avant un sens maigre
+            keys.append((rank - min(len(glosses), 5), key2(word, "zh"), eid, word, pinyin))
+    write_ja(dst, native, senses_rows, keys, source, lang="zh")
+
+def write_ja(dst, native, senses_rows, keys, source, lang="ja"):
     """Japonais : chaque entrée de JMdict une seule fois (`senses`), retrouvée par chacune de
     ses graphies et lectures (`keys`) ; la vue `entries` a la forme des autres dictionnaires."""
     tmp = dst + ".tmp"
@@ -1135,7 +1257,7 @@ def write_ja(dst, native, senses_rows, keys, source):
             mw, mi = main[eid]
             rows.append((k, len(rows), eid, None if word == mw else word, None if ipa == mi else ipa))
     db.executemany("INSERT INTO keys VALUES(?,?,?,?,?)", rows)
-    db.executemany("INSERT INTO meta VALUES(?,?)", {"format": "2", "lang": "ja", "native": native, "source": source}.items())
+    db.executemany("INSERT INTO meta VALUES(?,?)", {"format": "2", "lang": lang, "native": native, "source": source}.items())
     db.commit()
     db.execute("VACUUM")
     db.close()
@@ -1175,6 +1297,11 @@ def check(path_gz, lang, freq_path, sizes=(1000, 5000, 20000)):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if args[:1] == ["--zh"]:
+        os.makedirs(args[3], exist_ok=True)
+        build_zh(args[1], "en", os.path.join(args[3], "en-zh.db.gz"), "CC-CEDICT (MDBG, CC BY-SA 4.0)")
+        build_zh(args[2], "fr", os.path.join(args[3], "fr-zh.db.gz"), "CFDICT (Chine Informations, chine.in, CC BY-SA 3.0)")
+        sys.exit()
     if args[:1] == ["--split"]:
         split(args[1])
         sys.exit()

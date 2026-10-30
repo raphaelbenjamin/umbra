@@ -191,6 +191,21 @@ const NOISE: &[&str] = &[
 /// Artiste et titre d'un clip YouTube : « Artiste - Titre (Official Video) ».
 /// `channel` : la chaîne, à défaut d'artiste dans le titre.
 pub fn split_title(video_title: &str, channel: &str) -> (String, String) {
+    // à la chinoise ou à la japonaise : « 盧廣仲 Crowd Lu【太陽與地球 Sun & Earth】Official Video »,
+    // « Jess Lee 李佳薇〈strangers 甲乙丙丁〉 », « YOASOBI「アイドル」 » : l'artiste, puis le titre entre crochets
+    for (open, close) in [('【', '】'), ('《', '》'), ('〈', '〉'), ('「', '」'), ('『', '』'), ('[', ']')] {
+        let (Some(i), Some(j)) = (video_title.find(open), video_title.find(close)) else { continue };
+        if i == 0 || j <= i {
+            continue;
+        }
+        let artist = video_title[..i].trim().trim_end_matches(['-', '–', '|']).trim();
+        let title = video_title[i + open.len_utf8()..j].trim();
+        let low = title.to_lowercase();
+        if artist.is_empty() || title.is_empty() || NOISE.iter().any(|n| low.contains(n)) || (open == '[' && !title.chars().any(cjk)) {
+            continue;
+        }
+        return (cjk_part(artist), cjk_part(title));
+    }
     // parenthèses et crochets de décor retirés, les autres gardés (« (Remix) »)
     let mut clean = String::new();
     let mut rest = video_title;
@@ -223,11 +238,27 @@ pub fn split_title(video_title: &str, channel: &str) -> (String, String) {
     for sep in [" - ", " – ", " — ", " | ", " ｜ "] {
         if let Some((a, b)) = clean.split_once(sep) {
             let b = b.split(" | ").next().unwrap_or(b);
-            return (cut_feat(a), cut_feat(b));
+            return (cjk_part(&cut_feat(a)), cjk_part(&cut_feat(b)));
         }
     }
     let artist = channel.trim_end_matches(" - Topic").trim_end_matches("VEVO").trim_end_matches(" OFFICIAL").trim_end_matches(" Official").trim();
     (artist.to_string(), cut_feat(&clean))
+}
+
+/// Idéogramme ou kana.
+fn cjk(c: char) -> bool {
+    crate::text::is_han(c) || matches!(c, '\u{3040}'..='\u{30ff}')
+}
+
+/// Un nom écrit dans deux écritures (« 盧廣仲 Crowd Lu », « 太陽與地球 Sun & Earth ») : la
+/// partie en caractères chinois ou japonais, celle des paroles ; sinon le nom tel quel.
+fn cjk_part(s: &str) -> String {
+    let own: Vec<&str> = s.split_whitespace().filter(|w| w.chars().any(cjk)).collect();
+    if own.is_empty() {
+        s.to_string()
+    } else {
+        own.join(" ")
+    }
 }
 
 #[cfg(test)]
@@ -273,6 +304,15 @@ mod tests {
         assert_eq!(split_title("Aurora, Lumi - Il mare [Official Music Video] 🌊", "x"), ("Aurora, Lumi".into(), "Il mare".into()));
         assert_eq!(split_title("La notte (Remix)", "Lumi - Topic"), ("Lumi".into(), "La notte (Remix)".into()));
         assert_eq!(split_title("La notte", "LumiVEVO"), ("Lumi".into(), "La notte".into()));
+        // titres à la chinoise : l'artiste, le titre entre crochets, la partie en caractères chinois
+        let pair = |a: &str, b: &str| (a.to_string(), b.to_string());
+        assert_eq!(split_title("盧廣仲 Crowd Lu【太陽與地球 Sun & Earth】Official Video", "x"), pair("盧廣仲", "太陽與地球"));
+        assert_eq!(split_title("Jess Lee 李佳薇〈strangers 甲乙丙丁〉Official Lyric Video", "x"), pair("李佳薇", "甲乙丙丁"));
+        assert_eq!(split_title("Cosmos People 宇宙人 [ 沒有人像我一樣 No One Like You ] Official Music Video | 影集", "x"), pair("宇宙人", "沒有人像我一樣"));
+        assert_eq!(split_title("楊丞琳 Rainie Yang - 雨愛", "x"), pair("楊丞琳", "雨愛"));
+        assert_eq!(split_title("A-Lin《幸福在歌唱 Happiness Is Singing》Official Music Video", "x"), pair("A-Lin", "幸福在歌唱"));
+        // un crochet en tête ne donne pas le titre : l'artiste vient de la chaîne
+        assert_eq!(split_title("【Ado】Raven Sky", "Ado").0, "Ado");
     }
 
     /// Recherche réelle dans LRCLIB (n'affiche que des métadonnées, jamais les paroles) :

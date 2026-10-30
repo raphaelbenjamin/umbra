@@ -30,9 +30,17 @@ const PREPARE_MAX_WORDS = 12;
 const pending = new Map<string, Promise<string>>();
 let player: HTMLAudioElement | null = null;
 
-/** La voix naturelle est installée et utilisable. */
-export function naturalVoiceReady(): boolean {
-  return isTauri && useApp.getState().models.some((m) => m.kind === "tts" && m.installed);
+/** Langues que la voix naturelle ne parle pas (miroir de `text::VOICE_LANGS`) : la voix du système les dit. */
+const NO_NATURAL_VOICE = new Set(["zh"]);
+
+/** La voix naturelle parle cette langue. */
+export function naturalVoiceSpeaks(lang: string): boolean {
+  return !NO_NATURAL_VOICE.has(lang);
+}
+
+/** La voix naturelle est installée et utilisable (pour cette langue). */
+export function naturalVoiceReady(lang?: string): boolean {
+  return isTauri && (!lang || naturalVoiceSpeaks(lang)) && useApp.getState().models.some((m) => m.kind === "tts" && m.installed);
 }
 
 function keyOf(lang: LangCode, text: string): string {
@@ -57,7 +65,7 @@ function request(lang: LangCode, text: string, prefetch: boolean): Promise<strin
 
 /** Prépare la prononciation en arrière-plan, pour qu'elle soit immédiate au clic. */
 export function preparePronunciation(text: string, lang: LangCode) {
-  if (!naturalVoiceReady() || text.split(/\s+/).length > PREPARE_MAX_WORDS) return;
+  if (!naturalVoiceReady(lang) || text.split(/\s+/).length > PREPARE_MAX_WORDS) return;
   request(lang, text, true).catch(() => {});
 }
 
@@ -78,7 +86,7 @@ export function stopPronunciation() {
  */
 export async function pronounce(text: string, lang: LangCode, voiceURI?: string, touched = false) {
   const my = ++turn;
-  if (naturalVoiceReady()) {
+  if (naturalVoiceReady(lang)) {
     try {
       let path: string;
       try {

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon, type IconName } from "../components/Icon";
 import { Sheet } from "../components/ui";
 import { api, errorText, isTauri } from "../lib/api";
@@ -820,6 +820,111 @@ export function ImportSheet() {
   );
 }
 
+/** Une liste se dessine par tranches : un podcast quotidien a des milliers d'épisodes. */
+const LIST_BATCH = 150;
+/** À partir de ce nombre d'éléments, la liste se cherche et se trie. */
+const LIST_TOOLS = 12;
+
+/** Sans majuscules ni accents, pour chercher un titre. */
+const fold = (s: string) => s.toLocaleLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+
+/** Les épisodes, vidéos ou morceaux d'une liste, à cocher. */
+function MediaList({ media, picked, onPick }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void }) {
+  const n = media.length;
+  const on = useMemo(() => new Set(picked), [picked]);
+  const dates = media.map((m) => m.date).filter(Boolean);
+  const dated = dates.length >= 2;
+  // d'abord dans l'ordre du flux : du plus récent au plus ancien d'ordinaire, l'inverse pour un feuilleton
+  const [newest, setNewest] = useState(() => !dated || dates[0] >= dates[dates.length - 1]);
+  const [q, setQ] = useState("");
+  const [shown, setShown] = useState(LIST_BATCH);
+  const tools = n >= LIST_TOOLS;
+
+  const order = useMemo(() => {
+    const needle = fold(q.trim());
+    const idx = media.map((_, i) => i).filter((i) => !needle || fold(media[i].title).includes(needle) || media[i].date.includes(needle));
+    if (!dated) return idx;
+    const dir = newest ? -1 : 1;
+    // même date, ou pas de date : l'ordre du flux
+    return idx.sort((a, b) => (media[a].date === media[b].date ? a - b : media[a].date < media[b].date ? -dir : dir));
+  }, [media, q, newest, dated]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  // nouvelle recherche, autre ordre : la liste repart du haut
+  useEffect(() => {
+    setShown(LIST_BATCH);
+    listRef.current?.scrollTo({ top: 0 });
+  }, [q, newest]);
+
+  const allOn = order.length > 0 && order.every((i) => on.has(i));
+  const checkAll = () => {
+    const next = new Set(on);
+    for (const i of order) {
+      if (allOn) next.delete(i);
+      else next.add(i);
+    }
+    onPick([...next].sort((a, b) => a - b));
+  };
+  const toggle = (i: number, yes: boolean) => onPick(yes ? [...picked, i].sort((a, b) => a - b) : picked.filter((x) => x !== i));
+  const rest = order.length - shown;
+
+  return (
+    <>
+      {tools && (
+        <div className="link-list-tools">
+          <label className="search">
+            <Icon name="search" size={15} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder={t(`Chercher parmi ${formatNumber(n)} titres`, `Search ${formatNumber(n)} titles`)}
+              aria-label={t("Chercher un titre", "Search a title")}
+            />
+          </label>
+          {dated && (
+            <button className="btn ghost sm" onClick={() => setNewest(!newest)} title={t("Changer l'ordre", "Change the order")}>
+              <Icon name="clock" size={14} />
+              {newest ? t("Plus récents d'abord", "Newest first") : t("Plus anciens d'abord", "Oldest first")}
+            </button>
+          )}
+        </div>
+      )}
+      <div className="link-list-head">
+        <span className="muted num">
+          {t(`${formatNumber(picked.length)} sur ${formatNumber(n)}`, `${formatNumber(picked.length)} of ${formatNumber(n)}`)}
+          {q.trim() && ` · ${count(order.length, "trouvé", "trouvés", "match", "matches")}`}
+        </span>
+        {order.length > 0 && (
+          <button className="btn ghost sm" onClick={checkAll}>
+            {allOn ? t("Tout décocher", "Uncheck all") : q.trim() ? t("Cocher ceux-ci", "Check these") : t("Tout cocher", "Check all")}
+          </button>
+        )}
+      </div>
+      <div ref={listRef} className={`chapter-list link-list ${tools ? "tall" : ""}`}>
+        {order.slice(0, shown).map((i) => {
+          const m = media[i];
+          return (
+            <label key={`${i}-${m.url}`} className="chapter-item">
+              <input type="checkbox" checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
+              <span className="link-item-title">{m.title || t("Sans titre", "Untitled")}</span>
+              {m.date && <span className="muted num link-item-meta">{shortDate(m.date)}</span>}
+              {m.duration > 0 && <span className="muted num link-item-meta">{formatDuration(m.duration)}</span>}
+            </label>
+          );
+        })}
+        {order.length === 0 && <p className="muted link-list-empty">{t("Aucun titre ne correspond.", "No title matches.")}</p>}
+        {rest > 0 && (
+          <button className="btn ghost sm link-list-more" onClick={() => setShown(shown + LIST_BATCH)}>
+            {t(`Afficher ${Math.min(rest, LIST_BATCH)} de plus`, `Show ${Math.min(rest, LIST_BATCH)} more`)}
+            <span className="muted num">{t(` · encore ${formatNumber(rest)}`, ` · ${formatNumber(rest)} left`)}</span>
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 /** Ce qu'un lien contient, et le choix de ce qu'on en importe. */
 function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: Found): void; asrMissing: React.ReactNode }) {
   const { info, article, choice, picked } = found;
@@ -869,9 +974,6 @@ function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: 
   const title = info.title || article?.title || first.title;
   // le nom du site seulement s'il apporte quelque chose (un podcast porte souvent le nom de son émission)
   const site = info.site && info.site.toLowerCase() !== title.toLowerCase() ? info.site : "";
-  const all = picked.length === n;
-  const toggle = (i: number, on: boolean) =>
-    onChange({ ...found, picked: on ? [...picked, i].sort((a, b) => a - b) : picked.filter((x) => x !== i) });
 
   return (
     <>
@@ -919,26 +1021,7 @@ function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: 
         </div>
       )}
 
-      {info.list && choice !== "article" && (
-        <>
-          <div className="link-list-head">
-            <span className="muted num">{t(`${picked.length} sur ${n}`, `${picked.length} of ${n}`)}</span>
-            <button className="btn ghost sm" onClick={() => onChange({ ...found, picked: all ? [] : info.media.map((_, i) => i) })}>
-              {all ? t("Tout décocher", "Uncheck all") : t("Tout cocher", "Check all")}
-            </button>
-          </div>
-          <div className="chapter-list link-list">
-            {info.media.map((m, i) => (
-              <label key={`${i}-${m.url}`} className="chapter-item">
-                <input type="checkbox" checked={picked.includes(i)} onChange={(e) => toggle(i, e.target.checked)} />
-                <span className="link-item-title">{m.title || t("Sans titre", "Untitled")}</span>
-                {m.date && <span className="muted num link-item-meta">{shortDate(m.date)}</span>}
-                {m.duration > 0 && <span className="muted num link-item-meta">{formatDuration(m.duration)}</span>}
-              </label>
-            ))}
-          </div>
-        </>
-      )}
+      {info.list && choice !== "article" && <MediaList media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
 
       {asrMissing}
     </>

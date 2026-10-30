@@ -2,6 +2,39 @@
   "_lisezmoi": "Nouveautés montrées après chaque mise à jour (components/News.tsx) et notes de publication. Ajouter ce qui change sous la version \"next\" au fil du travail ; « Publier une version » lui donne son numéro et sa date. Icônes : noms de components/Icon.tsx. Actions : \"tour\" (visite guidée), \"guide\", \"settings:<page>\" (profile, general, langs, reading, voice, discover, podcasts, ai, videos, backup, storage, lingq, about), \"import:<onglet>\" (text, link, file, media, podcast), \"view:<vue>\" (library, discover, playlists, chat, vocab, progress).",
   "releases": [
     {
+      "version": "1.4.0",
+      "date": "2026-10-30",
+      "title": { "fr": "Le chinois, et tous les épisodes d'un podcast", "en": "Chinese, and every episode of a podcast" },
+      "items": [
+        {
+          "icon": "globe",
+          "title": { "fr": "Apprenez le chinois", "en": "Learn Chinese" },
+          "body": {
+            "fr": "Le chinois rejoint les langues de Lumen. Les textes sont découpés en vrais mots (我们, 学生), pas caractère par caractère : vos mots connus et votre niveau ont un sens. Le dictionnaire hors ligne donne le pinyin et les sens, en français (CFDICT) ou en anglais (CC-CEDICT), et lit un mot qu'il n'a pas par ses parties. Vos audios et vos vidéos sont transcrits en caractères simplifiés, la lanterne au mot près. Découvrir propose 19 sources : Mandarin Corner, Easy Mandarin, Learning Chinese through Stories, News In Easy Chinese, BBC 中文, DW, RFI, les chansons du moment à Taïwan… La voix naturelle ne parle pas encore chinois : la voix du système prononce les mots et lit les leçons.",
+            "en": "Chinese joins Lumen's languages. Texts are split into real words (我们, 学生), not character by character: your known words and your level mean something. The offline dictionary gives the pinyin and the meanings, in English (CC-CEDICT) or French (CFDICT), and reads a word it doesn't have through its parts. Your audio and videos are transcribed in simplified characters, with the lantern on every word. Discover offers 19 sources: Mandarin Corner, Easy Mandarin, Learning Chinese through Stories, News In Easy Chinese, BBC 中文, DW, RFI, the songs of the moment in Taiwan… The natural voice doesn't speak Chinese yet: the system voice pronounces words and reads lessons."
+          },
+          "action": "settings:langs"
+        },
+        {
+          "icon": "podcast",
+          "title": { "fr": "Tous les épisodes d'un podcast", "en": "Every episode of a podcast" },
+          "body": {
+            "fr": "Un podcast n'affichait que ses 300 derniers épisodes. Lumen les lit désormais tous, jusqu'à 5 000, y compris quand le flux est découpé en pages, et jusqu'à 2 000 vidéos d'une playlist ou d'une chaîne. Dans la liste, cherchez un épisode par son titre, triez des plus anciens aux plus récents pour commencer au premier, et cochez d'un geste tous ceux que la recherche a trouvés.",
+            "en": "A podcast only showed its last 300 episodes. Lumen now reads them all, up to 5,000, even when the feed is split into pages, and up to 2,000 videos of a playlist or a channel. In the list, search an episode by its title, sort from oldest to newest to start with the first one, and check in one go every episode the search found."
+          },
+          "action": "import:link"
+        },
+        {
+          "icon": "wave",
+          "title": { "fr": "La lanterne au plus près des mots en japonais", "en": "The lantern closer to the words in Japanese" },
+          "body": {
+            "fr": "En japonais comme en chinois, Whisper donne maintenant l'instant de chaque morceau de phrase, et non plus un seul pour toute la phrase : dans vos nouvelles transcriptions, la lanterne suit les mots de plus près.",
+            "en": "In Japanese as in Chinese, Whisper now gives the timing of each piece of a sentence, rather than a single one for the whole sentence: in your new transcripts, the lantern follows the words more closely."
+          }
+        }
+      ]
+    },
+    {
       "version": "1.3.0",
       "date": "2026-10-19",
       "title": { "fr": "Votre progression partout, les plus récents d'abord", "en": "Your progress everywhere, newest first" },

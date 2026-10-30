@@ -172,7 +172,7 @@ pub fn build_transcript(words: &[WWord]) -> (String, String) {
             continue;
         }
         let glue_left = raw.starts_with(' ') || i == 0;
-        let ends_sentence = text.trim_end().ends_with(['.', '!', '?', '…']);
+        let ends_sentence = text.trim_end().ends_with(['.', '!', '?', '…', '。', '！', '？']);
         if !text.is_empty() {
             if w.t0 - prev_end > 1.6 && ends_sentence {
                 text.push_str("\n\n");
@@ -255,6 +255,16 @@ pub async fn lesson_transcript(
         eprintln!("texte de la page écarté : {:.0} % des mots retrouvés", found * 100.0);
     }
     let (mut text, mut timings) = build_transcript(&words);
+    if lang == "zh" {
+        text = full_width(&text);
+    }
+    if text::unspaced(lang) {
+        // les fragments de Whisper ne sont pas des mots : un instant par mot de la leçon
+        let (t, found) = align_timings(&text, lang, &words);
+        if found > 0.0 {
+            timings = t;
+        }
+    }
     if let (Some(writer), Some(pcm)) = (writer, pcm) {
         on_event(ImportEvent::Stage { stage: "text".into() });
         let stop = std::sync::atomic::AtomicBool::new(false);
@@ -294,6 +304,27 @@ pub async fn lesson_transcript(
         }
     }
     Ok(airy(&text, lang, &timings))
+}
+
+/// Chinois : Whisper ponctue à l'occidentale (« , » « ? ») ; après un idéogramme, la
+/// ponctuation pleine chasse (« ， » « ？ »), de même longueur en UTF-16 : les positions
+/// des mots ne bougent pas.
+fn full_width(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 16);
+    let mut prev = ' ';
+    for c in text.chars() {
+        let w = match c {
+            ',' if text::is_han(prev) => '，',
+            '?' if text::is_han(prev) => '？',
+            '!' if text::is_han(prev) => '！',
+            ':' if text::is_han(prev) => '：',
+            ';' if text::is_han(prev) => '；',
+            _ => c,
+        };
+        out.push(w);
+        prev = c;
+    }
+    out
 }
 
 /// Son décodé par `lumen-whisper --pcm` (mono, 16 kHz, f32 petit-boutiste).
@@ -364,7 +395,7 @@ pub fn airy(text: &str, lang: &str, timings: &str) -> (String, String) {
             (Some(x), Some(y)) => (y.0 - x.1).max(0.0),
             _ => 0.0,
         };
-        let comma = if gap(k).contains([',', ';', ':', '–', '—']) { 0.25 } else { 0.0 };
+        let comma = if gap(k).contains([',', ';', ':', '–', '—', '，', '、', '；', '：']) { 0.25 } else { 0.0 };
         pause + comma
     };
     let mut paras: Vec<(usize, usize)> = Vec::new();
@@ -410,11 +441,13 @@ pub fn airy(text: &str, lang: &str, timings: &str) -> (String, String) {
                 }
             }
         } else if g.contains('\n') {
-            // ancien saut de paragraphe, devenu inutile : une simple espace
-            let joined = g.split_whitespace().collect::<Vec<_>>().join(" ");
+            // ancien saut de paragraphe, devenu inutile : une simple espace (aucune en
+            // japonais et en chinois)
+            let sep = if text::unspaced(lang) { "" } else { " " };
+            let joined = g.split_whitespace().collect::<Vec<_>>().join(sep);
             out.push(&joined);
             if g.ends_with(char::is_whitespace) {
-                out.push(" ");
+                out.push(sep);
             }
         } else {
             out.push(g);
@@ -680,6 +713,9 @@ struct Heard {
 /// Mots entendus, redécoupés comme le texte de Lumen (élisions comprises),
 /// la durée d'un mot coupé étant répartie au prorata de la longueur.
 fn heard_keys(words: &[WWord], lang: &str) -> Vec<Heard> {
+    if text::unspaced(lang) {
+        return heard_unspaced(words, lang);
+    }
     let mut out = Vec::new();
     for w in words {
         let parts: Vec<text::Token> = text::tokenize(w.w.trim(), lang).into_iter().filter(|t| t.w).collect();
@@ -691,6 +727,43 @@ fn heard_keys(words: &[WWord], lang: &str) -> Vec<Heard> {
             out.push(Heard { k: p.k.clone(), t0: at, t1: at + d, punct });
             at += d;
         }
+    }
+    out
+}
+
+/// Japonais, chinois : rien ne sépare les mots dans ce qu'entend Whisper (un fragment
+/// peut finir au milieu d'un mot). Tout est mis bout à bout, puis redécoupé d'un seul
+/// tenant comme le texte de la leçon (jieba voit la phrase entière) ; chaque caractère
+/// garde l'instant de son fragment, réparti au prorata.
+fn heard_unspaced(words: &[WWord], lang: &str) -> Vec<Heard> {
+    let mut all = String::new();
+    // instants de chaque unité UTF-16 de `all`
+    let mut at: Vec<(f64, f64)> = Vec::new();
+    for w in words {
+        // la ponctuation ne prend pas de temps
+        let n = w.w.chars().filter(|c| c.is_alphanumeric()).count().max(1);
+        let d = (w.t1 - w.t0).max(0.0) / n as f64;
+        let mut k = 0usize;
+        for c in w.w.chars() {
+            let span = (w.t0 + d * k as f64, w.t0 + d * (k + 1) as f64);
+            if c.is_alphanumeric() {
+                k += 1;
+            }
+            all.push(c);
+            at.extend(std::iter::repeat_n(span, c.len_utf16()));
+        }
+    }
+    let toks = text::tokenize(&all, lang);
+    let byte_at = byte_positions(&all);
+    let mut out = Vec::new();
+    for (i, t) in toks.iter().enumerate() {
+        if !t.w {
+            continue;
+        }
+        // ponctuation qui suit, jusqu'au mot suivant
+        let next = toks[i + 1..].iter().find(|x| x.w).map_or(all.len(), |x| byte_at[x.s]);
+        let gap = &all[byte_at[t.e]..next];
+        out.push(Heard { k: t.k.clone(), t0: at[t.s].0, t1: at[t.e - 1].1, punct: trailing_punct(gap).to_string() });
     }
     out
 }
@@ -920,9 +993,10 @@ async fn run_with_fallback(
 }
 
 /// Ce que yt-dlp sait d'une adresse, sans rien télécharger. Une liste
-/// (playlist, chaîne, podcast) n'est pas dépliée : ses éléments sont seulement nommés.
+/// (playlist, chaîne, podcast) n'est pas dépliée : ses éléments sont seulement nommés,
+/// 2 000 au plus (`link::MAX_YTDLP` ; une chaîne de 2 000 vidéos se lit en 20 s).
 pub async fn yt_info(data_dir: &Path, ytdlp: &Path, url: &str, browser: Option<&str>) -> Result<serde_json::Value> {
-    let args: Vec<String> = vec!["-J".into(), "--flat-playlist".into(), "--playlist-items".into(), "1:300".into(), url.into()];
+    let args: Vec<String> = vec!["-J".into(), "--flat-playlist".into(), "--playlist-items".into(), "1:2000".into(), url.into()];
     let mut quiet = |_p: f64| {};
     let out = run_with_fallback(data_dir, ytdlp, &args, browser, &mut quiet).await?;
     let json = out
@@ -932,6 +1006,16 @@ pub async fn yt_info(data_dir: &Path, ytdlp: &Path, url: &str, browser: Option<&
     Ok(serde_json::from_str(json)?)
 }
 
+/// Langue de l'interface de YouTube (`youtube:lang`) : le chinois s'y dit « zh-CN »
+/// (yt-dlp refuse « zh »).
+fn yt_hl(lang: &str) -> &str {
+    if lang == "zh" {
+        "zh-CN"
+    } else {
+        lang
+    }
+}
+
 /// Les `max` dernières vidéos d'une chaîne (son onglet « Vidéos » : ni Shorts
 /// ni directs), sans rien télécharger. `lang` : titres dans cette langue (ceux de
 /// la chaîne, que YouTube traduirait sinon en anglais) ; sans elle, dates
@@ -939,7 +1023,7 @@ pub async fn yt_info(data_dir: &Path, ytdlp: &Path, url: &str, browser: Option<&
 pub async fn yt_latest(data_dir: &Path, ytdlp: &Path, url: &str, max: usize, lang: Option<&str>) -> Result<serde_json::Value> {
     let mut args: Vec<String> = vec!["-J".into(), "--flat-playlist".into(), "--playlist-items".into(), format!("1:{max}")];
     match lang {
-        Some(l) => args.extend(["--extractor-args".into(), format!("youtube:lang={l}")]),
+        Some(l) => args.extend(["--extractor-args".into(), format!("youtube:lang={}", yt_hl(l))]),
         None => args.extend(["--extractor-args".into(), "youtubetab:approximate_date".into()]),
     }
     args.push(url.into());
@@ -957,7 +1041,7 @@ pub async fn yt_latest(data_dir: &Path, ytdlp: &Path, url: &str, max: usize, lan
 pub async fn yt_flat(data_dir: &Path, ytdlp: &Path, url: &str, from: usize, to: usize, lang: Option<&str>) -> Result<serde_json::Value> {
     let mut args: Vec<String> = vec!["-J".into(), "--flat-playlist".into(), "--playlist-items".into(), format!("{from}:{to}")];
     if let Some(l) = lang {
-        args.extend(["--extractor-args".into(), format!("youtube:lang={l}")]);
+        args.extend(["--extractor-args".into(), format!("youtube:lang={}", yt_hl(l))]);
     }
     args.push(url.into());
     let mut quiet = |_p: f64| {};
@@ -1103,6 +1187,24 @@ mod tests {
     use super::*;
     fn ww(w: &str, t0: f64, t1: f64) -> WWord {
         WWord { w: w.into(), t0, t1 }
+    }
+
+    #[test]
+    fn chinese_heard_as_words() {
+        // les fragments de Whisper coupent les mots ailleurs que jieba : tout est retrouvé
+        let text = "我们是学生。我们很好。";
+        let heard = [ww("我", 0.0, 0.2), ww("们是", 0.2, 0.6), ww("学", 0.6, 0.8), ww("生。", 0.8, 1.0), ww("我们", 1.5, 1.9), ww("很好。", 1.9, 2.5)];
+        let (timings, found) = align_timings(text, "zh", &heard);
+        assert_eq!(found, 1.0);
+        let t: Vec<[f64; 4]> = serde_json::from_str(&timings).unwrap();
+        // 我们 · 是 · 学生 · 我们 · 很 · 好 : un instant par mot de la leçon
+        assert_eq!(t.len(), 6);
+        assert_eq!(t[0], [0.0, 2.0, 0.0, 0.4]);
+        assert_eq!(t[2], [3.0, 5.0, 0.6, 1.0]);
+        // Whisper seul : le texte assemblé, sans espaces ; sa ponctuation en pleine chasse
+        let (built, _) = build_transcript(&heard);
+        assert_eq!(built, text);
+        assert_eq!(full_width("是谁写的呢? 3,5 ok, 好!"), "是谁写的呢？ 3,5 ok, 好！");
     }
 
     #[test]
