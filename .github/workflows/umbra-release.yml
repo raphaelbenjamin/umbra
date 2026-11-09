@@ -4,6 +4,10 @@ on:
   push:
     tags: ["v*"]
 
+concurrency:
+  group: umbra-release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -33,5 +37,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/umbra-release-assets.mjs src-tauri/target/release/bundle/macos release
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes release/*
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            test "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" = true
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" release/* --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

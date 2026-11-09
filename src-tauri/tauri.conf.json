@@ -94,6 +94,7 @@
   },
   "plugins": {
     "updater": {
+      "requireSignedVersion": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCQjQ0NThFRjQ1MTMyMDMKUldRRE1sSDBqa1cwK3cvYkNlZlNiWlBuSFdtVFdBeHVSZnJIWmdtVGFDNDhKVXdGQWpVVks4a08K",
       "endpoints": [
         "https://github.com/raphaelbenjamin/umbra/releases/latest/download/latest.json"

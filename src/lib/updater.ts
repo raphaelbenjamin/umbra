@@ -37,7 +37,8 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     if (!pending || get().phase !== "available") return;
     set({ phase: "installing", error: "" });
     try {
-      await pending.downloadAndInstall();
+      // The short manifest timeout should not carry over to the app archive.
+      await pending.downloadAndInstall(undefined, { timeout: 600000 });
       set({ phase: "ready" });
     } catch (error) {
       set({ phase: "error", error: String(error) });
