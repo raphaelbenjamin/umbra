@@ -47,6 +47,7 @@ const RAW: (Omit<LangInfo, "name"> & { fr: string; en: string })[] = [
   { code: "el", fr: "Grec", en: "Greek", native: "Ελληνικά", badge: "EL", color: "#1c7ed6", tts: ["el-GR", "el"], hello: "Γεια σου" },
   { code: "tr", fr: "Turc", en: "Turkish", native: "Türkçe", badge: "TR", color: "#c2255c", tts: ["tr-TR", "tr"], hello: "Merhaba" },
   { code: "ar", fr: "Arabe", en: "Arabic", native: "العربية", badge: "AR", color: "#087f5b", tts: ["ar-SA", "ar-EG", "ar"], hello: "مرحبا", rtl: true },
+  { code: "he", fr: "Hébreu", en: "Hebrew", native: "עברית", badge: "HE", color: "#3656a6", tts: ["he-IL", "he", "iw-IL"], hello: "שלום", rtl: true },
   { code: "hi", fr: "Hindi", en: "Hindi", native: "हिन्दी", badge: "HI", color: "#e67700", tts: ["hi-IN", "hi"], hello: "नमस्ते" },
   { code: "id", fr: "Indonésien", en: "Indonesian", native: "Bahasa Indonesia", badge: "ID", color: "#d9480f", tts: ["id-ID", "id"], hello: "Halo" },
   { code: "vi", fr: "Vietnamien", en: "Vietnamese", native: "Tiếng Việt", badge: "VI", color: "#c0392b", tts: ["vi-VN", "vi"], hello: "Xin chào" },
@@ -369,6 +370,10 @@ O akşam bir cevap yazdı ve onu aynı yere bıraktı. Birinin onu bir gün bulu
 جلست مارتا وقرأت الرسالة من جديد. من كتبها؟ منذ متى وهي هناك؟ نظرت إلى البحر، كأن الجواب قد يأتي مع الموجة التالية.
 
 في ذلك المساء، كتبت ردًا وتركته في المكان نفسه. لم تكن تعرف إن كان أحد سيجده يومًا. لكن للمرة الأولى منذ سنوات، لم تبدُ المنارة فارغة.`,
+  },
+  he: {
+    title: "בוקר ליד הים",
+    text: "בַּבֹּקֶר נוֹעָה הוֹלֶכֶת לַיָּם. הַמַּיִם שְׁקֵטִים וְהַשֶּׁמֶשׁ זוֹרַחַת. נוֹעָה עוֹצֶרֶת לְרֶגַע וּמַקְשִׁיבָה לַגַּלִּים.",
   },
   hi: {
     title: "पुराना प्रकाशस्तंभ",

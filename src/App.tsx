@@ -16,7 +16,6 @@ import { setUiLang, t, type UiLang } from "./lib/i18n";
 import { useAppMenu, useWindowsKeys } from "./lib/menu";
 import { isMobile, playableCodecs } from "./lib/platform";
 import { useApp } from "./lib/store";
-import { startUpdateChecks } from "./lib/updater";
 import { ImportSheet } from "./views/ImportSheet";
 import { Preview } from "./components/Preview";
 import { Chat } from "./views/Chat";
@@ -123,7 +122,6 @@ export function App() {
       .catch(() => {});
     init()
       .then(() => {
-        startUpdateChecks();
         startBackupEvents();
       })
       .catch((e) => setFailed(String(e)));

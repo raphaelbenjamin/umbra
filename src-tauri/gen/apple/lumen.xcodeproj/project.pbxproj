@@ -66,7 +66,7 @@
 		56260FA16BCD40B01BDF2A0E /* vulkan.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = vulkan.rs; sourceTree = "<group>"; };
 		57EE21B189E6B45D13C448E9 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		583C82BD011E6B478A041E87 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		5E48EA751600C17D40301BA8 /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E48EA751600C17D40301BA8 /* Umbra.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Umbra.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		65681C4946D0BA6F0BC96365 /* dict.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = dict.rs; sourceTree = "<group>"; };
 		65847B91993160B512D46F8F /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		68E5AD4B859FF22154786F0F /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -225,7 +225,7 @@
 		C754A016365D29C0F94D2E1D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5E48EA751600C17D40301BA8 /* Lumen.app */,
+				5E48EA751600C17D40301BA8 /* Umbra.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -283,7 +283,7 @@
 			packageProductDependencies = (
 			);
 			productName = lumen_iOS;
-			productReference = 5E48EA751600C17D40301BA8 /* Lumen.app */;
+			productReference = 5E48EA751600C17D40301BA8 /* Umbra.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -372,7 +372,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = lumen_iOS/lumen_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 4TSSSN82DS;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -399,8 +398,8 @@
 					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
 					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.reader;
-				PRODUCT_NAME = "Lumen";
+				PRODUCT_BUNDLE_IDENTIFIER = com.raphaelbenjamin.lumenhebrew;
+				PRODUCT_NAME = "Umbra";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -535,7 +534,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = lumen_iOS/lumen_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 4TSSSN82DS;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -562,8 +560,8 @@
 					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
 					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.reader;
-				PRODUCT_NAME = "Lumen";
+				PRODUCT_BUNDLE_IDENTIFIER = com.raphaelbenjamin.lumenhebrew;
+				PRODUCT_NAME = "Umbra";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

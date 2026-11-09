@@ -1074,12 +1074,48 @@ pub async fn yt_stream(data_dir: &Path, ytdlp: &Path, url: &str, audio_only: boo
 
 /// Télécharge la piste audio d'une vidéo (YouTube et la plupart des sites
 /// vidéo). Renvoie le fichier et le titre.
+pub async fn yt_captions(
+    data_dir: &Path, ytdlp: &Path, url: &str, stem: &str, lang: &str, browser: Option<&str>,
+) -> Result<(String, String)> {
+    let dir = data_dir.join(format!("{stem}.captions"));
+    tokio::fs::create_dir(&dir).await?;
+    let template = dir.join("captions.%(ext)s");
+    let mut codes = vec![format!("{lang}-orig"), lang.to_owned()];
+    if lang == "he" { codes.extend(["iw-orig".into(), "iw".into()]); }
+    let languages = codes.join(",");
+    let args = [
+        "--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs",
+        &languages, "--sub-format", "json3", "-o",
+        &template.to_string_lossy(), url,
+    ].map(str::to_owned);
+    let downloaded = run_with_fallback(data_dir, ytdlp, &args, browser, &mut |_| {}).await;
+    let mut lesson = None;
+    if downloaded.is_ok() {
+        for code in codes {
+            let path = dir.join(format!("captions.{code}.json3"));
+            if let Ok(raw) = tokio::fs::read_to_string(path).await {
+                if let Ok(parsed) = crate::captions::lesson(&raw, lang) {
+                    lesson = Some(parsed);
+                    break;
+                }
+            }
+        }
+    }
+    let _ = tokio::fs::remove_dir_all(&dir).await;
+    downloaded?;
+    lesson.ok_or_else(|| anyhow!(crate::i18n::t(
+        "Aucun sous-titre utilisable dans la langue choisie. Choisissez la transcription locale pour cet épisode.",
+        "No usable captions were found in the selected language. Choose local transcription for this episode."
+    )))
+}
+
 pub async fn yt_audio(
     data_dir: &Path,
     ytdlp: &Path,
     url: &str,
     stem: &str,
     browser: Option<&str>,
+    strict_audio: bool,
     on_progress: &mut (dyn FnMut(f64) + Send),
 ) -> Result<(PathBuf, String)> {
     let dir = media_dir(data_dir);
@@ -1087,7 +1123,8 @@ pub async fn yt_audio(
     let template = dir.join(format!("{stem}.audio.%(ext)s"));
     let args: Vec<String> = vec![
         "-f".into(),
-        "ba[ext=m4a]/ba[acodec^=mp4a]/ba[ext=mp3]/b[ext=mp4]".into(),
+        if strict_audio { "ba[ext=m4a]/ba[acodec^=mp4a]/ba[ext=mp3]/ba" }
+        else { "ba[ext=m4a]/ba[acodec^=mp4a]/ba[ext=mp3]/b[ext=mp4]" }.into(),
         "--no-simulate".into(),
         "--print".into(),
         "TITLE:%(title)s".into(),
@@ -1513,6 +1550,16 @@ mod tests {
             std::fs::write(out, &text).unwrap();
         }
         assert!(paras > 3 && !tm.is_empty());
+    }
+
+    #[test]
+    fn hebrew_timings_align_with_pointed_text() {
+        let words = vec![ww(" שלום", 0.1, 0.5), ww(" עולם", 0.5, 1.0)];
+        let text = "📖 שָׁלוֹם־עוֹלָם";
+        let (timings, coverage) = align_timings(text, "he", &words);
+        let ranges: Vec<[f64; 4]> = serde_json::from_str(&timings).unwrap();
+        assert_eq!(coverage, 1.0);
+        assert_eq!(ranges, vec![[3.0, 10.0, 0.1, 0.5], [11.0, 17.0, 0.5, 1.0]]);
     }
 
     #[test]

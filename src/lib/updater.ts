@@ -1,88 +1,46 @@
-// Mises à jour automatiques : Lumen consulte la dernière version publiée,
-// la télécharge (paquet signé) puis redémarre sur la nouvelle version.
+import type { Update } from "@tauri-apps/plugin-updater";
 import { create } from "zustand";
-import { api, isTauri } from "./api";
+import { isTauri } from "./api";
+import { isMobile, isWindows } from "./platform";
 
-type Phase = "idle" | "checking" | "available" | "downloading" | "ready" | "uptodate" | "error";
+export const canUpdate = isTauri && !isMobile && !isWindows;
+type Phase = "idle" | "checking" | "available" | "installing" | "ready" | "current" | "error";
 
 interface UpdateState {
   phase: Phase;
   version: string;
-  notes: string;
-  progress: number; // 0 à 1
   error: string;
-  dismissed: boolean;
-  check(manual?: boolean): Promise<void>;
+  check(): Promise<void>;
   install(): Promise<void>;
-  restart(): Promise<void>;
-  dismiss(): void;
 }
 
-// objet Update du greffon (gardé hors de l'état pour ne pas le sérialiser)
-let pending: { downloadAndInstall(cb: (e: { event: string; data?: { contentLength?: number; chunkLength?: number } }) => void): Promise<void> } | null =
-  null;
+let pending: Update | null = null;
 
 export const useUpdate = create<UpdateState>((set, get) => ({
   phase: "idle",
   version: "",
-  notes: "",
-  progress: 0,
   error: "",
-  dismissed: false,
-
-  async check(manual = false) {
-    if (!isTauri) {
-      if (manual) set({ phase: "uptodate" });
-      return;
-    }
-    if (["checking", "downloading", "ready"].includes(get().phase)) return;
+  async check() {
+    if (!canUpdate || ["checking", "installing", "ready"].includes(get().phase)) return;
     set({ phase: "checking", error: "" });
     try {
       const { check } = await import("@tauri-apps/plugin-updater");
-      const update = await check();
-      if (update) {
-        pending = update as unknown as typeof pending;
-        set({ phase: "available", version: update.version, notes: update.body ?? "", dismissed: false });
-      } else {
-        set({ phase: manual ? "uptodate" : "idle" });
-      }
-    } catch (e) {
-      set({ phase: manual ? "error" : "idle", error: String(e) });
+      await pending?.close();
+      pending = null;
+      pending = await check({ timeout: 15000 });
+      set({ phase: pending ? "available" : "current", version: pending?.version ?? "" });
+    } catch (error) {
+      set({ phase: "error", error: String(error) });
     }
   },
-
   async install() {
-    if (!pending) return;
-    set({ phase: "downloading", progress: 0 });
-    let total = 0;
-    let got = 0;
+    if (!pending || get().phase !== "available") return;
+    set({ phase: "installing", error: "" });
     try {
-      await pending.downloadAndInstall((e) => {
-        if (e.event === "Started") total = e.data?.contentLength ?? 0;
-        else if (e.event === "Progress") {
-          got += e.data?.chunkLength ?? 0;
-          set({ progress: total ? Math.min(1, got / total) : 0 });
-        } else if (e.event === "Finished") set({ progress: 1 });
-      });
+      await pending.downloadAndInstall();
       set({ phase: "ready" });
-    } catch (e) {
-      set({ phase: "error", error: String(e) });
+    } catch (error) {
+      set({ phase: "error", error: String(error) });
     }
-  },
-
-  async restart() {
-    // par Lumen plutôt que par le greffon : sur Mac, la nouvelle version s'ouvre au premier plan
-    await api().appRelaunch();
-  },
-
-  dismiss() {
-    set({ dismissed: true });
   },
 }));
-
-/** Vérifie au démarrage puis toutes les six heures. */
-export function startUpdateChecks() {
-  if (!isTauri) return;
-  window.setTimeout(() => void useUpdate.getState().check(), 8000);
-  window.setInterval(() => void useUpdate.getState().check(), 6 * 3600 * 1000);
-}

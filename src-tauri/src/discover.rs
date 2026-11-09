@@ -465,6 +465,9 @@ pub static SOURCES: &[Source] = &[
     yt("ar-bbc", "ar", "BBC News عربي", "UCelk6aHijZq-GJBBB9YpReA", C1, C1, News),
     yt("ar-ajdoc", "ar", "الجزيرة الوثائقية", "UC0LSnqrwqtMwl2YwfUpO66g", C1, C1, Culture),
     art("ar-bbc-art", "ar", "BBC News عربي", "https://www.bbc.com/arabic/index.xml", C1, C1, News),
+    // hébreu : dialogues pour apprenants, et conversations en hébreu courant
+    pod("he-hebrew-podcasts", "he", "Hebrew Podcasts", "https://www.hebrewpodcasts.com/rss/hp.xml", A1, B2, Learn),
+    pod("he-alma-talks", "he", "Alma Talks", "https://anchor.fm/s/107c507d0/podcast/rss", B2, C1, Culture),
     // ----- hindi -----
     yt("hi-ci", "hi", "Comprehensible Hindi", "UCVt9SQjiL-R1GuH-5Uieovw", A1, B1, Learn),
     yt("hi-kurz", "hi", "आसान शब्दों में – Kurzgesagt", "UCIR1LQvYrHOWBpOGq5nFo0Q", B2, C1, Culture),

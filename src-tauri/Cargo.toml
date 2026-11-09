@@ -4,13 +4,17 @@ resolver = "2"
 
 [package]
 name = "lumen"
-version = "1.4.0"
+version = "2.0.0"
 description = "Lumen : apprendre les langues en lisant et en écoutant"
 authors = ["Ulysse Rives"]
 license = "GPL-3.0-or-later"
 repository = "https://github.com/LivingTwice/lumen"
 edition = "2021"
 rust-version = "1.80"
+
+[[bin]]
+name = "lumen-hebrew"
+path = "src/main.rs"
 
 [lib]
 name = "lumen_lib"
@@ -29,7 +33,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 flate2 = "1"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["fs", "io-util", "process", "rt-multi-thread", "macros", "sync", "time"] }
 unicode-segmentation = "1"
@@ -46,6 +50,7 @@ parking_lot = "0.12"
 getrandom = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+tauri-plugin-updater = "2.13"
 llama-cpp-2 = { version = "0.1.158", default-features = false, features = ["metal", "mtmd"] }
 
 # Mac, iPhone et iPad : les mêmes outils d'Apple (AVFoundation, AudioToolbox, Foundation)
@@ -68,12 +73,6 @@ objc2-av-foundation = { version = "0.3", default-features = false, features = ["
 
 [target.'cfg(not(any(target_os = "macos", target_os = "ios", windows)))'.dependencies]
 llama-cpp-2 = { version = "0.1.158", default-features = false, features = ["mtmd"] }
-
-# mises à jour automatiques et relance : Mac et Windows seulement (sur iPhone et
-# iPad, c'est l'App Store ou TestFlight qui met l'app à jour)
-[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
-tauri-plugin-updater = "2.13"
-tauri-plugin-process = "2.4"
 
 # iPhone et iPad : l'IA sur la puce graphique (Metal), comme sur Mac ; ce que fait
 # la version Windows sans les outils de macOS (archives .tar.bz2, couvertures)

@@ -168,7 +168,7 @@
   height: 3px;
   border-radius: 50%;
   background: #ffd8a0;
-  box-shadow: 0 0 8px 1px rgba(255, 190, 110, 0.9);
+  box-shadow: 0 0 8px 1px rgba(130, 170, 250, 0.9);
   opacity: 0;
   animation: mote 12s linear infinite;
 }
@@ -201,24 +201,26 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 36%, #ffffff 0%, #fff4df 32%, #ffcf8a 68%, #f5a04e 100%);
-  box-shadow: 0 0 40px 10px rgba(255, 186, 104, 0.55), 0 0 140px 40px rgba(255, 170, 90, 0.28), inset -6px -10px 24px rgba(220, 120, 40, 0.25);
+  background:
+    radial-gradient(circle at 34% 35%, #9db4d8 0 12%, transparent 15%),
+    radial-gradient(circle at 66% 57%, #a7bce0 0 16%, transparent 19%),
+    radial-gradient(circle at 40% 36%, #ffffff 0%, #e1ecff 32%, #b6cdf4 68%, #7898cb 100%);
+  box-shadow: 0 0 40px 10px rgba(136, 172, 246, 0.55), 0 0 140px 40px rgba(106, 146, 234, 0.28), inset -6px -10px 24px rgba(62, 95, 155, 0.25);
 }
 .ob-orb-halo {
   position: absolute;
   inset: -90%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 200, 130, 0.5), rgba(255, 190, 110, 0.12) 55%, transparent);
+  background: radial-gradient(closest-side, rgba(157, 191, 255, 0.5), rgba(130, 170, 250, 0.12) 55%, transparent);
   animation: breathe 6s ease-in-out infinite;
 }
 .ob-orb-rays {
   position: absolute;
   inset: -160%;
   border-radius: 50%;
-  background: repeating-conic-gradient(from 0deg, rgba(255, 196, 120, 0.16) 0deg 3deg, transparent 3deg 18deg);
+  background: repeating-conic-gradient(from 0deg, rgba(137, 179, 251, 0.16) 0deg 3deg, transparent 3deg 18deg);
   -webkit-mask: radial-gradient(closest-side, transparent 22%, #000 30%, transparent 72%);
   mask: radial-gradient(closest-side, transparent 22%, #000 30%, transparent 72%);
-  animation: spin 90s linear infinite;
 }
 
 .ob-horizon {
@@ -709,7 +711,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(360px circle at var(--mx, -400px) var(--my, -400px), rgba(255, 200, 130, 0.28), transparent 45%);
+  background: radial-gradient(360px circle at var(--mx, -400px) var(--my, -400px), rgba(157, 191, 255, 0.28), transparent 45%);
   pointer-events: none;
 }
 .ob-card.on {
@@ -885,7 +887,7 @@
   inset: -46px;
   z-index: -1;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 196, 120, 0.55), rgba(255, 180, 94, 0.18) 55%, transparent);
+  background: radial-gradient(closest-side, rgba(137, 179, 251, 0.55), rgba(255, 180, 94, 0.18) 55%, transparent);
   animation: ob-me-breathe 6s ease-in-out infinite;
   pointer-events: none;
 }

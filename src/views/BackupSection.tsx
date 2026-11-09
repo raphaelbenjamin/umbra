@@ -271,7 +271,7 @@ function PlacePicker({ s, onPick }: { s: BackupStatus; onPick(dir: string): Prom
 }
 
 /**
- * iPhone et iPad : un seul emplacement, le dossier « Lumen » d'iCloud Drive choisi dans
+ * iPhone et iPad : un seul emplacement, le dossier « Lumen Hebrew » d'iCloud Drive choisi dans
  * l'app Fichiers (celui où le Mac sauvegarde déjà ; chaque appareil y a son dossier).
  */
 function IosPlace({ s, onPick }: { s: BackupStatus; onPick(dir: string): Promise<void> }) {
@@ -294,7 +294,7 @@ function IosPlace({ s, onPick }: { s: BackupStatus; onPick(dir: string): Promise
     <div className="ios-place">
       <span className="place-glyph">{busy ? <Orb size={16} /> : <Icon name="cloud" size={20} />}</span>
       <div className="grow">
-        <strong>{s.dir ? placeLabel(s) : t("Le dossier « Lumen » de votre sauvegarde", "The “Lumen” folder of your backup")}</strong>
+        <strong>{s.dir ? placeLabel(s) : t("Le dossier « Lumen Hebrew » de votre sauvegarde", "The “Lumen Hebrew” folder of your backup")}</strong>
         <span>
           {s.dir
             ? t("Choisi dans l'app Fichiers. Vos autres appareils y sauvegardent aussi.", "Chosen in the Files app. Your other devices back up there too.")
@@ -363,6 +363,29 @@ export function BackupSection() {
   const settings = useApp((x) => x.settings);
   const setSetting = useApp((x) => x.setSetting);
   const toast = useApp((x) => x.toast);
+  const [importingOriginal, setImportingOriginal] = useState(false);
+  const [copyMedia, setCopyMedia] = useState(true);
+  const importOriginal = async () => {
+    setImportingOriginal(true);
+    try {
+      if (!await confirmAsk(
+        t("Copier les leçons, le vocabulaire et la progression de Lumen vers Umbra ? Les deux bibliothèques restent séparées.",
+          "Copy lessons, vocabulary and progress from Lumen into Umbra? The two libraries will remain separate."),
+        "Umbra", t("Copier", "Copy"),
+      )) return;
+      const result = await api().backupImportOriginal(copyMedia);
+      await reloadProgress();
+      toast(syncedText({ device_name: "Lumen", report: result.report }), "light");
+      if (result.missing_media) toast(t(
+        `${result.missing_media} fichiers multimédias sont introuvables dans Lumen.`,
+        `${result.missing_media} media files could not be found in Lumen.`,
+      ), "light");
+    } catch (error) {
+      toast(errorText(error), "error");
+    } finally {
+      setImportingOriginal(false);
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -407,6 +430,23 @@ export function BackupSection() {
   return (
     // le titre et la présentation sont dans l'en-tête de la page des Réglages
     <section className="set-section">
+      {isTauri && !isIOS && !isWindows && (
+        <div className="set-card">
+          <div className="set-row">
+            <div className="grow">
+              <strong>{t("Importer depuis Lumen", "Import from original Lumen")}</strong>
+              <span>{t("Fusionne vos bibliothèques dans Lumen Hebrew.", "Adds your original library to Lumen Hebrew.")}</span>
+              <label>
+                <input type="checkbox" checked={copyMedia} disabled={importingOriginal} onChange={(e) => setCopyMedia(e.target.checked)} />
+                {" "}{t("Copier aussi les fichiers audio, vidéos et couvertures", "Also copy audio, video and covers")}
+              </label>
+            </div>
+            <button className="btn sm soft" disabled={importingOriginal || busy || restoring} onClick={() => void importOriginal()}>
+              {importingOriginal ? t("Copie en cours…", "Copying…") : t("Importer", "Import")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="set-card">
         <div className="set-row backup-hero">
@@ -453,7 +493,7 @@ export function BackupSection() {
               {s.dir
                 ? placeLabel(s)
                 : isIOS
-                  ? t("Choisissez ci-dessous le dossier « Lumen » où votre\u00a0Mac sauvegarde.", "Choose below the “Lumen” folder your\u00a0Mac backs up to.")
+                  ? t("Choisissez ci-dessous le dossier « Lumen Hebrew » où votre\u00a0Mac sauvegarde.", "Choose below the “Lumen Hebrew” folder your\u00a0Mac backs up to.")
                   : isWindows
                   ? t("Choisissez où sauvegarder : OneDrive, un autre nuage ou un dossier.", "Choose where to back up: OneDrive, another cloud or a folder.")
                   : t(
@@ -506,7 +546,7 @@ export function BackupSection() {
               <div className="grow">
                 <span>
                   {isIOS
-                    ? t("Votre progression est sur votre\u00a0Mac ? Choisissez d'abord le dossier « Lumen » de sa sauvegarde.", "Your progress is on your\u00a0Mac? First choose the “Lumen” folder of its backup.")
+                    ? t("Votre progression est sur votre\u00a0Mac ? Choisissez d'abord le dossier « Lumen Hebrew » de sa sauvegarde.", "Your progress is on your\u00a0Mac? First choose the “Lumen Hebrew” folder of its backup.")
                     : t("Vous avez déjà utilisé Lumen sur un autre Mac ?", "Have you used Lumen on another Mac before?")}
                 </span>
               </div>

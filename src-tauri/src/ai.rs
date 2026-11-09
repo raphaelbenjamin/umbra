@@ -556,6 +556,7 @@ pub fn lang_name(code: &str) -> &'static str {
         "el" => "grec",
         "tr" => "turc",
         "ar" => "arabe",
+        "he" => "hébreu",
         "hi" => "hindi",
         "id" => "indonésien",
         "vi" => "vietnamien",
@@ -595,6 +596,7 @@ pub fn lang_name_en(code: &str) -> &'static str {
         "el" => "Greek",
         "tr" => "Turkish",
         "ar" => "Arabic",
+        "he" => "Hebrew",
         "hi" => "Hindi",
         "id" => "Indonesian",
         "vi" => "Vietnamese",
@@ -620,6 +622,9 @@ fn word_query(lang: &str, word: &str, sentence: &str, hint: &str) -> String {
     if !hint.is_empty() {
         q.push_str(&format!("\nDictionnaire : {hint}"));
     }
+    if lang == "he" {
+        q.push_str("\nInterprète les préfixes attachés et les mots non vocalisés selon le contexte de la phrase.");
+    }
     q
 }
 
@@ -627,6 +632,9 @@ fn word_query_en(lang: &str, word: &str, sentence: &str, hint: &str) -> String {
     let mut q = format!("Language: {}\nSentence: {sentence}\nWord: {word}", lang_name_en(lang));
     if !hint.is_empty() {
         q.push_str(&format!("\nDictionary: {hint}"));
+    }
+    if lang == "he" {
+        q.push_str("\nUse the sentence context to interpret attached prefixes and disambiguate unpointed words.");
     }
     q
 }

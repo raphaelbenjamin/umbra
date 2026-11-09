@@ -28,7 +28,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSFileProviderDomainUsageDescription</key>
-	<string>Lumen backs up your progress (words, lessons, settings) to your iCloud Drive or the folder you chose, so that it&apos;s never lost.</string>
+	<string>Umbra backs up your progress (words, lessons, settings) to your iCloud Drive or the folder you chose, so that it&apos;s never lost.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

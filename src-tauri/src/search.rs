@@ -518,6 +518,7 @@ pub fn country(lang: &str) -> &'static str {
         "el" => "gr",
         "tr" => "tr",
         "ar" => "eg",
+        "he" => "il",
         "hi" => "in",
         "id" => "id",
         "vi" => "vn",

@@ -1,7 +1,5 @@
 #!/bin/bash
-# Environnement commun aux scripts « Compiler Lumen » et « Publier une version ».
-# Vérifie les outils (et les installe au besoin) et prépare la clé de signature
-# des mises à jour.
+# Environnement de compilation de Umbra.
 
 step() { echo ""; echo "› $1"; }
 fail() { echo ""; echo "✗ $1"; echo ""; echo "Le journal complet est dans $LOG"; read -n 1 -s -r -p "Appuyez sur une touche pour fermer…"; exit 1; }
@@ -49,30 +47,3 @@ echo "  ok : $(cargo -V)"
 step "Dépendances"
 npm install --no-audit --no-fund >/dev/null || fail "npm install a échoué."
 echo "  ok"
-
-step "Clé de signature des mises à jour"
-KEY="$HOME/.tauri/lumen-updater.key"
-if [ ! -f "$KEY" ]; then
-  mkdir -p "$HOME/.tauri"
-  npx tauri signer generate --ci -p "" -w "$KEY" >/dev/null || fail "La clé n'a pas pu être créée."
-  echo "  Nouvelle clé créée : $KEY"
-  echo "  ⚠︎  Sauvegardez ce fichier : sans lui, plus aucune mise à jour ne pourra être publiée."
-fi
-node -e '
-  const fs = require("fs");
-  const p = "src-tauri/tauri.conf.json";
-  const c = JSON.parse(fs.readFileSync(p, "utf8"));
-  const pub = fs.readFileSync(process.argv[1], "utf8").trim();
-  if (c.plugins.updater.pubkey !== pub) {
-    c.plugins.updater.pubkey = pub;
-    fs.writeFileSync(p, JSON.stringify(c, null, 2) + "\n");
-    console.log("  Clé publique inscrite dans la configuration.");
-  }
-' "$KEY.pub"
-export TAURI_SIGNING_PRIVATE_KEY="$KEY"
-export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
-echo "  ok"
-
-ARCH="$(uname -m)"
-[ "$ARCH" = "arm64" ] && ARCH="aarch64"
-BUNDLE="src-tauri/target/release/bundle"

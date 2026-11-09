@@ -1,0 +1,37 @@
+name: Publish Umbra for macOS
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.repository == 'raphaelbenjamin/umbra'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify release version and architecture
+        run: |
+          test "$(uname -m)" = arm64
+          test "$GITHUB_REF_NAME" = "v$(node -p "require('./src-tauri/tauri.conf.json').version")"
+      - run: npm ci
+      - name: Build and sign
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.UMBRA_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.UMBRA_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run app:build -- --bundles app --config '{"bundle":{"createUpdaterArtifacts":true}}'
+      - name: Publish verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/umbra-release-assets.mjs src-tauri/target/release/bundle/macos release
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes release/*
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

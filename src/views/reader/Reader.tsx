@@ -12,7 +12,7 @@ import { formatNumber, useApp } from "../../lib/store";
 import { fitPages, pageOfToken } from "../../lib/pagefit";
 import { isMobile, isWindows } from "../../lib/platform";
 import { panelMode, readerLook, roomForSidePanel } from "../../lib/reading";
-import { paginate, sentenceBounds, type PageRange } from "../../lib/tokenize";
+import { displayText, paginate, sentenceBounds, type PageRange } from "../../lib/tokenize";
 import type { LessonSummary, OpenedLesson, Term, Token } from "../../lib/types";
 import { Player, type PlayerHandle, type PlaybackState } from "./Player";
 import { useChat } from "../../lib/chat";
@@ -542,6 +542,7 @@ export function Reader() {
   const setStatus = useCallback(
     (key: string, status: number, extra?: Partial<Term>) => {
       if (!lesson || !key) return;
+      const wasKnown = statusOf(key) === 4;
       setTerms((prev) => {
         const next = { ...prev };
         if (status === 0) delete next[key];
@@ -563,10 +564,10 @@ export function Reader() {
       }
       void api()
         .termSet({ lang: lesson.lang, term: key, status, translation: extra?.translation, note: extra?.note, context: extra?.context })
-        .then(() => (status === 4 || status === 0 ? refreshKnown() : undefined))
+        .then(() => (status === 4 || status === 0 || wasKnown ? refreshKnown() : undefined))
         .catch((e) => toast(errorText(e), "error"));
     },
-    [lesson, refreshKnown, toast],
+    [lesson, refreshKnown, statusOf, toast],
   );
 
   const rangeRef = useRef<Range | null>(null);
@@ -629,12 +630,20 @@ export function Reader() {
   );
 
   // ---------- souris : clic et glisser pour les expressions ----------
-  const idxFromEvent = (e: React.PointerEvent) => {
+  const idxFromEvent = (e: React.MouseEvent) => {
     const el = (e.target as HTMLElement).closest("[data-i]") as HTMLElement | null;
     return el ? Number(el.dataset.i) : -1;
   };
+  const onWordContextMenu = (e: React.MouseEvent) => {
+    const token = tokens[idxFromEvent(e)];
+    if (!token?.w) return;
+    e.preventDefault();
+    const status = statusOf(token.k);
+    if (status === 4) setStatus(token.k, 1);
+    else if (status >= 1 && status <= 3) setStatus(token.k, 4);
+  };
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || (e.ctrlKey && !isWindows)) return;
     const i = idxFromEvent(e);
     if (i < 0) return;
     if (e.altKey) {
@@ -942,6 +951,12 @@ export function Reader() {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey) return;
       if (useApp.getState().importOpen || useMenu.getState().shortcuts || simplify || complete || lookOpen || adding) return;
+      if (settings.arrow_seek === "1" && lesson?.media_path && !e.shiftKey && !e.altKey &&
+          (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        playerRef.current?.skip(e.key === "ArrowLeft" ? -3 : 3);
+        return;
+      }
       const words: number[] = [];
       for (let i = pr.start; i < pr.end; i++) if (tokens[i].w) words.push(i);
       const cur = range ? words.indexOf(range.a) : -1;
@@ -1222,8 +1237,9 @@ export function Reader() {
     const ph = phraseCover.get(i);
     const inPhrase = ph && i > ph.a && i <= ph.b;
     const inSel = range && range.a !== range.b && i > range.a && i < range.b;
+    const visible = displayText(t.t, lang);
     if (!t.w) {
-      const parts = t.t.split(/\n+/);
+      const parts = visible.split(/\n+/);
       if (parts.length > 1) {
         if (parts[0]) current.push(parts[0]);
         if (current.length) paragraphs.push(<p key={`p${i}`}>{current}</p>);
@@ -1234,10 +1250,10 @@ export function Reader() {
         current.push(
           inPhrase || inSel ? (
             <span key={i} className={`${inPhrase ? `ph p${ph!.status}` : ""} ${inSel ? "sel-gap" : ""}`}>
-              {t.t}
+              {visible}
             </span>
           ) : (
-            t.t
+            visible
           ),
         );
       }
@@ -1253,7 +1269,7 @@ export function Reader() {
     if (glowKeys.has(t.k)) cls += " known-glow";
     current.push(
       <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.75}s` } as React.CSSProperties) : undefined}>
-        {t.t}
+        {visible}
       </span>,
     );
   }
@@ -1309,7 +1325,7 @@ export function Reader() {
           </>
         )}
       </div>
-      <h1 dir="auto">{lesson.title}</h1>
+      <h1 dir="auto">{displayText(lesson.title, lang)}</h1>
       <div className="reader-chips">
         <span className="chip">{li.name}</span>
         {paged ? (
@@ -1333,6 +1349,7 @@ export function Reader() {
       className={`page ${markClass} ${illum ? "illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
+      onContextMenu={onWordContextMenu}
       lang={lang}
       dir={li.rtl ? "rtl" : undefined}
     >
@@ -1542,6 +1559,7 @@ export function Reader() {
             playing={mediaPlaying}
             onHost={setVideoHost}
             onToggle={() => playerRef.current?.toggle()}
+            onWordContextMenu={onWordContextMenu}
             onWord={(i) => {
               // la vidéo s'arrête sur le mot touché ; il ne se fait entendre que si elle était déjà en pause
               const wasPlaying = !!playerRef.current?.isPlaying();

@@ -1,4 +1,4 @@
-import type { PageRange } from "./tokenize";
+import { displayText, type PageRange } from "./tokenize";
 import type { Token } from "./types";
 
 /**
@@ -31,26 +31,27 @@ const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c]);
 
 /** Même découpage en paragraphes que le rendu du lecteur (Reader.tsx). */
-function compose(tokens: Token[], a: number, b: number): string {
+function compose(tokens: Token[], a: number, b: number, lang: string): string {
   let html = "";
   let p = "";
   for (let i = a; i < b; i++) {
     const tk = tokens[i];
+    const visible = displayText(tk.t, lang);
     if (tk.w) {
-      p += `<span class="w" data-k="${i}">${esc(tk.t)}</span>`;
+      p += `<span class="w" data-k="${i}">${esc(visible)}</span>`;
       continue;
     }
-    const parts = tk.t.split(/\n+/);
+    const parts = visible.split(/\n+/);
     if (parts.length > 1) {
       if (parts[0]) p += esc(parts[0]);
       if (p) html += `<p>${p}</p>`;
       p = "";
       const tail = parts[parts.length - 1];
       if (tail.trim()) p += esc(tail);
-    } else if (tk.t.trim()) {
+    } else if (visible.trim()) {
       // ponctuation : mesurée elle aussi (un tiret ou un guillemet peut ouvrir la ligne)
-      p += `<span data-k="${i}">${esc(tk.t)}</span>`;
-    } else p += esc(tk.t);
+      p += `<span data-k="${i}">${esc(visible)}</span>`;
+    } else p += esc(visible);
   }
   if (p) html += `<p>${p}</p>`;
   return html;
@@ -98,7 +99,7 @@ export function fitPages(box: HTMLElement, tokens: Token[], opts: FitOptions): P
  * -1 : tout le morceau tient mais la leçon continue (morceau trop court).
  */
 function fitOne(box: HTMLElement, tokens: Token[], start: number, stop: number, height: number, line: number): number {
-  box.innerHTML = compose(tokens, start, stop);
+  box.innerHTML = compose(tokens, start, stop, box.lang);
   const spans = box.querySelectorAll<HTMLElement>("[data-k]");
   if (!spans.length) return stop;
   const top = box.getBoundingClientRect().top;

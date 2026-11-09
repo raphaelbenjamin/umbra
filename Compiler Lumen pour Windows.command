@@ -12,12 +12,12 @@ source scripts/mac-env.sh
 step "Version Windows (une vingtaine de minutes la première fois)"
 node scripts/build-windows.mjs || fail "La compilation pour Windows a échoué."
 VERSION="$(node -p 'require("./package.json").version')"
-SETUP="src-tauri/target/windows/x86_64-pc-windows-msvc/release/bundle/nsis/Lumen_${VERSION}_x64-setup.exe"
+SETUP="src-tauri/target/windows/x86_64-pc-windows-msvc/release/bundle/nsis/Umbra_${VERSION}_x64-setup.exe"
 mkdir -p Distribution
 cp "$SETUP" Distribution/ || fail "L'installateur est introuvable."
 
 echo ""
-echo "✓ Installateur Windows : Distribution/Lumen_${VERSION}_x64-setup.exe"
+echo "✓ Installateur Windows : Distribution/Umbra_${VERSION}_x64-setup.exe"
 echo "  Copiez-le sur un PC et double-cliquez dessus. Au premier lancement, Windows peut"
 echo "  avertir (« Windows a protégé votre ordinateur ») : Informations complémentaires › Exécuter quand même."
 open Distribution

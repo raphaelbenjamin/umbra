@@ -1,4 +1,4 @@
-// Icône de Lumen : l'illustration icon-source.png (l'astre au-dessus d'un livre ouvert), posée dans la forme d'Apple.
+// Icône de Lumen : l'illustration icon-source.png (la lune au-dessus d'un livre ouvert), posée dans la forme d'Apple.
 // Écrit icon.svg et icon-small.svg (même image : elle se lit aussi en 16 et 32 px) à côté de ce fichier.
 // Rendu en PNG et installation dans l'app : `node scripts/design.mjs`.
 import { writeFileSync } from "node:fs";
@@ -31,7 +31,9 @@ const SQ = squircle(100, 100, 824, 824, 185.4);
 
 // image carrée qui remplit la forme ; lue à côté du SVG par le Chromium de scripts/design.mjs
 const doc = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs><clipPath id="sq"><path d="${SQ}"/></clipPath></defs>
+  <defs>
+    <clipPath id="sq"><path d="${SQ}"/></clipPath>
+  </defs>
   <image href="icon-source.png" x="100" y="100" width="824" height="824" preserveAspectRatio="xMidYMid slice" clip-path="url(#sq)"/>
 </svg>
 `;

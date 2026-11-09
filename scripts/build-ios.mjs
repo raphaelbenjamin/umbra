@@ -182,10 +182,10 @@ if (args.includes("--install") || args.includes("--sim-release")) {
   const buildDir = join(tauriDir, "gen", "apple", "build");
   if (sim) {
     // l'app du simulateur, installée et ouverte dans le simulateur en marche
-    const app = out(`find "${buildDir}" -name "Lumen.app" -path "*simulator*" -maxdepth 4 | head -1`).trim() || out(`find "${buildDir}" -name "Lumen.app" -maxdepth 5 | head -1`).trim();
-    if (!app) fail("Lumen.app est introuvable après la compilation.");
+    const app = out(`find "${buildDir}" -name "Umbra.app" -path "*simulator*" -maxdepth 4 | head -1`).trim() || out(`find "${buildDir}" -name "Umbra.app" -maxdepth 5 | head -1`).trim();
+    if (!app) fail("Umbra.app est introuvable après la compilation.");
     spawnSync("xcrun", ["simctl", "install", "booted", app], { env, stdio: "inherit" });
-    spawnSync("xcrun", ["simctl", "launch", "booted", "app.lumen.reader"], { env, stdio: "inherit" });
+    spawnSync("xcrun", ["simctl", "launch", "booted", "com.raphaelbenjamin.lumenhebrew"], { env, stdio: "inherit" });
     console.log("\n✓ Lumen (version complète) est ouvert dans le simulateur.");
     process.exit(0);
   }
@@ -194,7 +194,7 @@ if (args.includes("--install") || args.includes("--sim-release")) {
   step(`Installation sur ${target.name}`);
   const inst = spawnSync("xcrun", ["devicectl", "device", "install", "app", "--device", target.id, join(buildDir, "arm64", ipa.name)], { env, stdio: "inherit" });
   if (inst.status !== 0) fail(`L'installation sur ${target.name} a échoué : gardez l'iPhone déverrouillé et branché, puis relancez.`);
-  const launched = spawnSync("xcrun", ["devicectl", "device", "process", "launch", "--device", target.id, "app.lumen.reader"], { env, stdio: "ignore" });
+  const launched = spawnSync("xcrun", ["devicectl", "device", "process", "launch", "--device", target.id, "com.raphaelbenjamin.lumenhebrew"], { env, stdio: "ignore" });
   console.log(`\n✓ Lumen est installé sur ${target.name}.`);
   if (launched.status !== 0)
     console.log(

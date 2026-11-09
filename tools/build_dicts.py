@@ -254,7 +254,7 @@ def build_en(src: str, dst: str, lang: str):
 
 # ====================== Version 2 : les 24 autres langues ======================
 
-V2_LANGS = "nl sv da fi et lv lt pl cs sk sl hr hu ro bg uk el tr ar hi id vi ko ja".split()
+V2_LANGS = "nl sv da fi et lv lt pl cs sk sl hr hu ro bg uk el tr ar he hi id vi ko ja".split()
 # Wiktionnaire anglais : le croate est rangé sous le serbo-croate (alphabet latin seulement)
 EN_CODES = {"hr": ["sh"]}
 FR_CODES = {"hr": ["hr", "sh"]}
@@ -307,6 +307,8 @@ def plain_word(w: str, lang: str) -> str:
 def key2(s: str, lang: str) -> str:
     """Clé de recherche d'un mot (miroir de dict::key dans dict.rs)."""
     s = unicodedata.normalize("NFD", s.strip().lower().replace("’", "'"))
+    if lang == "he":
+        s = re.sub(r"[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]", "", s).replace("׳", "'").replace("״", '"')
     if lang in STRIPS_ACCENTS:
         s = s.replace("\u0301", "").replace("\u0300", "")
     if lang == "tr":

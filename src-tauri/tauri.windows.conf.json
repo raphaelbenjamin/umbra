@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Lumen",
+        "title": "Umbra",
         "width": 1380,
         "height": 880,
         "minWidth": 980,
@@ -36,13 +36,6 @@
         "installerIcon": "icons/icon.ico",
         "headerImage": "nsis/header.bmp",
         "sidebarImage": "nsis/sidebar.bmp"
-      }
-    }
-  },
-  "plugins": {
-    "updater": {
-      "windows": {
-        "installMode": "passive"
       }
     }
   }

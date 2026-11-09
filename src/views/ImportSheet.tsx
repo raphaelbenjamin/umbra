@@ -23,6 +23,7 @@ import {
 } from "../lib/importers";
 import { count, formatNumber, locale, pick, t } from "../lib/i18n";
 import { inLang } from "../lib/langs";
+import { isMobile } from "../lib/platform";
 import { formatBytes, formatDuration, useApp, type ImportTab } from "../lib/store";
 import type { BookChapter, CreatedBook, DiscoverItem, ImportEvent, LinkInfo, LinkMedia, NewLesson } from "../lib/types";
 import { PodcastTab, usePodcastForm } from "./import/PodcastTab";
@@ -48,7 +49,12 @@ interface Pending {
 }
 
 /** Ce qu'on importe d'un lien qui offre à la fois un texte et un son. */
-type Choice = "both" | "media" | "article";
+type Choice = "both" | "media" | "article" | "captions" | "videoCaptions";
+
+function canUseCaptions(info: LinkInfo): boolean {
+  const item = info.media[0];
+  return isTauri && !isMobile && !info.list && !!item && !item.direct && !!youtubeId(item.url);
+}
 
 /** Lien analysé : ce qu'il contient et ce que l'utilisateur en garde. */
 interface Found {
@@ -57,6 +63,7 @@ interface Found {
   choice: Choice;
   /** éléments cochés d'une liste, dans l'ordre de la liste */
   picked: number[];
+  videoHeight?: number;
 }
 
 /** Livre ouvert dans la feuille : ses chapitres à cocher, sa couverture. */
@@ -350,7 +357,7 @@ export function ImportSheet() {
       }
       // un long article accompagné d'un son : le texte d'abord ; un texte court : le son, recalé sur le texte s'il le suit.
       // Un épisode dont la page porte le texte (DW, RFI…) : le son avec ce texte, la lanterne calée dessus.
-      const choice: Choice = !article ? "media" : hint?.page_text && !info.list ? "both" : article.words >= 150 ? "article" : info.list ? "media" : "both";
+      const choice: Choice = canUseCaptions(info) ? "captions" : !article ? "media" : hint?.page_text && !info.list ? "both" : article.words >= 150 ? "article" : info.list ? "media" : "both";
       setFound({ info, article, choice, picked: [0] });
     });
 
@@ -370,7 +377,9 @@ export function ImportSheet() {
       for (let i = 0; i < items.length; i++) {
         const prefix = items.length > 1 ? `${i + 1}/${items.length} · ` : "";
         try {
-          ids.push(await api().importLink(lang, items[i], text, onImportEvent(prefix)));
+          const captions = choice === "captions" || choice === "videoCaptions";
+          const item = choice === "captions" ? { ...items[i], video: false } : items[i];
+          ids.push(await api().importLink(lang, item, text, onImportEvent(prefix), captions, item.video ? found.videoHeight : undefined));
         } catch (e) {
           // un élément d'une liste qui échoue n'arrête pas les suivants
           if (items.length === 1) throw e;
@@ -515,15 +524,18 @@ export function ImportSheet() {
     if (tab === "link" && !preview && found) {
       const n = found.info.list ? found.picked.length : 1;
       const wantsMedia = found.choice !== "article";
+      const wantsCaptions = found.choice === "captions" || found.choice === "videoCaptions";
       footer = (
         <>
           <button className="btn ghost" onClick={() => setFound(null)}>
             {t("Retour", "Back")}
           </button>
-          <button className="btn primary" disabled={wantsMedia && (!asrReady || n === 0)} onClick={importFound}>
+          <button className="btn primary" disabled={wantsMedia && ((!wantsCaptions && !asrReady) || n === 0)} onClick={importFound}>
             {!wantsMedia
               ? t("Voir le texte", "See the text")
-              : found.info.list
+              : wantsCaptions
+                ? found.choice === "videoCaptions" ? t("Importer la vidéo et les sous-titres", "Import video and captions") : t("Importer le son et les sous-titres", "Import audio and captions")
+                : found.info.list
                 ? `${t("Importer", "Import")} ${itemsLabel(found.info, n)}`
                 : found.info.media[0].video
                   ? t("Importer la vidéo", "Import the video")
@@ -739,7 +751,7 @@ export function ImportSheet() {
               </>
             )}
 
-            {!preview && tab === "link" && found && <LinkFound found={found} onChange={setFound} asrMissing={!asrReady && found.choice !== "article" ? <AsrMissing /> : null} />}
+            {!preview && tab === "link" && found && <LinkFound found={found} onChange={setFound} captionsAvailable={canUseCaptions(found.info)} asrMissing={!asrReady && (found.choice === "media" || found.choice === "both") ? <AsrMissing /> : null} />}
 
             {!preview && tab === "file" && !book && (
               <button className="file-drop" onClick={chooseDocs} disabled={!isTauri}>
@@ -926,7 +938,7 @@ function MediaList({ media, picked, onPick }: { media: LinkMedia[]; picked: numb
 }
 
 /** Ce qu'un lien contient, et le choix de ce qu'on en importe. */
-function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: Found): void; asrMissing: React.ReactNode }) {
+function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: Found; onChange(f: Found): void; captionsAvailable: boolean; asrMissing: React.ReactNode }) {
   const { info, article, choice, picked } = found;
   const first = info.media[0];
   const n = info.media.length;
@@ -942,8 +954,24 @@ function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: 
   if (article) facts.push(t(`article de ${count(article.words, "mot", "mots", "word", "words")}`, `${formatNumber(article.words)}-word article`));
 
   const options: { id: Choice; icon: IconName; label: string; hint: string }[] = [];
-  if (article) {
-    if (!info.list)
+  if (captionsAvailable) {
+    options.push({
+      id: "captions",
+      icon: "wave",
+      label: t("Son et sous-titres YouTube", "Audio and YouTube captions"),
+      hint: t("Utilise les sous-titres de la vidéo et leur minutage, sans transcription locale.",
+        "Uses the video's caption text and timing, with no local transcription."),
+    });
+  }
+  if (captionsAvailable && video) {
+    options.push({
+      id: "videoCaptions", icon: "video",
+      label: t("Vidéo et sous-titres YouTube", "Video and YouTube captions"),
+      hint: t("Conserve l’image et utilise le minutage des sous-titres.", "Keeps the video and uses the caption timing."),
+    });
+  }
+  if (article || captionsAvailable) {
+    if (article && !info.list)
       options.push({
         id: "both",
         icon: "sparkle",
@@ -963,7 +991,7 @@ function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: 
           : t("Le son, transcrit", "The sound, transcribed"),
       hint: t("Transcription mot à mot sur votre Mac, synchronisée avec le son.", "Word-by-word transcript on your Mac, in sync with the sound."),
     });
-    options.push({
+    if (article) options.push({
       id: "article",
       icon: "text",
       label: t("Le texte de l'article", "The article's text"),
@@ -1021,6 +1049,17 @@ function LinkFound({ found, onChange, asrMissing }: { found: Found; onChange(f: 
         </div>
       )}
 
+      {captionsAvailable && video && choice !== "captions" && choice !== "article" && (
+        <label className="set-row">
+          {t("Résolution vidéo préférée", "Preferred video resolution")}
+          <select className="select" value={found.videoHeight ?? ""} onChange={(e) =>
+            onChange({ ...found, videoHeight: Number(e.target.value) || undefined })}>
+            <option value="">{t("Réglage de stockage", "Use storage setting")}</option>
+            <option value="720">720p</option>
+            <option value="1080">1080p</option>
+          </select>
+        </label>
+      )}
       {info.list && choice !== "article" && <MediaList media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
 
       {asrMissing}

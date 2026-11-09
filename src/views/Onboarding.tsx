@@ -7,7 +7,7 @@ import { Orb, Switch } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { formatWhen, isCloud, pickBackupFolder, placeDir, reloadProgress, restoreStage, useBackup } from "../lib/backup";
 import { count, t, type UiLang } from "../lib/i18n";
-import { LANGS, STARTERS, featuredLangs, flagOf, langLower, starterCollection, type LangInfo } from "../lib/langs";
+import { LANGS, STARTERS, featuredLangs, flagOf, langInfo, langLower, starterCollection, type LangInfo } from "../lib/langs";
 import { inFolder, isIOS } from "../lib/platform";
 import { PROFILES, useRecommendedProfile } from "../lib/profiles";
 import { formatBytes, formatNumber, useApp } from "../lib/store";
@@ -178,8 +178,8 @@ export function Onboarding() {
   const below = compact ? { top: horizonY + STEP_GAP } : undefined;
 
   const toggle = (c: LangCode) => setLangs((l) => (l.includes(c) ? l.filter((x) => x !== c) : [...l, c]));
-  const featured = LANGS.filter((l) => featuredLangs().includes(l.code));
-  const others = LANGS.filter((l) => !featuredLangs().includes(l.code));
+  const featured = ["he", ...featuredLangs()].map(langInfo);
+  const others = LANGS.filter((l) => !featured.some((f) => f.code === l.code));
 
   const langCard = (l: LangInfo, delay: number) => {
     const on = langs.includes(l.code);
@@ -200,7 +200,7 @@ export function Onboarding() {
         </span>
         <span className="meta">
           <span className="dot-lang" style={{ background: l.color }} />
-          {featuredLangs().includes(l.code) && l.name !== l.native ? `${l.name} · ${l.native}` : l.name}
+          {featured.some((f) => f.code === l.code) && l.name !== l.native ? `${l.name} · ${l.native}` : l.name}
         </span>
         <AnimatePresence>
           {on && (
@@ -418,8 +418,8 @@ export function Onboarding() {
         <AnimatePresence mode="wait">
           {n === 0 && (
             <motion.div key="0" ref={measureStep} className="ob-step welcome" style={below} {...stepAnim}>
-              <h1 className="ob-word" aria-label="Lumen">
-                {"Lumen".split("").map((c, i) => (
+              <h1 className="ob-word" aria-label="Umbra">
+                {"Umbra".split("").map((c, i) => (
                   <motion.span
                     key={i}
                     className="ch"
@@ -431,7 +431,7 @@ export function Onboarding() {
                   </motion.span>
                 ))}
                 <span className="sheen" aria-hidden="true">
-                  Lumen
+                  Umbra
                 </span>
               </h1>
               <motion.p className="ob-lead" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.3, duration: 1 }}>

@@ -68,12 +68,13 @@ fn vietnamese(c: char) -> bool {
 /// Langue probable d'un texte, ou rien si le texte est trop court ou ambigu.
 pub fn guess(text: &str) -> Option<&'static str> {
     let low = text.to_lowercase();
-    let (mut latin, mut cyr, mut greek, mut arabic, mut deva, mut hangul, mut kana, mut han, mut viet) = (0usize, 0, 0, 0, 0, 0, 0, 0, 0);
+    let (mut latin, mut cyr, mut greek, mut arabic, mut deva, mut hangul, mut kana, mut han, mut viet, mut hebrew) = (0usize, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     for c in low.chars() {
         match c {
             '\u{400}'..='\u{4ff}' => cyr += 1,
             '\u{370}'..='\u{3ff}' | '\u{1f00}'..='\u{1fff}' => greek += 1,
             '\u{600}'..='\u{6ff}' | '\u{750}'..='\u{77f}' => arabic += 1,
+            '\u{05d0}'..='\u{05ea}' => hebrew += 1,
             '\u{900}'..='\u{97f}' => deva += 1,
             '\u{ac00}'..='\u{d7af}' | '\u{1100}'..='\u{11ff}' => hangul += 1,
             '\u{3040}'..='\u{30ff}' => kana += 1,
@@ -86,7 +87,7 @@ pub fn guess(text: &str) -> Option<&'static str> {
             viet += 1;
         }
     }
-    let total = latin + cyr + greek + arabic + deva + hangul + kana + han;
+    let total = latin + cyr + greek + arabic + deva + hangul + kana + han + hebrew;
     if total < 8 {
         return None;
     }
@@ -100,6 +101,9 @@ pub fn guess(text: &str) -> Option<&'static str> {
     }
     if share(greek) > 0.4 {
         return Some("el");
+    }
+    if share(hebrew) > 0.4 {
+        return Some("he");
     }
     if share(arabic) > 0.4 {
         return Some("ar");

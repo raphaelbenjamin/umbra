@@ -31,7 +31,7 @@ const pending = new Map<string, Promise<string>>();
 let player: HTMLAudioElement | null = null;
 
 /** Langues que la voix naturelle ne parle pas (miroir de `text::VOICE_LANGS`) : la voix du système les dit. */
-const NO_NATURAL_VOICE = new Set(["zh"]);
+const NO_NATURAL_VOICE = new Set(["zh", "he"]);
 
 /** La voix naturelle parle cette langue. */
 export function naturalVoiceSpeaks(lang: string): boolean {

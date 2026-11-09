@@ -1,11 +1,11 @@
 {
-  "name": "lumen",
+  "name": "umbra",
   "private": true,
-  "version": "1.4.0",
+  "version": "2.0.0",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LivingTwice/lumen.git"
+    "url": "https://github.com/raphaelbenjamin/umbra.git"
   },
   "type": "module",
   "scripts": {
@@ -25,8 +25,7 @@
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-dialog": "^2.8.1",
     "@tauri-apps/plugin-opener": "^2.7.0",
-    "@tauri-apps/plugin-process": "^2.4.0",
-    "@tauri-apps/plugin-updater": "^2.13.1",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "hls.js": "^1.7.3",
     "jszip": "^3.10.2",
     "motion": "^14.0.0",

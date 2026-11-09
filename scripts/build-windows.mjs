@@ -3,7 +3,7 @@
 //   node scripts/build-windows.mjs           l'installateur
 //   node scripts/build-windows.mjs --check   vérifie seulement que tout compile pour Windows
 //   node scripts/build-windows.mjs --tests   compile aussi les tests pour Windows (sans les lancer)
-// Résultat : src-tauri/target/windows/x86_64-pc-windows-msvc/release/bundle/nsis/Lumen_<version>_x64-setup.exe
+// Résultat : src-tauri/target/windows/x86_64-pc-windows-msvc/release/bundle/nsis/Umbra_<version>_x64-setup.exe
 //
 // Outils, installés au besoin la première fois : rustup et sa cible Windows (le Rust
 // de Homebrew ne compile que pour le Mac), cargo-xwin (il télécharge une fois les
@@ -121,16 +121,9 @@ copyFileSync(sidecar, join(tauriDir, "binaries", `lumen-whisper-${TARGET}.exe`))
 console.log("  ok");
 
 step("Lumen pour Windows (une vingtaine de minutes la première fois)");
-// la clé des mises à jour signe l'installateur ; sans elle, pas de signature (essai)
-const key = join(homedir(), ".tauri", "lumen-updater.key");
-if (!env.TAURI_SIGNING_PRIVATE_KEY && existsSync(key)) {
-  env.TAURI_SIGNING_PRIVATE_KEY = key;
-  env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "";
-}
-const unsigned = env.TAURI_SIGNING_PRIVATE_KEY ? "" : ` --config '{"bundle":{"createUpdaterArtifacts":false}}'`;
-run(`npx tauri build --runner cargo-xwin --target ${TARGET} --bundles nsis${unsigned}`);
+run(`npx tauri build --runner cargo-xwin --target ${TARGET} --bundles nsis`);
 
 const version = JSON.parse(readFileSync(join(tauriDir, "tauri.conf.json"), "utf8")).version;
-const setup = join(targetDir, TARGET, "release", "bundle", "nsis", `Lumen_${version}_x64-setup.exe`);
+const setup = join(targetDir, TARGET, "release", "bundle", "nsis", `Umbra_${version}_x64-setup.exe`);
 if (!existsSync(setup)) fail(`installateur introuvable : ${setup}`);
-console.log(`\n✓ ${setup}${existsSync(`${setup}.sig`) ? "\n✓ signature de mise à jour" : ""}`);
+console.log(`\n✓ ${setup}`);

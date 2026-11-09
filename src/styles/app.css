@@ -34,9 +34,9 @@
   --text: #17181c;
   --muted: #5b5d65;
   --faint: #8a8c94;
-  --accent: #3b4cca;
-  --accent-hover: #2f3fb3;
-  --accent-soft: rgba(59, 76, 202, 0.12);
+  --accent: #3159ad;
+  --accent-hover: #264a97;
+  --accent-soft: rgba(49, 89, 173, 0.12);
   --on-accent: #ffffff;
   --chip: rgba(23, 24, 28, 0.055);
   --chip-hover: rgba(23, 24, 28, 0.09);
@@ -44,34 +44,34 @@
   --ok: #1e8a63;
   --danger: #c2412d;
 
-  --w-new: rgba(59, 76, 202, 0.11);
-  --w-new-line: #3b4cca;
+  --w-new: rgba(49, 89, 173, 0.11);
+  --w-new-line: #3159ad;
   --w-l1: rgba(232, 134, 22, 0.38);
   --w-l2: rgba(232, 134, 22, 0.23);
   --w-l3: rgba(232, 134, 22, 0.12);
   --w-ln1: rgba(214, 118, 10, 0.95);
   --w-ln2: rgba(214, 118, 10, 0.62);
   --w-ln3: rgba(214, 118, 10, 0.34);
-  --w-phrase: rgba(59, 76, 202, 0.5);
+  --w-phrase: rgba(49, 89, 173, 0.5);
   /* surlignage de plusieurs mots (opaque : pas de rayures aux chevauchements) */
   --w-sel: color-mix(in srgb, var(--accent) 26%, var(--bg));
 
   /* la lumière de Lumen */
-  --light: #ffb45e;
-  --light-strong: #f59e4c;
-  --light-soft: rgba(255, 180, 94, 0.32);
-  --light-veil: rgba(255, 196, 120, 0.16);
-  --lantern: radial-gradient(closest-side, rgba(255, 196, 110, 0.55), rgba(255, 180, 94, 0.22) 60%, rgba(255, 180, 94, 0));
+  --light: #8cb6ff;
+  --light-strong: #5d91e6;
+  --light-soft: rgba(103, 154, 244, 0.32);
+  --light-veil: rgba(142, 181, 255, 0.16);
+  --lantern: radial-gradient(closest-side, rgba(144, 183, 255, 0.55), rgba(103, 154, 244, 0.22) 60%, rgba(103, 154, 244, 0));
   /* la lanterne du lecteur : légère, le mouvement suffit à la suivre */
-  --lantern-halo: radial-gradient(closest-side, rgba(255, 196, 110, 0.32), rgba(255, 184, 100, 0.12) 60%, rgba(255, 184, 100, 0));
-  --lantern-fill: rgba(255, 186, 104, 0.2);
-  --lantern-ring: rgba(255, 180, 94, 0.3);
+  --lantern-halo: radial-gradient(closest-side, rgba(144, 183, 255, 0.32), rgba(121, 170, 255, 0.12) 60%, rgba(121, 170, 255, 0));
+  --lantern-fill: rgba(117, 165, 250, 0.2);
+  --lantern-ring: rgba(103, 154, 244, 0.3);
   /* flamme de la série (Progrès), et texte posé sur la lumière */
   --flame-top: #ffc56e;
   --flame-base: #ee7a30;
   --flame-core-top: #fff8e6;
   --flame-core: #ffd383;
-  --on-light: #4a2a0c;
+  --on-light: #132646;
 
   --shadow-s: 0 1px 2px rgba(17, 18, 24, 0.06), 0 1px 1px rgba(17, 18, 24, 0.04);
   --shadow-m: 0 6px 20px rgba(17, 18, 24, 0.08), 0 1px 3px rgba(17, 18, 24, 0.06);
@@ -83,46 +83,46 @@
 /* sombre ; aussi dans une leçon dont la page est sombre (Crépuscule, Nuit, Encre), même Lumen en clair */
 :root[data-theme="dark"],
 .paper-dark {
-  --bg: #121316;
-  --bg-elev: #1b1c21;
-  --bg-sunk: #0e0f12;
-  --side: #17181c;
+  --bg: #111621;
+  --bg-elev: #1a2332;
+  --bg-sunk: #0c111b;
+  --side: #171e2b;
   --side-vibrant: rgba(22, 23, 27, 0.55);
-  --panel: #18191e;
+  --panel: #182130;
   --border: rgba(255, 255, 255, 0.075);
   --border-strong: rgba(255, 255, 255, 0.14);
   --text: #ecebe7;
   --muted: #a3a5ad;
   --faint: #73757d;
-  --accent: #9aa6ff;
-  --accent-hover: #b0baff;
-  --accent-soft: rgba(154, 166, 255, 0.14);
-  --on-accent: #121316;
+  --accent: #a9c8ff;
+  --accent-hover: #c1d7ff;
+  --accent-soft: rgba(169, 200, 255, 0.14);
+  --on-accent: #111621;
   --chip: rgba(255, 255, 255, 0.065);
   --chip-hover: rgba(255, 255, 255, 0.1);
   --raised: #2a2b31;
   --ok: #4cc79a;
   --danger: #f08a73;
 
-  --w-new: rgba(140, 154, 255, 0.22);
-  --w-new-line: #9aa6ff;
+  --w-new: rgba(124, 167, 246, 0.22);
+  --w-new-line: #a9c8ff;
   --w-l1: rgba(245, 160, 60, 0.4);
   --w-l2: rgba(245, 160, 60, 0.25);
   --w-l3: rgba(245, 160, 60, 0.13);
   --w-ln1: rgba(245, 165, 70, 0.95);
   --w-ln2: rgba(245, 165, 70, 0.62);
   --w-ln3: rgba(245, 165, 70, 0.34);
-  --w-phrase: rgba(154, 166, 255, 0.55);
+  --w-phrase: rgba(169, 200, 255, 0.55);
   --w-sel: color-mix(in srgb, var(--accent) 40%, var(--bg));
 
-  --light: #ffc27a;
-  --light-strong: #ffb45e;
-  --light-soft: rgba(255, 190, 110, 0.26);
-  --light-veil: rgba(255, 190, 110, 0.1);
-  --lantern: radial-gradient(closest-side, rgba(255, 190, 110, 0.42), rgba(255, 180, 94, 0.16) 60%, rgba(255, 180, 94, 0));
-  --lantern-halo: radial-gradient(closest-side, rgba(255, 190, 110, 0.26), rgba(255, 184, 100, 0.09) 60%, rgba(255, 184, 100, 0));
-  --lantern-fill: rgba(255, 192, 116, 0.15);
-  --lantern-ring: rgba(255, 194, 122, 0.27);
+  --light: #bdd7ff;
+  --light-strong: #8cb6ff;
+  --light-soft: rgba(139, 180, 252, 0.26);
+  --light-veil: rgba(139, 180, 252, 0.1);
+  --lantern: radial-gradient(closest-side, rgba(139, 180, 252, 0.42), rgba(103, 154, 244, 0.16) 60%, rgba(103, 154, 244, 0));
+  --lantern-halo: radial-gradient(closest-side, rgba(139, 180, 252, 0.26), rgba(121, 170, 255, 0.09) 60%, rgba(121, 170, 255, 0));
+  --lantern-fill: rgba(137, 178, 255, 0.15);
+  --lantern-ring: rgba(149, 189, 255, 0.27);
   --flame-top: #ffd08a;
   --flame-base: #f2853c;
   --flame-core-top: #fffaf0;
@@ -1352,12 +1352,16 @@ button.chip.on {
   font-weight: 500;
 }
 
-/* astre de Lumen */
+/* Umbra’s moon mark */
 .orb {
   position: relative;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 38%, #fff 0%, #fff1d6 38%, #ffc27a 78%, #f59e4c 100%);
-  box-shadow: 0 0 calc(var(--s, 22px) * 0.5) calc(var(--s, 22px) * 0.08) rgba(255, 186, 104, 0.55);
+  background:
+    radial-gradient(circle at 34% 35%, #91abd3 0 12%, transparent 15%),
+    radial-gradient(circle at 66% 57%, #a7bce0 0 16%, transparent 19%),
+    radial-gradient(circle at 38% 72%, #b1c5e5 0 8%, transparent 11%),
+    radial-gradient(circle at 40% 36%, #f8fbff 0%, #dbe8fc 62%, #8eabd7 100%);
+  box-shadow: 0 0 calc(var(--s, 22px) * 0.45) rgba(126, 168, 247, 0.48);
   flex-shrink: 0;
 }
 .orb::before {
@@ -1365,8 +1369,7 @@ button.chip.on {
   position: absolute;
   inset: -55%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 196, 120, 0.42), rgba(255, 196, 120, 0));
-  animation: breathe 5.5s ease-in-out infinite;
+  background: radial-gradient(closest-side, rgba(142, 181, 255, 0.42), rgba(142, 181, 255, 0));
   z-index: -1;
 }
 @keyframes breathe {

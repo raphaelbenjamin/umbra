@@ -315,6 +315,12 @@ span.player-voice .icon-btn {
 .player .timeline {
   min-width: 60px;
 }
+.player .media-rate-cycle {
+  flex: 0 0 auto;
+  min-width: 46px;
+  padding: 3px 5px;
+  font-size: 12px;
+}
 .rate-compact {
   display: none;
   min-width: 46px;
@@ -1426,7 +1432,7 @@ span.player-voice .icon-btn {
   content: "";
   position: absolute;
   inset: -60% -30%;
-  background: radial-gradient(closest-side, rgba(255, 190, 110, 0.27), rgba(255, 184, 100, 0.09) 60%, rgba(255, 184, 100, 0));
+  background: radial-gradient(closest-side, rgba(139, 180, 252, 0.27), rgba(121, 170, 255, 0.09) 60%, rgba(121, 170, 255, 0));
   filter: blur(2px);
 }
 .sub-lantern::after {
@@ -1434,8 +1440,8 @@ span.player-voice .icon-btn {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(255, 196, 120, 0.1);
-  box-shadow: 0 0 0 1px rgba(255, 196, 120, 0.27);
+  background: rgba(142, 181, 255, 0.1);
+  box-shadow: 0 0 0 1px rgba(142, 181, 255, 0.27);
 }
 .subtitle-band .sw {
   cursor: pointer;

@@ -1,6 +1,6 @@
 name: lumen
 options:
-  bundleIdPrefix: app.lumen.reader
+  bundleIdPrefix: com.raphaelbenjamin.lumenhebrew
   deploymentTarget:
     iOS: 17.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Lumen
-      PRODUCT_BUNDLE_IDENTIFIER: app.lumen.reader
+      PRODUCT_NAME: Umbra
+      PRODUCT_BUNDLE_IDENTIFIER: com.raphaelbenjamin.lumenhebrew
 targetTemplates:
   app:
     type: application

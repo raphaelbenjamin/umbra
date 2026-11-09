@@ -1,3 +1,4 @@
+import { canUpdate, useUpdate } from "../lib/updater";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "../components/Avatar";
@@ -19,7 +20,6 @@ import { PROFILES, useRecommendedProfile } from "../lib/profiles";
 import { formatBytes, useApp, type SettingsTab } from "../lib/store";
 import { naturalVoiceFor, naturalVoices, naturalVoiceSpeaks, pronounce } from "../lib/pronounce";
 import { loadVoices, sayWord, voicesFor } from "../lib/tts";
-import { useUpdate } from "../lib/updater";
 import { panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
 import { FontPicker, LayoutPicker, PaperPicker, lineHeightOptions, widthOptions } from "./reader/Display";
 import type { GpuInfo, LangCode, ModelRow } from "../lib/types";
@@ -38,7 +38,7 @@ import { shortName, writerFor } from "../lib/writers";
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 /** Dépôt public du code de Lumen (GPL-3.0). */
-const SOURCE_URL = "https://github.com/LivingTwice/lumen";
+const SOURCE_URL = "https://github.com/raphaelbenjamin/umbra";
 
 interface Tab {
   id: SettingsTab;
@@ -233,7 +233,6 @@ function useBadges(): Partial<Record<SettingsTab, "busy" | "warn" | "light">> {
   const downloading = useApp((s) => Object.keys(s.downloads).length > 0);
   const backupError = useBackup((s) => !!s.status?.enabled && !!s.status.error && !s.status.running);
   const lingq = useLingq((s) => s.phase === "importing");
-  const update = useUpdate((s) => s.phase === "available" || s.phase === "ready");
   const online = useOnline();
   // rien pour traduire ni converser : ni modèle sur ce Mac, ni IA en ligne prête pour les deux
   const noLlm = models.length > 0 && !models.some((m) => m.kind === "llm" && m.installed) && !(online.ready && online.words && online.chat);
@@ -241,7 +240,6 @@ function useBadges(): Partial<Record<SettingsTab, "busy" | "warn" | "light">> {
     ai: downloading ? "busy" : noLlm || (online.on && !online.ready) ? "warn" : undefined,
     backup: backupError ? "warn" : undefined,
     lingq: lingq ? "busy" : undefined,
-    about: update ? "light" : undefined,
   };
 }
 
@@ -790,6 +788,16 @@ function ReadingPane() {
       </Section>
       <Section title={t("En lisant", "While reading")}>
         <div className="set-card">
+          <div className="set-row">
+            <div className="grow">
+              <strong>{t("Avancer et reculer avec ← et →", "Seek with ← and →")}</strong>
+              <span>{t(
+                "Dans une leçon avec audio, ← recule de 3 secondes et → avance de 3 secondes. Dans une leçon de texte, les flèches passent d’un mot à l’autre.",
+                "In a lesson with audio, ← goes back 3 seconds and → goes forward 3 seconds. In text lessons, the arrows move between words.",
+              )}</span>
+            </div>
+            <Switch on={settings.arrow_seek === "1"} onChange={(v) => setSetting("arrow_seek", v ? "1" : "0")} label={t("Avancer et reculer avec les flèches", "Seek with arrow keys")} />
+          </div>
           <div className="set-row">
             <div className="grow">
               <strong>{t("Terminer la page marque les mots bleus comme connus", "Finishing the page marks blue words as known")}</strong>
@@ -1342,23 +1350,18 @@ function AboutPane() {
   const openGuide = useApp((s) => s.openGuide);
   const openNews = useApp((s) => s.openNews);
   const startTour = useApp((s) => s.startTour);
-  const upd = useUpdate();
   const version = info?.version.match(/\d+\.\d+\.\d+/)?.[0] ?? "";
 
-  const updateLine =
-    upd.phase === "checking"
-      ? t("Recherche en cours…", "Checking…")
-      : upd.phase === "uptodate"
-        ? t("Lumen est à jour.", "Lumen is up to date.")
-        : upd.phase === "available"
-          ? t(`La version ${upd.version} est disponible.`, `Version ${upd.version} is available.`)
-          : upd.phase === "downloading"
-            ? t(`Téléchargement… ${Math.round(upd.progress * 100)} %`, `Downloading… ${Math.round(upd.progress * 100)}%`)
-            : upd.phase === "ready"
-              ? t("Installée : redémarrez Lumen pour l'utiliser.", "Installed: restart Lumen to use it.")
-              : upd.phase === "error"
-                ? t(`Impossible de vérifier : ${upd.error}`, `Couldn't check: ${upd.error}`)
-                : t("Lumen vérifie automatiquement au démarrage et toutes les six heures.", "Lumen checks automatically at launch and every six hours.");
+  const update = useUpdate();
+  const updateLine = {
+    idle: t("Mises à jour signées depuis GitHub.", "Signed updates from GitHub."),
+    checking: t("Recherche en cours…", "Checking…"),
+    available: t(`Version ${update.version} disponible.`, `Version ${update.version} is available.`),
+    installing: t("Téléchargement et vérification…", "Downloading and verifying…"),
+    ready: t("Redémarrez pour ouvrir la nouvelle version.", "Restart to open the new version."),
+    current: t("Vous avez la dernière version.", "You have the latest version."),
+    error: update.error,
+  }[update.phase];
 
   return (
     <>
@@ -1367,7 +1370,7 @@ function AboutPane() {
           <Orb size={58} />
         </span>
         <div>
-          <strong className="about-name">Lumen</strong>
+          <strong className="about-name">Umbra</strong>
           <span className="about-version num">{version ? t(`Version ${version}`, `Version ${version}`) : ""}</span>
           <span className="about-tag">
             {t("Apprendre une langue en lisant et en écoutant. Toute l'intelligence vit sur votre Mac.", "Learn a language by reading and listening. All the intelligence lives on your Mac.")}
@@ -1435,7 +1438,7 @@ function AboutPane() {
             </span>
             <div className="grow">
               <strong>{t("Écran d'accueil", "Welcome screen")}</strong>
-              <span>{t("Revoir l'aube de Lumen. Vos leçons et votre vocabulaire restent intacts.", "See Lumen's dawn again. Your lessons and vocabulary stay intact.")}</span>
+              <span>{t("Revoir l’accueil d’Umbra. Vos leçons et votre vocabulaire restent intacts.", "See Umbra’s welcome again. Your lessons and vocabulary stay intact.")}</span>
             </div>
             <button className="btn sm soft" onClick={() => useApp.getState().setReplay(true)}>
               {t("Revoir l'accueil", "Replay the welcome")}
@@ -1446,25 +1449,23 @@ function AboutPane() {
 
       <Section title={t("Cette installation", "This installation")}>
         <div className="set-card">
-          <div className="set-row">
-            <div className="grow">
-              <strong>{t("Mises à jour", "Updates")}</strong>
-              <span>{updateLine}</span>
+          {canUpdate && (
+            <div className="set-row">
+              <div className="grow">
+                <strong>{t("Mises à jour", "Updates")}</strong>
+                <span>{updateLine}</span>
+              </div>
+              {update.phase === "ready" ? (
+                <button className="btn sm primary" onClick={() => void api().appRelaunch()}>{t("Redémarrer", "Restart")}</button>
+              ) : update.phase === "available" ? (
+                <button className="btn sm primary" onClick={() => void update.install()}>{t("Installer", "Install Update")}</button>
+              ) : (
+                <button className="btn sm soft" disabled={update.phase === "checking" || update.phase === "installing"} onClick={() => void update.check()}>
+                  {t("Rechercher les mises à jour", "Check for Updates")}
+                </button>
+              )}
             </div>
-            {upd.phase === "available" ? (
-              <button className="btn sm primary" onClick={upd.install}>
-                {t("Mettre à jour", "Update")}
-              </button>
-            ) : upd.phase === "ready" ? (
-              <button className="btn sm primary" onClick={upd.restart}>
-                {t("Redémarrer", "Restart")}
-              </button>
-            ) : (
-              <button className="btn sm soft" onClick={() => upd.check(true)} disabled={upd.phase === "checking" || upd.phase === "downloading"}>
-                {t("Rechercher", "Check")}
-              </button>
-            )}
-          </div>
+          )}
           <div className="set-row">
             <div className="grow">
               <strong>{t("Données", "Data")}</strong>

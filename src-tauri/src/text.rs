@@ -6,14 +6,13 @@ use serde::Serialize;
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Langues proposées par Lumen : toutes celles de la voix naturelle (Supertonic 3), et le chinois.
+/// Langues proposées par Lumen : toutes celles de la voix naturelle (Supertonic 3), ainsi que le chinois et l’hébreu.
 pub const LANGS: &[&str] = &[
     "en", "it", "de", "pt", "ru", "es", "fr", "nl", "sv", "da", "fi", "et", "lv", "lt", "pl", "cs", "sk", "sl", "hr", "hu", "ro", "bg", "uk",
-    "el", "tr", "ar", "hi", "id", "vi", "ko", "ja", "zh",
+    "el", "tr", "ar", "he", "hi", "id", "vi", "ko", "ja", "zh",
 ];
 
-/// Langues de la voix naturelle (Supertonic 3) : toutes celles de Lumen sauf le chinois,
-/// que dit la voix du système.
+/// Langues de la voix naturelle (Supertonic 3) : le chinois et l’hébreu utilisent la voix du système.
 pub const VOICE_LANGS: &[&str] = &[
     "en", "it", "de", "pt", "ru", "es", "fr", "nl", "sv", "da", "fi", "et", "lv", "lt", "pl", "cs", "sk", "sl", "hr", "hu", "ro", "bg", "uk",
     "el", "tr", "ar", "hi", "id", "vi", "ko", "ja",
@@ -48,6 +47,12 @@ pub fn normalize_for(s: &str, lang: &str) -> String {
     let lower = s.trim().to_lowercase().replace('’', "'");
     let kept: String = if strips_accents(lang) {
         lower.nfd().filter(|c| *c != '\u{0301}' && *c != '\u{0300}').nfc().collect()
+    } else if lang == "he" {
+        lower.nfd()
+            .filter(|c| !matches!(c, '\u{0591}'..='\u{05bd}' | '\u{05bf}' | '\u{05c1}' | '\u{05c2}' | '\u{05c4}' | '\u{05c5}' | '\u{05c7}'))
+            .map(|c| match c { '׳' => '\'', '״' => '"', _ => c })
+            .nfc()
+            .collect()
     } else {
         lower.nfc().collect()
     };
@@ -69,7 +74,7 @@ pub struct Token {
 
 /// Ponctuation de fin de phrase (latine, grecque « ; », japonaise, hindi, arabe).
 pub fn ends_sentence(piece: &str) -> bool {
-    piece.contains(|c: char| matches!(c, '.' | '!' | '?' | '…' | ';' | '。' | '！' | '？' | '।' | '؟' | '\n'))
+    piece.contains(|c: char| matches!(c, '.' | '!' | '?' | '…' | ';' | '。' | '！' | '？' | '।' | '؟' | '׃' | '\n'))
 }
 
 /// Phrases d'un texte, en indices de jetons [début, fin) ; chacune contient au

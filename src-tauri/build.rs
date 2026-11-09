@@ -3,6 +3,18 @@ fn main() {
     // manque aux éditions « N » de Windows sans le Media Feature Pack. Chargé seulement
     // au moment où il sert : Lumen démarre partout, et garde alors le son en WAV.
     let target = |k: &str| std::env::var(k).unwrap_or_default();
+    if target("CARGO_CFG_TARGET_OS") == "macos" {
+        // Metal's availability checks use compiler-rt. Rust's final link skips
+        // Clang's default libraries, so include the runtime from the selected SDK.
+        let output = std::process::Command::new("xcrun")
+            .args(["clang", "-print-resource-dir"])
+            .output()
+            .expect("locate the Apple Clang runtime");
+        assert!(output.status.success(), "xcrun could not locate Apple Clang");
+        let resources = String::from_utf8(output.stdout).expect("Clang resource directory is UTF-8");
+        let runtime = std::path::Path::new(resources.trim()).join("lib/darwin/libclang_rt.osx.a");
+        println!("cargo:rustc-link-arg={}", runtime.display());
+    }
     if target("CARGO_CFG_TARGET_OS") == "windows" && target("CARGO_CFG_TARGET_ENV") == "msvc" {
         for dll in ["mfplat.dll", "mfreadwrite.dll"] {
             println!("cargo:rustc-link-arg=/DELAYLOAD:{dll}");

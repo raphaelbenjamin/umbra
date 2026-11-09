@@ -147,7 +147,7 @@ export const LOOK_DEFAULTS: Record<string, string> = {
 
 /** Vitesses de lecture : audio et vidéo, ou voix (réglages `media_rate` et `tts_rate`). */
 export function playbackRates(media: boolean): string[] {
-  return media ? ["0.75", "0.9", "1", "1.25"] : ["0.75", "0.85", "0.95", "1.1"];
+  return media ? ["0.75", "1", "1.5", "2"] : ["0.75", "0.85", "0.95", "1.1"];
 }
 
 export function readFont(id: string | undefined): ReadFont {

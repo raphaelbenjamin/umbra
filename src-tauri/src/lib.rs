@@ -18,6 +18,7 @@ mod link;
 mod lingq;
 mod lyrics;
 mod media;
+mod captions;
 mod models;
 mod online;
 mod parakeet;
@@ -52,12 +53,17 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_opener::init());
-    // mises à jour et relance : Mac et Windows (sur iPhone et iPad, l'App Store s'en charge)
-    #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build()).plugin(tauri_plugin_process::init());
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     builder
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
+            #[cfg(desktop)]
+            if data_dir.file_name().and_then(|n| n.to_str()) != Some("com.raphaelbenjamin.lumenhebrew")
+                || std::fs::symlink_metadata(&data_dir).is_ok_and(|m| m.is_symlink())
+            {
+                return Err("Umbra requires its own application data directory".into());
+            }
             std::fs::create_dir_all(&data_dir)?;
             // connexion à ChatGPT (jetons hors de la base, propres à cet appareil)
             chatgpt::init(&data_dir);
@@ -101,6 +107,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::app_relaunch,
             commands::app_relaunch,
             commands::settings_get,
             commands::settings_set,
@@ -165,6 +172,7 @@ pub fn run() {
             commands::backup_pick_folder,
             commands::backup_sync,
             commands::backup_merge,
+            commands::backup_import_original,
             commands::haptic,
             commands::device_info,
             commands::discover_list,

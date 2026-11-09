@@ -1,0 +1,12 @@
+Hebrew–English dictionary
+
+Definitions and word forms come from English Wiktionary contributors, as extracted
+by Kaikki / Wiktextract on October 30, 2026 from the October 1, 2026 dump.
+Source and attribution: https://kaikki.org/dictionary/Hebrew/index.html
+Wiktionary entries and their revision histories: https://en.wiktionary.org/
+
+The Lumen Hebrew build tool converted the extract to Lumen's format-2 SQLite
+schema, removed duplicate glosses and normalized lookup keys.
+
+The adapted dictionary is distributed under Creative Commons Attribution-
+ShareAlike 4.0: https://creativecommons.org/licenses/by-sa/4.0/

@@ -5,7 +5,7 @@
 //! dans le nuage de l'utilisateur, gratuitement dans la limite de son forfait.
 //!
 //! ```text
-//! Lumen/
+//! Lumen Hebrew/
 //!   <nom du Mac> (<clé>)/     une sauvegarde par Mac et par profil
 //!     Progression.lumen       la base SQLite compressée, sans le cache
 //!     Infos.json              appareil, date, mots et leçons, médias cités
@@ -37,7 +37,7 @@ use crate::media::{self, ImportEvent};
 use crate::state::AppState;
 use crate::user;
 
-const ROOT_NAME: &str = "Lumen";
+const ROOT_NAME: &str = "Lumen Hebrew";
 const MEDIA: &str = "Médias";
 const HISTORY: &str = "Historique";
 const SNAPSHOT: &str = "Progression.lumen";
@@ -149,7 +149,7 @@ pub struct Status {
     /// réglage `backup_on` : "1" active, "0" coupée, "" pas encore choisie
     pub enabled: bool,
     pub decided: bool,
-    /// dossier « Lumen » de la sauvegarde (aucun : ni iCloud Drive ni dossier choisi)
+    /// dossier « Lumen Hebrew » de la sauvegarde (aucun : ni iCloud Drive ni dossier choisi)
     pub dir: Option<String>,
     pub icloud: bool,
     pub icloud_available: bool,
@@ -229,14 +229,25 @@ pub fn icloud_drive() -> Option<PathBuf> {
     p.is_dir().then_some(p)
 }
 
-/// Dossier « Lumen » de la sauvegarde : dans le dossier choisi, sinon dans iCloud Drive.
+/// Dossier « Lumen Hebrew » de la sauvegarde : dans le dossier choisi, sinon dans iCloud Drive.
 pub fn root(custom: &str) -> Option<PathBuf> {
     let custom = custom.trim();
-    if !custom.is_empty() {
+    let destination = if !custom.is_empty() {
         let p = PathBuf::from(custom);
-        return Some(if p.file_name().is_some_and(|n| n == ROOT_NAME) { p } else { p.join(ROOT_NAME) });
+        if p.file_name().is_some_and(|n| n == ROOT_NAME) { p } else { p.join(ROOT_NAME) }
+    } else {
+        icloud_drive()?.join(ROOT_NAME)
+    };
+    let parent = destination.parent()?;
+    let resolved = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
+    if resolved.components().any(|part| {
+        part.as_os_str().to_str().is_some_and(|name| {
+            name.eq_ignore_ascii_case("Lumen") || name.eq_ignore_ascii_case("app.lumen.reader")
+        })
+    }) || std::fs::symlink_metadata(&destination).is_ok_and(|m| m.is_symlink()) {
+        return None;
     }
-    icloud_drive().map(|d| d.join(ROOT_NAME))
+    Some(destination)
 }
 
 // ---------- nuages installés : Dropbox, Google Drive, OneDrive… ----------
@@ -252,7 +263,7 @@ pub struct Place {
     pub name: String,
     /// compte (adresse, équipe) : il peut y en avoir plusieurs pour un même service
     pub account: Option<String>,
-    /// dossier qui recevra « Lumen » (à passer par `place_dir`) ; vide : iCloud Drive
+    /// dossier qui recevra « Lumen Hebrew » (à passer par `place_dir`) ; vide : iCloud Drive
     pub path: String,
 }
 
@@ -1301,8 +1312,8 @@ fn prefs(c: &Connection) -> Prefs {
 fn no_place() -> String {
     if cfg!(target_os = "ios") {
         return crate::i18n::t(
-            "Choisissez le dossier « Lumen » où votre Mac sauvegarde (iCloud Drive, Google Drive, Dropbox…), dans Réglages › Sauvegarde.",
-            "Choose the “Lumen” folder your Mac backs up to (iCloud Drive, Google Drive, Dropbox…), in Settings › Backup.",
+            "Choisissez le dossier « Lumen Hebrew » où votre Mac sauvegarde (iCloud Drive, Google Drive, Dropbox…), dans Réglages › Sauvegarde.",
+            "Choose the “Lumen Hebrew” folder your Mac backs up to (iCloud Drive, Google Drive, Dropbox…), in Settings › Backup.",
         )
         .into();
     }
@@ -1366,7 +1377,7 @@ fn friendly(e: &anyhow::Error, place: &Place, what: (&'static str, &'static str)
     e.to_string()
 }
 
-/// Dossier « Lumen » de la sauvegarde, avec l'accès qu'il demande. Sur iPhone et
+/// Dossier « Lumen Hebrew » de la sauvegarde, avec l'accès qu'il demande. Sur iPhone et
 /// iPad, le dossier vient de l'app Fichiers : iOS n'y laisse entrer que par son
 /// signet, le temps du travail (l'accès se referme avec `Root`).
 struct Root {
@@ -1726,6 +1737,99 @@ pub fn merge_for(state: &AppState, key: &str) -> Result<crate::sync::Report, Str
     Ok(r)
 }
 
+#[derive(Serialize)]
+pub struct OriginalImport {
+    report: crate::sync::Report,
+    missing_media: usize,
+}
+
+/// Read a consistent snapshot from the official Mac installation, then merge
+/// only into the fork. The original's settings and deletion history stay there.
+pub fn import_original(state: &AppState, include_media: bool) -> Result<OriginalImport> {
+    anyhow::ensure!(cfg!(target_os = "macos"), "Original Lumen import is available on macOS");
+    let _running = state.backup.wait();
+    let parent = state.data_dir.parent().ok_or_else(|| anyhow!("No application data parent"))?;
+    let source = parent.join("app.lumen.reader");
+    merge_original(&state.db, &source, &state.data_dir, include_media)
+}
+
+fn merge_original(live: &Mutex<Connection>, source: &Path, data_dir: &Path, include_media: bool) -> Result<OriginalImport> {
+    let original = db::path(source);
+    anyhow::ensure!(original.is_file(), crate::i18n::t(
+        "La base locale de Lumen est introuvable sur ce Mac.",
+        "The original Lumen database was not found on this Mac."
+    ));
+    anyhow::ensure!(source.canonicalize()? != data_dir.canonicalize()?, "The two data folders must be separate");
+    let stamp = media::new_stem();
+    let scratch = data_dir.join(format!("original-{stamp}.tmp"));
+    fs::create_dir(&scratch)?;
+    let mut copied = Vec::new();
+    let mut committed = false;
+    let result = (|| -> Result<OriginalImport> {
+        let snapshot = scratch.join("incoming.db");
+        let original = Connection::open_with_flags(&original, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        original.busy_timeout(Duration::from_secs(10))?;
+        original.execute("VACUUM INTO ?1", [snapshot.to_string_lossy()])?;
+        drop(original);
+        let incoming = db::open(&snapshot)?;
+        incoming.execute("DELETE FROM tombstones", [])?;
+        let incoming_langs = db::setting(&incoming, "langs").unwrap_or_default();
+        let mut media_paths = HashMap::new();
+        let mut missing_media = 0;
+        if include_media {
+            let mut statement = incoming.prepare(
+                "SELECT media_path FROM lessons UNION SELECT video_path FROM lessons UNION SELECT cover_path FROM lessons"
+            )?;
+            let names: HashSet<_> = statement.query_map([], |row| row.get::<_, Option<String>>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?.into_iter().flatten()
+                .map(|path| stored_name(&path)).filter(|name| !name.is_empty()).collect();
+            let from = media::media_dir(source);
+            let to = media::media_dir(data_dir);
+            fs::create_dir_all(&to)?;
+            anyhow::ensure!(to.canonicalize()?.starts_with(data_dir.canonicalize()?), "Destination media must stay inside Lumen Hebrew");
+            for name in names {
+                if Path::new(&name).file_name().and_then(|n| n.to_str()) != Some(name.as_str()) {
+                    continue;
+                }
+                let file = from.join(&name);
+                if !fs::symlink_metadata(&file).is_ok_and(|m| m.is_file()) {
+                    missing_media += 1;
+                    continue;
+                }
+                let dest = to.join(format!("original-{name}"));
+                if !dest.exists() {
+                    let staged = scratch.join("media.part");
+                    copy_file(&file, &staged)?;
+                    fs::rename(&staged, &dest)?;
+                    copied.push(dest.clone());
+                }
+                anyhow::ensure!(fs::symlink_metadata(&dest)?.is_file(), "Invalid destination media file");
+                media_paths.insert(name, dest.to_string_lossy().into_owned());
+            }
+        }
+        drop(incoming);
+        let mut live = live.lock();
+        let safety = data_dir.join(format!("lumen.before-original-{stamp}.db"));
+        live.execute("VACUUM INTO ?1", [safety.to_string_lossy()])?;
+        let (report, _) = crate::sync::merge_from(&mut live, &snapshot, &|name| media_paths.get(name).cloned(), true)?;
+        committed = true;
+        let current_langs = db::setting(&live, "langs").unwrap_or_default();
+        let mut langs: Vec<_> = current_langs.split(',').filter(|lang| !lang.is_empty()).collect();
+        for lang in incoming_langs.split(',') {
+            if crate::text::LANGS.contains(&lang) && !langs.contains(&lang) {
+                langs.push(lang);
+            }
+        }
+        db::setting_set(&live, "langs", &langs.join(","))?;
+        Ok(OriginalImport { report, missing_media })
+    })();
+    if !committed {
+        for path in copied { let _ = fs::remove_file(path); }
+    }
+    let _ = fs::remove_dir_all(scratch);
+    result
+}
+
 pub fn list_for(state: &AppState) -> Result<Vec<Info>, String> {
     let p = prefs(&state.db.lock());
     let root = open_root(state, &p).ok_or_else(no_place)?;
@@ -1764,6 +1868,45 @@ mod tests {
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(p.join("media")).unwrap();
         p
+    }
+
+    #[test]
+    fn original_import_preserves_both_libraries_and_can_add_media_later() {
+        let source = temp("original-import-source");
+        let fork = temp("original-import-fork");
+        let audio = source.join("media/fixture.m4a");
+        fs::write(&audio, b"audio fixture").unwrap();
+        let original = db::open(&db::path(&source)).unwrap();
+        db::setting_set(&original, "langs", "it,es").unwrap();
+        let original_lesson = lesson(&original, "Original lesson", "", Some(&audio), None, None);
+        original.execute("UPDATE lessons SET position=42 WHERE id=?1", [original_lesson]).unwrap();
+        original.execute(
+            "INSERT INTO terms(lang,term,status,created_at,updated_at) VALUES('it','faro',4,1,1)", []
+        ).unwrap();
+        drop(original);
+        let original_bytes = fs::read(db::path(&source)).unwrap();
+
+        let live = Mutex::new(db::open(&db::path(&fork)).unwrap());
+        db::setting_set(&live.lock(), "langs", "he").unwrap();
+        live.lock().execute(
+            "INSERT INTO terms(lang,term,status,created_at,updated_at) VALUES('he','שלום',4,1,1)", []
+        ).unwrap();
+        let report = merge_original(&live, &source, &fork, false).unwrap().report;
+        assert_eq!((report.known, report.lessons), (1, 1));
+        assert_eq!(db::setting(&live.lock(), "langs").as_deref(), Some("he,it,es"));
+        assert!(!fork.join("media/original-fixture.m4a").exists());
+        assert_eq!(merge_original(&live, &source, &fork, true).unwrap().report.lessons, 0);
+        let (position, media): (f64, String) = live.lock()
+            .query_row("SELECT position,media_path FROM lessons", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+        assert_eq!(position, 42.0);
+        assert_eq!(fs::read(media).unwrap(), b"audio fixture");
+        assert_eq!(fs::read(db::path(&source)).unwrap(), original_bytes);
+        assert_eq!(fs::read(audio).unwrap(), b"audio fixture");
+        let known: i64 = live.lock().query_row("SELECT count(*) FROM terms WHERE status=4", [], |r| r.get(0)).unwrap();
+        assert_eq!(known, 2);
+        drop(live);
+        fs::remove_dir_all(source).unwrap();
+        fs::remove_dir_all(fork).unwrap();
     }
 
     fn lesson(c: &Connection, title: &str, collection: &str, audio: Option<&Path>, video: Option<&Path>, cover: Option<&Path>) -> i64 {
@@ -2047,8 +2190,9 @@ mod tests {
         assert_eq!(folder_key(Path::new("/x/Médias")), None);
         assert_eq!(key_of("0123456789ab", "ba9876543210"), "012345ba9876");
         assert!(is_day("2026-10-03") && !is_day("2026-1-03") && !is_day("../../x"));
-        assert_eq!(root("/Users/x/Dropbox").unwrap(), PathBuf::from("/Users/x/Dropbox/Lumen"));
-        assert_eq!(root("/Volumes/Clé/Lumen").unwrap(), PathBuf::from("/Volumes/Clé/Lumen"));
+        assert_eq!(root("/Users/x/Dropbox").unwrap(), PathBuf::from("/Users/x/Dropbox/Lumen Hebrew"));
+        assert_eq!(root("/Volumes/Clé/Lumen Hebrew").unwrap(), PathBuf::from("/Volumes/Clé/Lumen Hebrew"));
+        assert!(root("/Volumes/Clé/Lumen").is_none());
     }
 
     // les nuages tels que macOS les range (chemins du Mac)

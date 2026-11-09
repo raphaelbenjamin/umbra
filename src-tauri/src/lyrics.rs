@@ -343,7 +343,7 @@ mod tests {
         let started = std::time::Instant::now();
         let url = crate::search::song_url(&dir, artist, title).await.unwrap();
         let ytdlp = crate::tools::find_ytdlp(&dir).expect("yt-dlp");
-        let (audio, _) = crate::media::yt_audio(&dir, &ytdlp, &url, "song", None, &mut |_| {}).await.unwrap();
+        let (audio, _) = crate::media::yt_audio(&dir, &ytdlp, &url, "song", None, false, &mut |_| {}).await.unwrap();
         println!("son : {} Ko en {:.1} s", std::fs::metadata(&audio).unwrap().len() / 1024, started.elapsed().as_secs_f64());
         if let Ok(model) = std::env::var("LUMEN_ASR_MODEL") {
             let started = std::time::Instant::now();

@@ -4,7 +4,7 @@ import { Icon } from "../../components/Icon";
 import { api, errorText, isTauri } from "../../lib/api";
 import { isMobile } from "../../lib/platform";
 import { useApp } from "../../lib/store";
-import { sentenceBounds } from "../../lib/tokenize";
+import { displayText, sentenceBounds } from "../../lib/tokenize";
 import type { Lesson, Term, Token } from "../../lib/types";
 import { t } from "../../lib/i18n";
 
@@ -18,6 +18,7 @@ interface Props {
   playing: boolean;
   onHost(el: HTMLDivElement | null): void;
   onWord(i: number): void;
+  onWordContextMenu(e: React.MouseEvent): void;
   onToggle(): void;
   onVideoReady(path: string): void;
   cinema: boolean;
@@ -64,7 +65,7 @@ const nativeWindow = () => import("@tauri-apps/api/window").then((m) => m.getCur
  * Scène vidéo : l'image seule au-dessus du texte ; en plein écran, l'image
  * occupe l'écran et les sous-titres interactifs s'affichent dans le noir, dessous.
  */
-export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onWord, onToggle, onVideoReady, cinema, setCinema, hidden, onClose }: Props) {
+export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onWord, onWordContextMenu, onToggle, onVideoReady, cinema, setCinema, hidden, onClose }: Props) {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const toast = useApp((s) => s.toast);
@@ -381,14 +382,14 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
                       transition={lamp.jump ? { duration: 0 } : LANTERN_SPRING}
                     />
                   )}
-                  <p key={shown.chunk[0]} className="sub-line" lang={lesson.lang}>
+                  <p key={shown.chunk[0]} className="sub-line" lang={lesson.lang} onContextMenu={onWordContextMenu}>
                     {tokens.slice(shown.chunk[0], shown.chunk[1]).map((t, j) => {
                       const i = shown.chunk[0] + j;
-                      if (!t.w) return <span key={i}>{t.t}</span>;
+                      if (!t.w) return <span key={i}>{displayText(t.t, lesson.lang)}</span>;
                       const st = terms[t.k]?.status ?? 0;
                       return (
                         <span key={i} data-i={i} className={`sw s${st}`} onClick={() => onWord(i)}>
-                          {t.t}
+                          {displayText(t.t, lesson.lang)}
                         </span>
                       );
                     })}

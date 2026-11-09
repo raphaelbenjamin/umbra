@@ -39,7 +39,7 @@ export function voicesFor(lang: string, voices = voicesCache): SpeechSynthesisVo
     return s;
   };
   return voices
-    .filter((v) => v.lang.toLowerCase().startsWith(lang))
+    .filter((v) => v.lang.toLowerCase().split("-")[0] === lang || (lang === "he" && /^iw(?:-|$)/i.test(v.lang)))
     .sort((a, b) => score(b) - score(a));
 }
 

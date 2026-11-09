@@ -17,7 +17,7 @@ import { langInfo } from "./langs";
 import { isMobile, isWindows, joinPath } from "./platform";
 import { LOOK_DEFAULTS, PAPERS, playbackRates, READ_FONTS, SIZE_MAX, SIZE_MIN } from "./reading";
 import { useApp, type View } from "./store";
-import { useUpdate } from "./updater";
+import { canUpdate, useUpdate } from "./updater";
 import type { LangCode } from "./types";
 
 /** Ce que la leçon ouverte permet, pour activer les entrées du menu Leçon. */
@@ -153,20 +153,6 @@ async function backupNow() {
   if (await useBackup.getState().save()) app.toast(t("Progression sauvegardée", "Progress backed up"), "light");
 }
 
-async function checkUpdates() {
-  const up = useUpdate.getState();
-  const { toast, info } = useApp.getState();
-  await up.check(true);
-  const s = useUpdate.getState();
-  if (s.phase === "available") {
-    toast(t(`Lumen ${s.version} est disponible.`, `Lumen ${s.version} is available.`), "light", { label: t("Installer", "Install"), run: () => void useUpdate.getState().install() });
-  } else if (s.phase === "uptodate") {
-    toast(t(`Lumen est à jour (version ${info?.version ?? ""}).`, `Lumen is up to date (version ${info?.version ?? ""}).`), "light");
-  } else if (s.phase === "error") {
-    toast(t("Impossible de vérifier les mises à jour. Vérifiez la connexion à Internet.", "Couldn't check for updates. Check the Internet connection."), "error");
-  }
-}
-
 async function revealData() {
   const dir = useApp.getState().info?.data_dir;
   if (!dir || !isTauri) return;
@@ -278,32 +264,35 @@ type Snap = ReturnType<typeof snapshot>;
 
 function appMenu(s: Snap): SubmenuOptions {
   const app = () => useApp.getState();
-  return sub("Lumen", [
+  return sub("Umbra", [
     {
       item: {
         // la version est lue dans le paquet de l'app
         About: {
-          name: "Lumen",
+          name: "Umbra",
           credits: t(
             "Apprendre les langues en lisant et en écoutant. Toute l'intelligence tourne sur votre Mac.",
             "Learn languages by reading and listening. All the intelligence runs on your Mac.",
           ),
         },
       },
-      text: t("À propos de Lumen", "About Lumen"),
+      text: t("À propos d’Umbra", "About Umbra"),
     },
-    act(t("Rechercher les mises à jour…", "Check for Updates…"), checkUpdates, { on: !s.calm }),
     sep,
+    ...(canUpdate ? [act(t("Rechercher les mises à jour…", "Check for Updates…"), () => {
+      app().openSettings("about");
+      void useUpdate.getState().check();
+    }, { on: !s.calm })] : []),
     act(t("Réglages…", "Settings…"), () => app().openSettings(), { key: "CmdOrCtrl+,", on: !s.calm }),
     act(t("Profil…", "Profile…"), () => app().openSettings("profile"), { on: !s.calm }),
     sep,
     { item: "Services", text: t("Services", "Services") },
     sep,
-    { item: "Hide", text: t("Masquer Lumen", "Hide Lumen") },
+    { item: "Hide", text: t("Masquer Umbra", "Hide Umbra") },
     { item: "HideOthers", text: t("Masquer les autres", "Hide Others") },
     { item: "ShowAll", text: t("Tout afficher", "Show All") },
     sep,
-    { item: "Quit", text: t("Quitter Lumen", "Quit Lumen") },
+    { item: "Quit", text: t("Quitter Umbra", "Quit Umbra") },
   ]);
 }
 
@@ -479,8 +468,9 @@ function lessonMenu(s: Snap): SubmenuOptions {
   const media = on && !!l?.media;
   const rateKey = l?.media ? "media_rate" : "tts_rate";
   // mêmes valeurs par défaut que le lecteur
-  const rate = (l?.media ? s.look.media_rate : s.look.tts_rate) || (l?.media ? "1" : "0.95");
   const rates = playbackRates(!!l?.media);
+  const savedRate = l?.media ? s.look.media_rate : s.look.tts_rate;
+  const rate = savedRate && rates.includes(savedRate) ? savedRate : l?.media ? "1" : "0.95";
   return sub(t("Leçon", "Lesson"), [
     act(t("Reprendre la lecture", "Resume Reading"), resumeLesson, { key: "CmdOrCtrl+R", on: !s.calm && s.resume }),
     sep,

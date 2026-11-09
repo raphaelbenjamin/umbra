@@ -46,7 +46,7 @@ interface Db {
   backup?: { last_at: number | null; size: number };
 }
 
-const KEY = "lumen-mock-db";
+const KEY = "lumen-hebrew-mock-db";
 
 function load(): Db {
   try {
@@ -1244,6 +1244,9 @@ export function createMockApi(): Api {
       await sleep(900);
       return { terms: 0, known: 0, lessons: 0, progress: 0, removed: 0 };
     },
+    async backupImportOriginal() {
+      return { report: { terms: 0, known: 0, lessons: 0, progress: 0, removed: 0 }, missing_media: 0 };
+    },
     async syncListen() {
       return () => {};
     },
@@ -1478,5 +1481,5 @@ export function createMockApi(): Api {
   return mock;
 }
 
-// Pour réinitialiser l'aperçu : localStorage.removeItem("lumen-mock-db")
+// Pour réinitialiser l'aperçu : localStorage.removeItem("lumen-hebrew-mock-db")
 export const MOCK_LANG_DEFAULT: LangCode = "en";

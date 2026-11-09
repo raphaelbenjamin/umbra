@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lumen",
-  "version": "1.4.0",
-  "identifier": "app.lumen.reader",
+  "productName": "Umbra",
+  "version": "2.0.0",
+  "identifier": "com.raphaelbenjamin.lumenhebrew",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:1428",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Lumen",
+        "title": "Umbra",
         "width": 1380,
         "height": 880,
         "minWidth": 980,
@@ -90,13 +90,13 @@
         }
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4NzVCQzBGQzBDRjA4MzkKUldRNUNNL0FEN3gxbU01QXNvUm1kRkpkTVdySkc4dXdxNXV1Wlg4b2piUldTQXdSK2dvLzAwdSsK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCQjQ0NThFRjQ1MTMyMDMKUldRRE1sSDBqa1cwK3cvYkNlZlNiWlBuSFdtVFdBeHVSZnJIWmdtVGFDNDhKVXdGQWpVVks4a08K",
       "endpoints": [
-        "https://github.com/LivingTwice/lumen/releases/latest/download/latest.json"
+        "https://github.com/raphaelbenjamin/umbra/releases/latest/download/latest.json"
       ]
     }
   }

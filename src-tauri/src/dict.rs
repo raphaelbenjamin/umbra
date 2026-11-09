@@ -169,7 +169,12 @@ impl Dicts {
     }
 
     fn bundled(&self, native: &str, lang: &str) -> bool {
-        native == "fr" && BUNDLED_FR.contains(&lang)
+        lang == "he" || (native == "fr" && BUNDLED_FR.contains(&lang))
+    }
+
+    fn bundled_path(&self, lang: &str) -> PathBuf {
+        let file = if lang == "he" { "en-he.db.gz".into() } else { format!("{lang}.db.gz") };
+        self.resource_dir.join(file)
     }
 
     /// Dictionnaire prêt pour cette langue, dans la langue de l'interface.
@@ -179,7 +184,7 @@ impl Dicts {
 
     pub fn available_in(&self, native: &str, lang: &str) -> bool {
         if self.bundled(native, lang) {
-            return self.resource_dir.join(format!("{lang}.db.gz")).exists();
+            return self.bundled_path(lang).exists();
         }
         remote(native, lang).is_some_and(|r| self.remote_db(r, lang).exists())
     }
@@ -273,7 +278,7 @@ impl Dicts {
         if target.exists() {
             return Ok(target);
         }
-        let src = self.resource_dir.join(format!("{lang}.db.gz"));
+        let src = self.bundled_path(lang);
         if !src.exists() {
             return Err(anyhow!("pas de dictionnaire pour « {lang} »"));
         }
@@ -335,6 +340,9 @@ impl Dicts {
                 }
             }
             let mut own = d.find_with_variants(native, lang, surface)?;
+            if lang == "he" && d.v2 {
+                own = d.hebrew_context(surface, after, own)?;
+            }
             if lang == "zh" && d.v2 && !own.found() && surface.chars().count() > 1 {
                 own.entries = d.parts_zh(surface)?;
             }
@@ -370,6 +378,31 @@ impl Dicts {
 }
 
 impl Dict {
+    fn hebrew_context(&self, surface: &str, after: &str, mut exact: DictResult) -> Result<DictResult> {
+        let key = key(surface, "he");
+        let Some(stem) = key.strip_prefix('ב').filter(|s| s.chars().count() >= 3) else {
+            return Ok(exact);
+        };
+        let noun = self.entries(stem, false)?.into_iter().find(|e| e.pos == "Noun");
+        let Some(noun) = noun else { return Ok(exact) };
+        if exact.entries.iter().any(|e| e.word == noun.word && e.pos == noun.pos) {
+            return Ok(exact);
+        }
+        let after = after.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '־' | '-'));
+        let next_word = crate::text::word_keys(after, "he").into_iter().next();
+        let year_context = stem == "שנה" && matches!(
+            next_word.as_deref(), Some("שעברה" | "הבאה" | "האחרונה" | "הראשונה" | "הזאת")
+        );
+        if (after.starts_with(|c: char| c.is_numeric()) || year_context) && self.entries(&key, false)?.is_empty() {
+            exact.lemma = Some(noun.word.clone());
+            exact.form_note = Some(format!("ב־ + {}", noun.word));
+            exact.entries.insert(0, noun);
+        } else {
+            exact.entries.insert(exact.entries.len().min(1), noun);
+        }
+        Ok(exact)
+    }
+
     fn key(&self, s: &str, lang: &str) -> String {
         if self.v2 {
             key(s, lang)
@@ -707,6 +740,16 @@ fn variants(lang: &str, word: &str) -> Vec<(String, Option<String>)> {
                             out.push((s2.to_string(), Some(format!("{s2} + {q}{p}"))));
                         }
                     }
+                }
+            }
+        }
+        "he" => {
+            // Exact headwords and attested forms take precedence. This fallback
+            // covers common attached articles, conjunctions and prepositions.
+            let w = key(word, "he");
+            for prefix in ["ו", "ה", "ב", "כ", "ל", "מ", "ש", "וה", "וב", "וכ", "ול", "ומ", "וש", "שה", "כש", "מה"] {
+                if let Some(stem) = w.strip_prefix(prefix).filter(|s| s.chars().count() >= 3) {
+                    out.push((stem.to_owned(), None));
                 }
             }
         }
@@ -1074,6 +1117,18 @@ mod tests {
         assert!(!r.entries.is_empty());
         let r = d.lookup_in("fr", "it", "andavo").unwrap();
         assert_eq!(r.lemma.as_deref(), Some("andare"));
+        let pointed = d.lookup_in("en", "he", "שָׁלוֹם").unwrap();
+        let plain = d.lookup_in("en", "he", "שלום").unwrap();
+        assert!(!pointed.entries.is_empty());
+        assert_eq!(pointed.entries[0].word, plain.entries[0].word);
+        assert!(d.lookup_in("en", "he", "וּבְשָׁלוֹם").unwrap().found());
+        let year = d.lookup_ctx("en", "he", "בשנה", "2024 עברנו דירה.").unwrap();
+        assert_eq!(year.lemma.as_deref(), Some("שנה"));
+        assert_eq!(year.entries[0].pos, "Noun");
+        assert_eq!(year.entries[1].word, "בוש");
+        let ambiguous = d.lookup_ctx("en", "he", "בשנה", "").unwrap();
+        assert_eq!(ambiguous.entries[0].word, "בוש");
+        assert!(ambiguous.entries.iter().any(|entry| entry.word == "שנה" && entry.pos == "Noun"));
         println!("{:?}", d.lookup_in("fr", "en", "chose").unwrap());
         let _ = std::fs::remove_dir_all(tmp);
     }
@@ -1081,9 +1136,10 @@ mod tests {
     #[test]
     fn catalogue() {
         // toutes les langues de Lumen ont un dictionnaire dans les deux langues de l'interface
+        let d = Dicts::new(PathBuf::new(), PathBuf::new());
         for lang in crate::text::LANGS {
-            let fr = BUNDLED_FR.contains(lang) || remote("fr", lang).is_some();
-            let en = remote("en", lang).is_some();
+            let fr = d.bundled("fr", lang) || remote("fr", lang).is_some();
+            let en = d.bundled("en", lang) || remote("en", lang).is_some();
             assert!(fr || *lang == "fr", "{lang} : pas de dictionnaire en français");
             assert!(en || *lang == "en", "{lang} : pas de dictionnaire en anglais");
         }
@@ -1097,6 +1153,8 @@ mod tests {
         assert_eq!(key("Kitabı", "tr"), "kitabı");
         assert_eq!(key("الْكِتَابُ", "ar"), "الكتاب");
         assert_eq!(key("أحمد", "ar"), "احمد");
+        assert_eq!(key("שָׁלוֹם", "he"), "שלום");
+        assert_eq!(key("צה״ל", "he"), "צה\"ל");
         assert_eq!(key("Πότε", "el"), "πότε");
         assert_eq!(key("Mà", "vi"), "mà");
         assert_eq!(key("до\u{301}м", "ru"), "дом");

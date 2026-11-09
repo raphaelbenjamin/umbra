@@ -1175,10 +1175,19 @@ pub async fn import_link(
     lang: String,
     item: link::MediaItem,
     text: Option<String>,
+    youtube_captions: Option<bool>,
+    video_height: Option<u32>,
     on_event: Channel<ImportEvent>,
 ) -> R<i64> {
-    // vérifie le modèle de transcription avant de télécharger quoi que ce soit
-    active_model(&state, "asr")?;
+    let use_captions = youtube_captions.unwrap_or(false);
+    if use_captions {
+        if !crate::text::LANGS.contains(&lang.as_str()) || item.direct || !link::is_youtube(&item.url) || crate::ytnative::is_on() {
+            return Err(t("Cette option nécessite un lien YouTube sur ordinateur.",
+                "This option requires a YouTube link on desktop.").into());
+        }
+    } else {
+        active_model(&state, "asr")?;
+    }
     let data_dir = state.data_dir.clone();
     let browser = db::setting(&state.db.lock(), "youtube_browser").filter(|b| !b.is_empty());
     let send = |stage: &str| {
@@ -1190,6 +1199,12 @@ pub async fn import_link(
     let stem = media::new_stem();
     let mut title = item.title.trim().to_string();
     let (codecs, level) = video_prefs(&state);
+    let video_level = match video_height {
+        Some(720) => compress::Level::Compact,
+        Some(1080) => compress::Level::Balanced,
+        _ => level,
+    };
+    let mut captions = None;
     let mut video: Option<String> = None;
     let mut video_task = None;
     let mut split_task = None;
@@ -1210,8 +1225,12 @@ pub async fn import_link(
             send("tools");
         }
         let ytdlp = crate::tools::ensure_youtube_tools(&data_dir, &mut prog).await.map_err(err)?;
+        if use_captions {
+            send("captions");
+            captions = Some(media::yt_captions(&data_dir, &ytdlp, &item.url, &stem, &lang, browser.as_deref()).await.map_err(err)?);
+        }
         send("download");
-        let (a, found) = media::yt_audio(&data_dir, &ytdlp, &item.url, &stem, browser.as_deref(), &mut prog).await.map_err(err)?;
+        let (a, found) = media::yt_audio(&data_dir, &ytdlp, &item.url, &stem, browser.as_deref(), use_captions, &mut prog).await.map_err(err)?;
         if title.is_empty() {
             title = found;
         }
@@ -1220,7 +1239,7 @@ pub async fn import_link(
             let (dd, yt, u, st, br) = (data_dir.clone(), ytdlp.clone(), item.url.clone(), stem.clone(), browser.clone());
             video_task = Some(tokio::spawn(async move {
                 let mut quiet = |_p: f64| {};
-                fetch_video(&dd, &yt, &u, &st, br.as_deref(), &codecs, level, &mut quiet).await
+                fetch_video(&dd, &yt, &u, &st, br.as_deref(), &codecs, video_level, &mut quiet).await
             }));
         }
         a
@@ -1232,7 +1251,10 @@ pub async fn import_link(
     });
 
     let reference = text.as_deref().map(str::trim).filter(|x| !x.is_empty());
-    let transcript = transcribe_media(&state, &audio, &lang, reference, &on_event).await;
+    let transcript = match captions {
+        Some(captions) => Ok(captions),
+        None => transcribe_media(&state, &audio, &lang, reference, &on_event).await,
+    };
     if let Some(task) = &video_task {
         if transcript.is_err() {
             task.abort();
@@ -1242,8 +1264,13 @@ pub async fn import_link(
         if transcript.is_ok() {
             send("video");
         }
-        if let Ok(Ok(p)) = task.await {
-            video = Some(p.display().to_string());
+        match task.await.map_err(err).and_then(|result| result.map_err(err)) {
+            Ok(p) => video = Some(p.display().to_string()),
+            Err(error) if transcript.is_ok() && (use_captions || video_height.is_some()) => {
+                let _ = std::fs::remove_file(&audio);
+                return Err(error);
+            }
+            Err(_) => {}
         }
     }
     if let Some(task) = split_task {
@@ -1307,7 +1334,8 @@ pub async fn import_link(
     };
     let conn = state.db.lock();
     let id = db::lesson_create(&conn, &lesson).map_err(err)?;
-    db::lesson_set_timings(&conn, id, &timings, db::TIMING_PRECISE).map_err(err)?;
+    let version = if use_captions { db::TIMING_LINES } else { db::TIMING_PRECISE };
+    db::lesson_set_timings(&conn, id, &timings, version).map_err(err)?;
     if let Some(c) = cover {
         db::lesson_set_cover(&conn, id, Some(&c.display().to_string())).map_err(err)?;
     }
@@ -1750,6 +1778,11 @@ pub async fn backup_merge(state: State<'_, AppState>, key: String) -> R<crate::s
     tokio::task::block_in_place(|| backup::merge_for(st, &key))
 }
 
+#[tauri::command]
+pub async fn backup_import_original(state: State<'_, AppState>, include_media: bool) -> R<backup::OriginalImport> {
+    tokio::task::block_in_place(|| backup::import_original(state.inner(), include_media)).map_err(err)
+}
+
 /// iPhone et iPad : choisir dans l'app Fichiers le dossier de la sauvegarde (le dossier
 /// « Lumen » d'iCloud Drive, où le Mac sauvegarde). Renvoie son chemin ; rien si
 /// l'apprenant renonce. Ailleurs, l'emplacement se choisit autrement (`backup_places`).
@@ -1935,7 +1968,7 @@ pub async fn import_song(state: State<'_, AppState>, lang: String, song: SongIte
     };
     send("download");
     let stem = media::new_stem();
-    let (audio, _) = media::yt_audio(&data_dir, &ytdlp, &url, &stem, browser.as_deref(), &mut prog).await.map_err(err)?;
+    let (audio, _) = media::yt_audio(&data_dir, &ytdlp, &url, &stem, browser.as_deref(), false, &mut prog).await.map_err(err)?;
     // le son d'une chanson reste tel quel (la musique avant tout) ; l'image du clip s'allège
     let (codecs, level) = video_prefs(&state);
     let video_task = song.video.then(|| {

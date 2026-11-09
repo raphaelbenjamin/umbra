@@ -1,3 +1,4 @@
+import { displayText } from "../../lib/tokenize";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
@@ -336,7 +337,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           <div>
             <div className="wp-word">
               <h2 className={sel.surface.length > 36 ? "long" : ""} dir="auto">
-                {sel.surface}
+                {displayText(sel.surface, lang)}
               </h2>
               <div style={{ display: "flex", gap: 2 }}>
                 <button className="icon-btn" onClick={() => void pronounce(sel.surface, lang, settings[`voice_${lang}`])} aria-label={t("Prononcer", "Pronounce")}>
@@ -353,7 +354,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
               {firstPos && <span>{firstPos}</span>}
               {lemma && (
                 <span>
-                  {t("forme de", "form of")} <b>{lemma}</b>
+                  {t("forme de", "form of")} <b>{displayText(lemma, lang)}</b>
                 </span>
               )}
             </div>
@@ -363,7 +364,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           {sel.phrase && (
             <button className="wp-expr" onClick={() => onSelectPhrase(sel.phrase!.a, sel.phrase!.b)} title={t("Ouvrir l'expression", "Open the phrase")}>
               <span className="eyebrow">{t("Fait partie de l'expression", "Part of the phrase")}</span>
-              <strong>{sel.phrase.surface}</strong>
+              <strong>{displayText(sel.phrase.surface, lang)}</strong>
               {sel.phrase.translation && <span className="wp-expr-tr">{sel.phrase.translation}</span>}
             </button>
           )}
@@ -465,7 +466,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
                   <div key={i}>
                     {(entries.length > 1 || e.word !== sel.surface.toLowerCase()) && (
                       <div className="pos">
-                        {e.word}
+                        {displayText(e.word, lang)}
                         {lang === "ja" && e.ipa && e.ipa !== e.word ? `【${e.ipa}】` : ""}
                         {lang === "zh" && e.ipa ? ` ${e.ipa}` : ""}
                         {e.pos && ` · ${e.pos}`}

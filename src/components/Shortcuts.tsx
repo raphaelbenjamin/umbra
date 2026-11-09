@@ -3,12 +3,13 @@ import { Fragment } from "react";
 import { t } from "../lib/i18n";
 import { closeShortcuts, useMenu } from "../lib/menu";
 import { isWindows, modKey as M } from "../lib/platform";
+import { useApp } from "../lib/store";
 import { Sheet } from "./ui";
 
 /** Une ligne : les touches (plusieurs combinaisons possibles) et ce qu'elles font. */
 type Row = { keys: string[][]; label: string };
 
-function groups(): { title: string; rows: Row[] }[] {
+function groups(arrowSeek: boolean): { title: string; rows: Row[] }[] {
   // les touches telles qu'elles sont écrites sur le clavier : celui du Mac ou celui d'un PC
   const shift = isWindows ? t("Maj", "Shift") : "⇧";
   const enter = isWindows ? t("Entrée", "Enter") : "↩";
@@ -17,7 +18,9 @@ function groups(): { title: string; rows: Row[] }[] {
     {
       title: t("Dans une leçon", "In a lesson"),
       rows: [
-        { keys: [["←", "→"]], label: t("Mot précédent, mot suivant", "Previous word, next word") },
+        { keys: [["←", "→"]], label: arrowSeek
+          ? t("Reculer ou avancer de 3 secondes avec audio ; sinon, changer de mot", "Back or forward 3 seconds with audio, otherwise move between words")
+          : t("Mot précédent, mot suivant", "Previous word, next word") },
         { keys: [[shift, "←"], [shift, "→"]], label: t("Étendre la sélection", "Extend the selection") },
         { keys: [["1", "2", "3"]], label: t("Mot en apprentissage, niveau 1 à 3", "Word being learned, level 1 to 3") },
         { keys: [["K"], ["4"]], label: t("Mot connu", "Known word") },
@@ -82,10 +85,11 @@ function groups(): { title: string; rows: Row[] }[] {
 /** Raccourcis clavier (menu Aide, ⌘/ ; sous Windows, Ctrl+/) : ceux du lecteur n'étaient écrits nulle part. */
 export function Shortcuts() {
   const open = useMenu((s) => s.shortcuts);
+  const arrowSeek = useApp((s) => s.settings.arrow_seek === "1");
   return (
     <Sheet open={open} onClose={closeShortcuts} title={t("Raccourcis clavier", "Keyboard shortcuts")} width={780}>
       <div className="keys-grid">
-        {groups().map((g, gi) => (
+        {groups(arrowSeek).map((g, gi) => (
           <motion.section
             key={g.title}
             className="keys-group"

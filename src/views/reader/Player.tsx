@@ -151,6 +151,7 @@ function MakeAudio({ lesson, again, onVoiced }: { lesson: Lesson; again?: boolea
  * arriver au moment où il commence (son déplacement dure environ 60 ms).
  */
 const LANTERN_LEAD = 0.06;
+const RESUME_REWIND = 0.2;
 
 /** Dernier indice i tel que get(i) <= x (recherche dichotomique). */
 export function lastLE(n: number, get: (i: number) => number, x: number): number {
@@ -214,6 +215,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   // début de la page affichée quand la lecture s'est arrêtée : la page n'a pas
   // bougé depuis, la lecture reprend là où elle en était, même sur une autre page
   const pausedOn = useRef<number | null>(null);
+  const pausedMediaAt = useRef<number | null>(null);
   const listenSecs = useRef(0);
   // lu une seule fois, à l'ouverture de la leçon
   const autoplayRef = useRef(!!autoplay);
@@ -278,7 +280,9 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   };
 
   const rateKey = hasMedia ? "media_rate" : "tts_rate";
-  const rate = parseFloat(settings[rateKey] ?? (hasMedia ? "1" : "0.95")) || 1;
+  const rates = playbackRates(hasMedia);
+  const savedRate = settings[rateKey];
+  const rate = hasMedia && !rates.includes(savedRate) ? 1 : parseFloat(savedRate ?? "0.95") || 1;
 
   useEffect(() => {
     onState?.({ playing, time, duration });
@@ -326,11 +330,17 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   useEffect(() => {
     if (!hasMedia || !playing) return;
     let raf = 0;
-    const tick = () => {
+    let lastPaint = -Infinity;
+    const tick = (now: number) => {
       const el = single ? videoRef.current : audioRef.current;
       if (el) {
         const t = el.currentTime;
-        setTime(t);
+        // The word cursor still follows every frame. The time display and
+        // progress bar do not need to render at the screen refresh rate.
+        if (now - lastPaint >= 100) {
+          setTime(t);
+          lastPaint = now;
+        }
         remember(t);
         if (timing) {
           const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], t + LANTERN_LEAD);
@@ -454,6 +464,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
     (t: number) => {
       const m = master();
       if (!m) return;
+      pausedMediaAt.current = null;
       m.currentTime = Math.max(0, t);
       if (dual && videoRef.current) videoRef.current.currentTime = m.currentTime;
       setTime(m.currentTime);
@@ -478,12 +489,18 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   const playMedia = () => {
     const m = master();
     if (!m) return;
+    pausedMediaAt.current = null;
     // refus possible (lecture sans geste de l'utilisateur) : le lecteur reste simplement en pause
     void m.play().catch(() => {});
     if (dual && !idleRef.current) void videoRef.current?.play().catch(() => {});
   };
   const pauseMedia = () => {
-    master()?.pause();
+    const m = master();
+    if (m && !m.paused && !m.ended) {
+      pausedMediaAt.current = m.currentTime;
+      markPause();
+    }
+    m?.pause();
     if (dual) videoRef.current?.pause();
   };
   const markPause = () => {
@@ -503,7 +520,11 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
       if (m.paused) {
         const cur = cursorRef.current;
         const r = pages[pageRef.current];
-        if (timing && !resumesAway(cur) && (cur < r.start || cur >= r.end)) seekToToken(r.start);
+        if (pausedMediaAt.current === m.currentTime && pausedOn.current === r?.start) {
+          seekTo(m.currentTime - RESUME_REWIND);
+        } else if (timing && r && !resumesAway(cur) && (cur < r.start || cur >= r.end)) {
+          seekToToken(r.start);
+        }
         playMedia();
       } else pauseMedia();
       return;
@@ -531,7 +552,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
       speakFrom(resumesAway(cur) || (cur >= r.start && cur < r.end) ? cur : r.start);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMedia, playing, pages, timing, seekToToken, speakFrom, lesson.lang, single, dual]);
+  }, [hasMedia, playing, pages, timing, seekTo, seekToToken, speakFrom, lesson.lang, single, dual]);
 
   toggleRef.current = toggle;
 
@@ -602,7 +623,10 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
 
   const skip = (d: number) => {
     const m = master();
-    if (m) seekTo(Math.min(m.duration || 0, m.currentTime + d));
+    if (m && m.readyState >= 1) {
+      const target = m.currentTime + d;
+      seekTo(Number.isFinite(m.duration) ? Math.min(m.duration, target) : target);
+    }
   };
 
   const onTimeline = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -621,7 +645,6 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   };
 
   const progress = hasMedia ? (duration ? time / duration : 0) : ttsPos;
-  const rates = playbackRates(hasMedia);
 
   const masterEvents = {
     onPlay: () => {
@@ -633,10 +656,15 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
       setPlaying(false);
       markPause();
       if (dual) videoRef.current?.pause();
-      if (!e.currentTarget.ended) remember(e.currentTarget.currentTime, true);
+      const media = e.currentTarget;
+      if (!media.ended) {
+        if (media.paused) pausedMediaAt.current = media.currentTime;
+        remember(media.currentTime, true);
+      }
     },
     // écoutée jusqu'au bout : la prochaine fois, on repart du début
     onEnded: () => {
+      pausedMediaAt.current = null;
       setPlaying(false);
       remember(0, true);
       finishedRef.current?.();
@@ -709,21 +737,22 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
           </div>
         </div>
         {hasMedia && <span className="time player-total">{formatDuration(duration)}</span>}
-        <div className="rate-full">
-          <Segmented
-            id={`rate-${hasMedia ? "m" : "t"}`}
-            label={t("Vitesse", "Speed")}
-            value={rates.includes(String(rate)) ? String(rate) : rates[2]}
-            onChange={(v) => setSetting(rateKey, v)}
-            options={rates.map((r) => ({ value: r, label: `${t(r.replace(".", ","), r)}×` }))}
-          />
-        </div>
-        {/* fenêtre étroite : un seul bouton qui passe à la vitesse suivante */}
+        {!hasMedia && (
+          <div className="rate-full">
+            <Segmented
+              id="rate-t"
+              label={t("Vitesse", "Speed")}
+              value={rates.includes(String(rate)) ? String(rate) : rates[2]}
+              onChange={(v) => setSetting(rateKey, v)}
+              options={rates.map((r) => ({ value: r, label: `${t(r.replace(".", ","), r)}×` }))}
+            />
+          </div>
+        )}
         <button
-          className="btn sm soft rate-compact num"
+          className={`btn sm soft num ${hasMedia ? "media-rate-cycle" : "rate-compact"}`}
           onClick={() => setSetting(rateKey, rates[(rates.indexOf(String(rate)) + 1) % rates.length])}
-          aria-label={t("Vitesse de lecture", "Playback speed")}
-          title={t("Vitesse de lecture", "Playback speed")}
+          aria-label={t(`Vitesse de lecture, ${rate}×`, `Playback speed, ${rate}×`)}
+          title={t("Changer la vitesse de lecture", "Change playback speed")}
         >
           {t(String(rate).replace(".", ","), String(rate))}×
         </button>

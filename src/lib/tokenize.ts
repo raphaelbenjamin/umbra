@@ -7,9 +7,21 @@ import type { Token } from "./types";
  */
 const STRIPS_ACCENTS = new Set(["", "en", "it", "de", "pt", "ru", "es", "uk", "bg"]);
 
+function stripHebrewMarks(text: string): string {
+  return text.normalize("NFD").replace(/[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/g, "");
+}
+
+/** Display Hebrew without vowel or cantillation marks, preserving the source text and offsets. */
+export function displayText(text: string, lang: string): string {
+  return lang === "he" ? stripHebrewMarks(text).normalize("NFC") : text;
+}
+
 /** Même normalisation que le backend (text.rs, `normalize_for`). */
 export function normalize(s: string, lang = ""): string {
   let t = s.trim().toLowerCase().replace(/’/g, "'");
+  if (lang === "he") {
+    t = stripHebrewMarks(t).replace(/׳/g, "'").replace(/״/g, '"');
+  }
   t = STRIPS_ACCENTS.has(lang) ? t.normalize("NFD").replace(/[\u0301\u0300]/g, "").normalize("NFC") : t.normalize("NFC");
   return t.split(/\s+/).filter(Boolean).join(" ");
 }
@@ -104,7 +116,7 @@ function countWords(tokens: Token[], a: number, b: number) {
 }
 
 // ponctuation de fin de phrase (latine, grecque « ; », japonaise, hindi, arabe), comme text.rs
-const SENTENCE_END = /[.!?…;。！？।؟]|\n/;
+const SENTENCE_END = /[.!?…;。！？।؟׃]|\n/;
 
 /** Bornes (indices de jetons) de la phrase qui contient le jeton i. */
 export function sentenceBounds(tokens: Token[], i: number): [number, number] {
@@ -132,7 +144,7 @@ export const RUN_ON_WORDS = 40;
 
 // fin de phrase sans le retour à la ligne : un saut de paragraphe ne termine pas une suite
 // (la mise en page aérée en met au milieu des phrases), un simple retour à la ligne oui (chansons)
-const CLOSES_SENTENCE = /[.!?…;。！？।؟]/;
+const CLOSES_SENTENCE = /[.!?…;。！？।؟׃]/;
 
 /** Plus longue suite de mots sans fin de phrase (miroir de media::longest_run). */
 export function longestRun(tokens: Token[]): number {

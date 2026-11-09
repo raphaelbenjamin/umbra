@@ -85,14 +85,18 @@ fn known_total(c: &Connection) -> Result<i64> {
 /// fichier de la sauvegarde (son, image, couverture) et renvoie son chemin ici.
 /// Renvoie aussi les fichiers des leçons supprimées ici, à effacer du disque.
 pub fn merge(live: &mut Connection, other: &Path, media: &dyn Fn(&str) -> Option<String>) -> Result<(Report, Vec<String>)> {
+    merge_from(live, other, media, false)
+}
+
+pub fn merge_from(live: &mut Connection, other: &Path, media: &dyn Fn(&str) -> Option<String>, fill_media: bool) -> Result<(Report, Vec<String>)> {
     db::ensure_uids(live)?;
     live.execute("ATTACH DATABASE ?1 AS o", [other.to_string_lossy()])?;
-    let res = merge_attached(live, media);
+    let res = merge_attached(live, media, fill_media);
     let _ = live.execute("DETACH DATABASE o", []);
     res
 }
 
-fn merge_attached(live: &mut Connection, media: &dyn Fn(&str) -> Option<String>) -> Result<(Report, Vec<String>)> {
+fn merge_attached(live: &mut Connection, media: &dyn Fn(&str) -> Option<String>, fill_media: bool) -> Result<(Report, Vec<String>)> {
     let mut report = Report::default();
     let known_before = known_total(live)?;
     let tx = live.transaction()?;
@@ -199,6 +203,13 @@ fn merge_attached(live: &mut Connection, media: &dyn Fn(&str) -> Option<String>)
     for o in &others {
         if let Some(&(id, opened, created, timing_v)) = here.get(&o.uid) {
             mapped.insert(o.id, id);
+            if fill_media {
+                tx.execute(
+                    "UPDATE lessons SET media_path=coalesce(media_path, ?1), video_path=coalesce(video_path, ?2),
+                     cover_path=coalesce(cover_path, ?3) WHERE id=?4",
+                    params![bring(&o.media_path), bring(&o.video_path), bring(&o.cover_path), id],
+                )?;
+            }
             // l'avancement le plus récent l'emporte
             if touched(o.opened_at, o.created_at) > touched(opened, created) && o.opened_at.is_some() {
                 tx.execute(

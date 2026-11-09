@@ -15,7 +15,6 @@ import { CountUp, Menu, Orb } from "./ui";
 import { BackupCard } from "./BackupCard";
 import { ImportQueueCard } from "./ImportQueueCard";
 import { LingqCard } from "./LingqCard";
-import { UpdateCard } from "./UpdateCard";
 import { count, formatNumber, t } from "../lib/i18n";
 import { studyTime } from "../lib/progress";
 import { useUserName } from "../lib/user";
@@ -97,7 +96,7 @@ export function Sidebar() {
       <div className="sidebar-top drag" data-tauri-drag-region />
       <div className="brand drag" data-tauri-drag-region>
         <Orb size={20} />
-        <span className="brand-name">Lumen</span>
+        <span className="brand-name">Umbra</span>
         {/* le profil de l'apprenant : son avatar, qui mène à Réglages › Profil */}
         <button
           className={`side-me no-drag ${view === "settings" && settingsTab === "profile" ? "on" : ""}`}
@@ -227,7 +226,6 @@ export function Sidebar() {
       )}
 
       <div className="side-bottom">
-        <UpdateCard />
         <ImportQueueCard />
         <LingqCard />
         <BackupCard />

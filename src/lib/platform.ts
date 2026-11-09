@@ -6,7 +6,7 @@
  *
  * Dans le navigateur (`npm run dev`), on peut essayer l'allure de Windows, d'un
  * iPhone ou d'un iPad : http://localhost:1420/?platform=windows (ou ios, ipad), ou
- *   localStorage.setItem("lumen-platform", "windows") puis recharger.
+ *   localStorage.setItem("lumen-hebrew-platform", "windows") puis recharger.
  */
 
 const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -17,7 +17,7 @@ function detect(): System {
   if (typeof navigator === "undefined") return "mac";
   if (!inTauri) {
     try {
-      const forced = new URLSearchParams(location.search).get("platform") ?? localStorage.getItem("lumen-platform");
+      const forced = new URLSearchParams(location.search).get("platform") ?? localStorage.getItem("lumen-hebrew-platform");
       if (forced === "windows") return "windows";
       if (forced === "ios" || forced === "iphone") return "iphone";
       if (forced === "ipad") return "ipad";

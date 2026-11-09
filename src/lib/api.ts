@@ -153,7 +153,7 @@ export interface Api {
   /** regarde ce qu'il y a derrière un lien : article, vidéo, podcast, Spotify… */
   linkProbe(url: string, onEvent: (e: ImportEvent) => void): Promise<LinkInfo>;
   /** importe un son ou une vidéo trouvé par linkProbe ; `text` : texte de la page, gardé si le son le suit */
-  importLink(lang: LangCode, item: LinkMedia, text: string | null, onEvent: (e: ImportEvent) => void): Promise<number>;
+  importLink(lang: LangCode, item: LinkMedia, text: string | null, onEvent: (e: ImportEvent) => void, youtubeCaptions?: boolean, videoHeight?: number): Promise<number>;
   /** télécharge l'image d'une vidéo ; `replace` : celle qui est là ne se lit pas sur cet ordinateur */
   lessonFetchVideo(id: number, onEvent: (e: ImportEvent) => void, replace?: boolean): Promise<string>;
   /** formats d'image que la fenêtre lit (« vp9 », « av1 ») : les vidéos en ligne arrivent dans le plus léger */
@@ -182,6 +182,7 @@ export interface Api {
   backupSync(): Promise<Synced | null>;
   /** ajoute la progression d'une sauvegarde à celle de cet appareil, sans la remplacer */
   backupMerge(key: string): Promise<SyncReport>;
+  backupImportOriginal(includeMedia: boolean): Promise<{ report: SyncReport; missing_media: number }>;
   /** progression arrivée d'un autre appareil (synchronisation automatique) */
   syncListen(onSynced: (s: Synced) => void): Promise<() => void>;
   /** nuages installés sur ce Mac, iCloud Drive en tête */
@@ -297,7 +298,7 @@ async function createTauriApi(): Promise<Api> {
     importMedia: (lang, path, title, onEvent) =>
       invoke("import_media", { lang, path, title, onEvent: ch<ImportEvent>(onEvent) }),
     linkProbe: (url, onEvent) => invoke("link_probe", { url, onEvent: ch<ImportEvent>(onEvent) }),
-    importLink: (lang, item, text, onEvent) => invoke("import_link", { lang, item, text, onEvent: ch<ImportEvent>(onEvent) }),
+    importLink: (lang, item, text, onEvent, youtubeCaptions, videoHeight) => invoke("import_link", { lang, item, text, youtubeCaptions: youtubeCaptions ?? false, videoHeight: videoHeight ?? null, onEvent: ch<ImportEvent>(onEvent) }),
     lessonFetchVideo: (id, onEvent, replace) => invoke("lesson_fetch_video", { id, replace: replace ?? false, onEvent: ch<ImportEvent>(onEvent) }),
     mediaCodecs: (codecs) => invoke("media_codecs", { codecs }),
     mediaUsage: () => invoke("media_usage"),
@@ -318,6 +319,7 @@ async function createTauriApi(): Promise<Api> {
     deviceInfo: () => invoke("device_info"),
     backupSync: () => invoke("backup_sync"),
     backupMerge: (key) => invoke("backup_merge", { key }),
+    backupImportOriginal: (includeMedia) => invoke("backup_import_original", { includeMedia }),
     syncListen: async (onSynced) => {
       const { listen } = await import("@tauri-apps/api/event");
       return listen<Synced>("synced", (e) => onSynced(e.payload));

@@ -2,7 +2,7 @@
 // script envoyé au serveur de Vite s'exécute dans la fenêtre de Lumen, simulateur
 // iPhone compris, et son résultat revient. Pour essayer les fonctions natives
 // sans toucher l'écran :
-//   curl -s localhost:1420/__remote/run --data 'return document.title'
+//   curl -s localhost:1428/__remote/run --data 'return document.title'
 // Le code reçoit `api` et `useApp` (voir src/lib/devremote.ts). Rien de tout cela
 // n'existe dans une version compilée.
 import type { Plugin } from "vite";
