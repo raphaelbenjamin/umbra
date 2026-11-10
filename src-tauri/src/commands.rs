@@ -1235,10 +1235,12 @@ pub async fn import_link(
         let ytdlp = crate::tools::ensure_youtube_tools(&data_dir, &mut prog).await.map_err(err)?;
         if use_captions {
             send("captions");
-            captions = Some(media::yt_captions(&data_dir, &ytdlp, &item.url, &stem, &lang, browser.as_deref()).await.map_err(err)?);
+            captions = Some(media::yt_captions(&data_dir, &ytdlp, &item.url, &stem, &lang, browser.as_deref()).await
+                .map_err(|e| format!("{}: {e}", t("Sous-titres YouTube", "YouTube captions")))?);
         }
         send("download");
-        let (a, found) = media::yt_audio(&data_dir, &ytdlp, &item.url, &stem, browser.as_deref(), use_captions, &mut prog).await.map_err(err)?;
+        let (a, found) = media::yt_audio(&data_dir, &ytdlp, &item.url, &stem, browser.as_deref(), use_captions, &mut prog).await
+            .map_err(|e| format!("{}: {e}", t("Téléchargement audio", "Audio download")))?;
         if title.is_empty() {
             title = found;
         }
@@ -1276,7 +1278,7 @@ pub async fn import_link(
             Ok(p) => video = Some(p.display().to_string()),
             Err(error) if transcript.is_ok() && (use_captions || video_height.is_some()) => {
                 let _ = std::fs::remove_file(&audio);
-                return Err(error);
+                return Err(format!("{}: {error}", t("Téléchargement vidéo", "Video download")));
             }
             Err(_) => {}
         }

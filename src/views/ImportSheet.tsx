@@ -21,7 +21,7 @@ import {
   wordCount,
   type Chapter,
 } from "../lib/importers";
-import { count, formatNumber, locale, pick, t } from "../lib/i18n";
+import { count, formatNumber, locale, t } from "../lib/i18n";
 import { inLang } from "../lib/langs";
 import { isMobile } from "../lib/platform";
 import { formatBytes, formatDuration, useApp, type ImportTab } from "../lib/store";
@@ -64,6 +64,7 @@ interface Found {
   /** éléments cochés d'une liste, dans l'ordre de la liste */
   picked: number[];
   videoHeight?: number;
+  batch?: { imported: number[]; failures: { index: number; reason: string }[] };
 }
 
 /** Livre ouvert dans la feuille : ses chapitres à cocher, sa couverture. */
@@ -368,41 +369,44 @@ export function ImportSheet() {
       setPreview({ title: article.title, text: article.text, kind: "web", source: info.url, image: info.image });
       return;
     }
-    const items: LinkMedia[] = info.list ? found.picked.map((i) => info.media[i]) : info.media.slice(0, 1);
+    const indices = info.list ? found.picked : [0];
     const text = choice === "both" && article ? article.text : null;
     void run(t("Préparation", "Preparing"), async () => {
       const ids: number[] = [];
-      let failed = 0;
-      let firstError: unknown = null;
-      for (let i = 0; i < items.length; i++) {
-        const prefix = items.length > 1 ? `${i + 1}/${items.length} · ` : "";
+      const imported = [...(found.batch?.imported ?? [])];
+      const failures: NonNullable<Found["batch"]>["failures"] = [];
+      const captions = choice === "captions" || choice === "videoCaptions";
+      for (const [i, index] of indices.entries()) {
+        const source = info.media[index];
+        const prefix = indices.length > 1 ? `${i + 1}/${indices.length} · ` : "";
         try {
-          const captions = choice === "captions" || choice === "videoCaptions";
-          const item = choice === "captions" ? { ...items[i], video: false } : items[i];
+          const item = choice === "captions" ? { ...source, video: false } : source;
           ids.push(await api().importLink(lang, item, text, onImportEvent(prefix), captions, item.video ? found.videoHeight : undefined));
+          imported.push(index);
         } catch (e) {
-          // un élément d'une liste qui échoue n'arrête pas les suivants
-          if (items.length === 1) throw e;
-          failed++;
-          firstError ??= e;
+          if (!info.list) throw e;
+          failures.push({ index, reason: errorText(e) });
         }
       }
-      if (!ids.length) throw firstError;
+      if (failures.length) {
+        if (ids.length) bump();
+        setFound({
+          ...found,
+          picked: failures.map(({ index }) => index),
+          batch: { imported, failures },
+        });
+        return;
+      }
       finish(
         ids,
-        ids.length > 1
-          ? t(`${ids.length} leçons créées`, `${ids.length} lessons created`)
-          : choice === "captions" || choice === "videoCaptions"
+        imported.length > 1
+          ? t(`${imported.length} leçons créées`, `${imported.length} lessons created`)
+          : captions
             ? t("Leçon avec sous-titres créée", "Captioned lesson created")
-            : items[0].video
-            ? t("Vidéo transcrite", "Video transcribed")
-            : t("Transcription prête", "Transcript ready"),
+            : info.media[indices[0]].video
+              ? t("Vidéo transcrite", "Video transcribed")
+              : t("Transcription prête", "Transcript ready"),
       );
-      if (failed)
-        toast(
-          `${pick(failed, `${failed} import n'a pas abouti`, `${failed} imports n'ont pas abouti`, `${failed} import failed`, `${failed} imports failed`)}${t(" : ", ": ")}${errorText(firstError)}`,
-          "error",
-        );
     });
   };
 
@@ -843,7 +847,7 @@ const LIST_TOOLS = 12;
 const fold = (s: string) => s.toLocaleLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
 /** Les épisodes, vidéos ou morceaux d'une liste, à cocher. */
-function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void; youtube: boolean }) {
+function MediaList({ media, picked, onPick, youtube, imported }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void; youtube: boolean; imported?: number[] }) {
   const [extraDates, setExtraDates] = useState<Record<string, string>>({});
   const [loadingDates, setLoadingDates] = useState(false);
   const [dateError, setDateError] = useState(false);
@@ -902,10 +906,12 @@ function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; pic
     listRef.current?.scrollTo({ top: 0 });
   }, [q, newest]);
 
-  const allOn = order.length > 0 && order.every((i) => on.has(i));
+  const done = useMemo(() => new Set(imported), [imported]);
+  const selectable = order.filter((i) => !done.has(i));
+  const allOn = selectable.length > 0 && selectable.every((i) => on.has(i));
   const checkAll = () => {
     const next = new Set(on);
-    for (const i of order) {
+    for (const i of selectable) {
       if (allOn) next.delete(i);
       else next.add(i);
     }
@@ -941,7 +947,7 @@ function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; pic
           {t(`${formatNumber(picked.length)} sur ${formatNumber(n)}`, `${formatNumber(picked.length)} of ${formatNumber(n)}`)}
           {q.trim() && ` · ${count(order.length, "trouvé", "trouvés", "match", "matches")}`}
         </span>
-        {order.length > 0 && (
+        {selectable.length > 0 && (
           <button className="btn ghost sm" onClick={checkAll}>
             {allOn ? t("Tout décocher", "Uncheck all") : q.trim() ? t("Cocher ceux-ci", "Check these") : t("Tout cocher", "Check all")}
           </button>
@@ -959,8 +965,9 @@ function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; pic
           const m = rows[i];
           return (
             <label key={`${i}-${m.url}`} className="chapter-item">
-              <input type="checkbox" checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
+              <input type="checkbox" disabled={done.has(i)} checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
               <span className="link-item-title">{m.title || t("Sans titre", "Untitled")}</span>
+              {done.has(i) && <span className="muted link-item-meta">{t("Importé", "Imported")}</span>}
               {m.date && <span className="muted num link-item-meta">{shortDate(m.date)}</span>}
               {m.duration > 0 && <span className="muted num link-item-meta">{formatDuration(m.duration)}</span>}
             </label>
@@ -1101,7 +1108,29 @@ function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: 
           </select>
         </label>
       )}
-      {info.list && choice !== "article" && <MediaList key={info.url} youtube={captionsAvailable} media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
+      {found.batch && (
+        <section className="link-batch-report" aria-label={t("Résultat de l’import", "Import results")}>
+          <strong role="status">
+            {t(
+              `${found.batch.imported.length} importés · ${found.batch.failures.length} en échec`,
+              `${found.batch.imported.length} imported · ${found.batch.failures.length} failed`,
+            )}
+          </strong>
+          <span className="muted">{t(
+            "Les leçons réussies sont dans votre bibliothèque. Seuls les éléments en échec ont été recochés.",
+            "Successful lessons are in your library. Only failed items were selected for retry.",
+          )}</span>
+          <ul>
+            {found.batch.failures.map(({ index, reason }) => (
+              <li key={index}>
+                <strong dir="auto">{info.media[index].title || youtubeId(info.media[index].url) || t(`Élément ${index + 1}`, `Item ${index + 1}`)}</strong>
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {info.list && choice !== "article" && <MediaList key={info.url} youtube={captionsAvailable} media={info.media} picked={picked} imported={found.batch?.imported} onPick={(p) => onChange({ ...found, picked: p })} />}
 
       {asrMissing}
     </>

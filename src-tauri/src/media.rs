@@ -969,7 +969,8 @@ async fn run_ytdlp(
 
 fn needs_cookies(e: &anyhow::Error) -> bool {
     let m = e.to_string().to_lowercase();
-    m.contains("sign in") || m.contains("logged-in") || m.contains("cookies") || m.contains("not a bot") || m.contains("age")
+    ["sign in", "logged-in", "cookies", "not a bot", "age-restricted", "age restricted", "confirm your age", "private video"]
+        .into_iter().any(|hint| m.contains(hint))
 }
 
 async fn run_with_fallback(
@@ -983,6 +984,10 @@ async fn run_with_fallback(
         Ok(v) => Ok(v),
         Err(e) if needs_cookies(&e) => match browser {
             Some(b) => run_ytdlp(data_dir, ytdlp, args, Some(b), on_progress).await,
+            None if e.to_string().to_lowercase().contains("private video") => Err(anyhow!(crate::i18n::t(
+                "Cette vidéo est privée. Si le propriétaire vous a donné accès, choisissez votre navigateur dans Réglages › Vidéos en ligne.",
+                "This video is private. If the owner gave you access, select your browser in Settings › Online videos."
+            ))),
             None => Err(anyhow!(crate::tr!(
                 "Le site demande de se connecter pour cette vidéo. Choisissez votre navigateur dans Réglages › Vidéos en ligne pour que Lumen utilise votre session. ({e})",
                 "The site asks you to sign in for this video. Choose your browser in Settings › Online videos so that Lumen can use your session. ({e})"
@@ -1092,8 +1097,7 @@ pub async fn yt_stream(data_dir: &Path, ytdlp: &Path, url: &str, audio_only: boo
     Ok(serde_json::from_str(json)?)
 }
 
-/// Télécharge la piste audio d'une vidéo (YouTube et la plupart des sites
-/// vidéo). Renvoie le fichier et le titre.
+/// Télécharge les sous-titres YouTube et construit le texte et son minutage.
 pub async fn yt_captions(
     data_dir: &Path, ytdlp: &Path, url: &str, stem: &str, lang: &str, browser: Option<&str>,
 ) -> Result<(String, String)> {
@@ -1104,28 +1108,50 @@ pub async fn yt_captions(
     if lang == "he" { codes.extend(["iw-orig".into(), "iw".into()]); }
     let languages = codes.join(",");
     let args = [
-        "--skip-download", "--write-subs", "--write-auto-subs", "--sub-langs",
-        &languages, "--sub-format", "json3", "-o",
+        "--skip-download", "--write-subs", "--write-auto-subs",
+        "--sleep-subtitles", "1", "--sub-langs", &languages, "--sub-format", "json3", "-o",
         &template.to_string_lossy(), url,
     ].map(str::to_owned);
     let downloaded = run_with_fallback(data_dir, ytdlp, &args, browser, &mut |_| {}).await;
     let mut lesson = None;
-    if downloaded.is_ok() {
-        for code in codes {
-            let path = dir.join(format!("captions.{code}.json3"));
-            if let Ok(raw) = tokio::fs::read_to_string(path).await {
-                if let Ok(parsed) = crate::captions::lesson(&raw, lang) {
+    let mut invalid = None;
+    // yt-dlp can exit with an error on an alternate track after saving a usable one.
+    for code in codes {
+        let path = dir.join(format!("captions.{code}.json3"));
+        match tokio::fs::read_to_string(path).await {
+            Ok(raw) => match crate::captions::lesson(&raw, lang) {
+                Ok(parsed) => {
                     lesson = Some(parsed);
                     break;
                 }
-            }
+                Err(e) => invalid = Some(e),
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => invalid = Some(e.into()),
         }
     }
     let _ = tokio::fs::remove_dir_all(&dir).await;
-    downloaded?;
-    lesson.ok_or_else(|| anyhow!(crate::i18n::t(
-        "Aucun sous-titre utilisable dans la langue choisie. Choisissez la transcription locale pour cet épisode.",
-        "No usable captions were found in the selected language. Choose local transcription for this episode."
+    if let Some(lesson) = lesson {
+        return Ok(lesson);
+    }
+    if let Err(e) = downloaded {
+        if e.to_string().contains("HTTP Error 429") {
+            return Err(anyhow!(crate::i18n::t(
+                "YouTube limite temporairement les téléchargements de sous-titres (HTTP 429). Réessayez dans quelques minutes.",
+                "YouTube is temporarily limiting caption downloads (HTTP 429). Try again in a few minutes."
+            )));
+        }
+        return Err(e);
+    }
+    if let Some(e) = invalid {
+        return Err(anyhow!("{} ({e})", crate::i18n::t(
+            "La piste téléchargée ne contient pas de sous-titres lisibles et minutés.",
+            "The downloaded track has no readable, timed captions."
+        )));
+    }
+    Err(anyhow!(crate::i18n::t(
+        "YouTube n’a fourni aucune piste de sous-titres dans la langue sélectionnée.",
+        "YouTube returned no caption track in the selected language."
     )))
 }
 
@@ -1242,6 +1268,44 @@ pub fn new_stem() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn youtube_access_errors_distinguish_private_videos_from_network_failures() {
+        assert!(needs_cookies(&anyhow!("Private video")));
+        assert!(needs_cookies(&anyhow!("Sign in to confirm your age")));
+        assert!(!needs_cookies(&anyhow!("Unable to download webpage: request timed out")));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn youtube_captions_keep_a_valid_track_when_another_download_fails() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("umbra-captions-{}-{}", std::process::id(), new_stem()));
+        std::fs::create_dir(&dir).unwrap();
+        let downloader = dir.join("yt-dlp");
+        std::fs::write(&downloader, r#"#!/bin/sh
+while [ "$1" != "-o" ]; do shift; done
+case "$3" in
+  */partial)
+    printf '%s' '{"events":[{"tStartMs":0,"dDurationMs":1000,"segs":[{"utf8":"Buongiorno"}]}]}' > "${2%.%(ext)s}.it-orig.json3"
+    ;;
+esac
+echo "ERROR: Unable to download video subtitles: HTTP Error 429: Too Many Requests" >&2
+exit 1
+"#).unwrap();
+        std::fs::set_permissions(&downloader, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let partial = yt_captions(&dir, &downloader, "https://example.test/partial", "partial", "it", None).await;
+        let limited = yt_captions(&dir, &downloader, "https://example.test/limited", "limited", "it", None).await;
+        let removed_tracks = !dir.join("partial.captions").exists() && !dir.join("limited.captions").exists();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(partial.unwrap().0, "Buongiorno");
+        assert!(limited.unwrap_err().to_string().contains("HTTP 429"));
+        assert!(removed_tracks);
+    }
+
     fn ww(w: &str, t0: f64, t1: f64) -> WWord {
         WWord { w: w.into(), t0, t1 }
     }
