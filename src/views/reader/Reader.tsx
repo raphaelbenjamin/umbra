@@ -24,6 +24,7 @@ import { DisplayMenu } from "./Display";
 import { PlaylistStrip, UpNext, toggleLoop, usePlaylist } from "./PlaylistBar";
 import { AsideTabs, ReaderChat, type AsideTab } from "./ReaderChat";
 import { VideoStage } from "./VideoStage";
+import { knownRuns, type ReaderPart } from "./knownRuns";
 import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
 
@@ -1228,9 +1229,10 @@ export function Reader() {
   }
 
   // ---------- rendu de la page ----------
-  const markClass = settings.word_style === "line" ? "mark-line" : "mark-tint";
+  const blurKnown = settings.blur_known_words === "1";
+  const markClass = blurKnown || settings.word_style === "line" ? "mark-line" : "mark-tint";
   const paragraphs: React.ReactNode[] = [];
-  let current: React.ReactNode[] = [];
+  let current: ReaderPart[] = [];
   const total = Math.max(1, pr.end - pr.start);
   for (let i = pr.start; i < pr.end; i++) {
     const t = tokens[i];
@@ -1241,21 +1243,22 @@ export function Reader() {
     if (!t.w) {
       const parts = visible.split(/\n+/);
       if (parts.length > 1) {
-        if (parts[0]) current.push(parts[0]);
-        if (current.length) paragraphs.push(<p key={`p${i}`}>{current}</p>);
+        if (parts[0]) current.push({ node: parts[0] });
+        if (current.length) paragraphs.push(<p key={`p${i}`}>{knownRuns(current, blurKnown)}</p>);
         current = [];
         const tail = parts[parts.length - 1];
-        if (tail.trim()) current.push(tail);
+        if (tail.trim()) current.push({ node: tail });
       } else {
-        current.push(
-          inPhrase || inSel ? (
+        current.push({
+          space: !inSel && /^\s+$/.test(visible),
+          node: inPhrase || inSel ? (
             <span key={i} className={`${inPhrase ? `ph p${ph!.status}` : ""} ${inSel ? "sel-gap" : ""}`}>
               {visible}
             </span>
           ) : (
             visible
           ),
-        );
+        });
       }
       continue;
     }
@@ -1267,13 +1270,14 @@ export function Reader() {
     if (i === cursor) cls += " cur";
     if (i === resumeAt) cls += " resume";
     if (glowKeys.has(t.k)) cls += " known-glow";
-    current.push(
-      <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.75}s` } as React.CSSProperties) : undefined}>
+    current.push({
+      known: st === 4 && !selected,
+      node: <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.75}s` } as React.CSSProperties) : undefined}>
         {visible}
       </span>,
-    );
+    });
   }
-  if (current.length) paragraphs.push(<p key="last">{current}</p>);
+  if (current.length) paragraphs.push(<p key="last">{knownRuns(current, blurKnown)}</p>);
 
   let newOnPage = 0;
   const seen = new Set<string>();
@@ -1346,7 +1350,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass}${illum ? " illuminate" : ""}${settings.blur_known_words === "1" ? " blur-known" : ""}`}
+      className={`page ${markClass}${illum ? " illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}

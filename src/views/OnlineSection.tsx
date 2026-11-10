@@ -557,10 +557,9 @@ export function OnlineSection() {
             <div className="grow">
               <strong>{t("Sens des mots et traduction des phrases", "Word meanings and sentence translation")}</strong>
               <span>
-                {t(
-                  "Au toucher d'un mot, dans les leçons et les sous-titres. Sans connexion, Lumen traduit avec le modèle de ce Mac s'il est installé.",
-                  "When you tap a word, in lessons and subtitles. Without a connection, Lumen translates with this Mac's model if it's installed.",
-                )}
+                {st.words
+                  ? t("En ligne dans les leçons et les sous-titres. Le modèle de ce Mac sert de secours s’il est installé.", "Online in lessons and subtitles. Umbra falls back to the model on this Mac if it’s installed.")
+                  : t("Sur ce Mac. Le dictionnaire fonctionne hors ligne et les traductions en contexte utilisent le modèle local.", "On this Mac. The dictionary works offline, and contextual translations use the local model.")}
               </span>
             </div>
             <Switch on={st.words} onChange={(v) => void setSetting("online_words", v ? "1" : "0")} label={t("Traduction en ligne", "Online translation")} />
@@ -569,10 +568,9 @@ export function OnlineSection() {
             <div className="grow">
               <strong>{t("Chat et Simplifier", "Chat and Simplify")}</strong>
               <span>
-                {t(
-                  "Un grand modèle lit des leçons plus longues en entier et explique avec plus de finesse.",
-                  "A large model reads longer lessons in full and explains with more nuance.",
-                )}
+                {st.chat
+                  ? t("Utilise le modèle en ligne choisi et nécessite une connexion.", "Uses your selected online model and requires a connection.")
+                  : t("Utilise le modèle installé sur ce Mac.", "Uses the model installed on this Mac.")}
               </span>
             </div>
             <Switch on={st.chat} onChange={(v) => void setSetting("online_chat", v ? "1" : "0")} label={t("Chat en ligne", "Online chat")} />

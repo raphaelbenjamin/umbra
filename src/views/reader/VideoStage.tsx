@@ -8,6 +8,7 @@ import { useApp } from "../../lib/store";
 import { displayText, sentenceBounds } from "../../lib/tokenize";
 import type { Lesson, Term, Token } from "../../lib/types";
 import { t } from "../../lib/i18n";
+import { knownRuns, type ReaderPart } from "./knownRuns";
 
 export type StageSize = "compact" | "large";
 
@@ -388,17 +389,21 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
                       transition={lamp.jump ? { duration: 0 } : LANTERN_SPRING}
                     />
                   )}
-                  <p key={shown.chunk[0]} className={`sub-line${settings.blur_known_words === "1" ? " blur-known" : ""}`} lang={lesson.lang} onContextMenu={onWordContextMenu}>
-                    {tokens.slice(shown.chunk[0], shown.chunk[1]).map((t, j) => {
+                  <p key={shown.chunk[0]} className="sub-line" lang={lesson.lang} onContextMenu={onWordContextMenu}>
+                    {knownRuns(tokens.slice(shown.chunk[0], shown.chunk[1]).map((t, j): ReaderPart => {
                       const i = shown.chunk[0] + j;
-                      if (!t.w) return <span key={i}>{displayText(t.t, lesson.lang)}</span>;
+                      const text = displayText(t.t, lesson.lang);
+                      if (!t.w) return { node: text, space: /^\s+$/.test(text) };
                       const st = terms[t.k]?.status ?? 0;
-                      return (
-                        <span key={i} data-i={i} className={`sw s${st}`} onClick={() => onWord(i)}>
-                          {displayText(t.t, lesson.lang)}
-                        </span>
-                      );
-                    })}
+                      return {
+                        known: st === 4,
+                        node: (
+                          <span key={i} data-i={i} className={`sw s${st}`} onClick={() => onWord(i)}>
+                            {text}
+                          </span>
+                        ),
+                      };
+                    }), settings.blur_known_words === "1")}
                   </p>
                 </div>
                 {showTr && subTr && <p className="sub-tr">{subTr}</p>}

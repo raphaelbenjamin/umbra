@@ -212,9 +212,12 @@
   box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
 
-.page.blur-known .w.s4:not(.sel, .sel-range) {
-  color: transparent;
-  text-shadow: 0 0 0.24em color-mix(in srgb, var(--text) 75%, transparent);
+.known-run {
+  filter: blur(0.27em);
+  opacity: 0.64;
+}
+.page .known-run .w:hover {
+  box-shadow: none;
 }
 
 /* teinte */
@@ -1424,10 +1427,6 @@ span.player-voice .icon-btn {
   color: #f6f0e8;
   animation: sub-in 0.2s ease-out both;
 }
-.sub-line.blur-known .sw.s4 {
-  color: transparent;
-  text-shadow: 0 0 0.24em rgba(246, 240, 232, 0.75);
-}
 /* la lanterne, derrière le mot prononcé */
 .sub-lantern {
   position: absolute;
@@ -1777,13 +1776,18 @@ span.player-voice .icon-btn {
   gap: 3px;
 }
 .wp-foot {
-  padding: 12px 24px;
+  flex-shrink: 0;
+  padding: 10px 24px 14px;
   border-top: 1px solid var(--border);
-  font-size: 11.5px;
-  color: var(--muted);
+  display: grid;
+  gap: 8px;
+}
+.wp-source {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
 }
 
 /* ---------- panneau du mot flottant (petit écran, ⌃⌘I) ----------
@@ -1850,18 +1854,6 @@ span.player-voice .icon-btn {
   padding: 16px 18px;
   gap: 15px;
 }
-/* l'essentiel d'abord : le mot, son sens ici, son statut ; puis le dictionnaire et ma traduction */
-.wp-float .wp-scroll > * {
-  order: 3;
-}
-.wp-float .wp-scroll > :first-child,
-.wp-float .wp-expr,
-.wp-float .wp-sense {
-  order: 1;
-}
-.wp-float .wp-scroll > [data-tour="status"] {
-  order: 2;
-}
 .wp-float .wp-word h2 {
   font-size: 27px;
 }
@@ -1876,8 +1868,7 @@ span.player-voice .icon-btn {
   font-size: 16px;
 }
 .wp-float .wp-foot {
-  padding: 9px 18px;
-  font-size: 11px;
+  padding: 9px 18px 12px;
 }
 
 /* chat flottant : un volet sur le bord droit, au-dessus du texte */

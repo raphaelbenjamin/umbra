@@ -71,7 +71,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
   const [aiNote, setAiNote] = useState("");
   const [aiState, setAiState] = useState<"idle" | "loading" | "stream" | "done" | "nomodel" | "error">("idle");
   const [aiError, setAiError] = useState("");
-  const [mine, setMine] = useState("");
   const [slow, setSlow] = useState(false);
   const reqId = useRef(0);
   const termRef = useRef(term);
@@ -88,7 +87,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
     setAi("");
     setAiNote("");
     setAiError("");
-    setMine(termRef.current?.translation ?? "");
     setAiState("loading");
     setSlow(false);
     const slowTimer = window.setTimeout(() => id === reqId.current && setSlow(true), 2500);
@@ -118,7 +116,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           // expression déjà enregistrée sans traduction : on la complète
           if (res && termRef.current && !termRef.current.translation) {
             onTranslation(sel.key, res, "", sel.sentence);
-            setMine(res);
           }
           return;
         }
@@ -137,7 +134,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
         // une sélection de plusieurs mots ne devient une expression que sur demande
         if (res.translation && !termRef.current?.translation && (!sel.isPhrase || termRef.current)) {
           onTranslation(sel.key, res.translation, res.note, sel.sentence);
-          setMine(res.translation);
         }
       } catch (e) {
         if (id !== reqId.current) return;
@@ -156,10 +152,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, sentence, lang, llmReady, onlineKey]);
-
-  useEffect(() => {
-    setMine(term?.translation ?? "");
-  }, [term?.translation]);
 
   // dictionnaire en téléchargement : le mot s'affiche dès qu'il arrive (une seule relecture)
   const pending = !!dict?.pending;
@@ -191,12 +183,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
     const t = window.setTimeout(() => preparePronunciation(surface, lang), 220);
     return () => window.clearTimeout(t);
   }, [surface, lang]);
-
-  const saveMine = () => {
-    if (!sel) return;
-    const v = mine.trim();
-    if (v !== (term?.translation ?? "")) onTranslation(sel.key, v, term?.note ?? aiNote, sel.sentence);
-  };
 
   if (!sel) {
     return (
@@ -380,7 +366,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           !term &&
           (sel.words <= EXPR_MAX_WORDS ? (
             <div className="wp-block">
-              <button className="btn primary glow" style={{ alignSelf: "flex-start" }} onClick={() => onTranslation(sel.key, mine.trim() || (aiState === "done" ? ai : ""), aiNote, sel.sentence)}>
+              <button className="btn primary glow" style={{ alignSelf: "flex-start" }} onClick={() => onTranslation(sel.key, aiState === "done" ? ai : "", aiNote, sel.sentence)}>
                 <Icon name="layers" size={15} /> {t("Créer l'expression", "Create the phrase")}
               </button>
               <span className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
@@ -420,7 +406,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
                     </div>
                   )}
                   {e.glosses.slice(0, 3).map((g, j) => (
-                    <button key={j} onClick={() => (setMine(g), onTranslation(sel.key, g, term?.note ?? aiNote, sel.sentence))} title={t("Utiliser comme ma traduction", "Use as my translation")}>
+                    <button key={j} onClick={() => onTranslation(sel.key, g, term?.note ?? aiNote, sel.sentence)} title={t("Utiliser comme ma traduction", "Use as my translation")}>
                       <span className="n">{j + 1}</span>
                       <span>{g}</span>
                     </button>
@@ -430,27 +416,17 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
             </div>
           </div>
         )}
-
+      </div>
+      <div className="wp-foot">
+        <div className="wp-source">
+          <span className={`dot ${online.words ? "online" : "ok"}`} />
+          {aiState === "nomodel"
+            ? t("Dictionnaire hors ligne", "Offline dictionary")
+            : online.words
+              ? t(`Traduit en ligne par ${online.provider.name} · la phrase lui est envoyée`, `Translated online by ${online.provider.name} · the sentence is sent to it`)
+              : t("Traduit sur votre Mac · aucune donnée envoyée", "Translated on your Mac · no data sent")}
+        </div>
         {(!sel.isPhrase || term) && (
-          <>
-          <div className="wp-block">
-            <label className="eyebrow" htmlFor="wp-mine">
-              {t("Ma traduction", "My translation")}
-            </label>
-            <input
-              id="wp-mine"
-              className="input"
-              value={mine}
-              placeholder={t("Ajoutez votre propre sens", "Add your own meaning")}
-              onChange={(e) => setMine(e.target.value)}
-              onBlur={saveMine}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                e.stopPropagation();
-              }}
-            />
-          </div>
-
           <div className="status-bar" data-tour="status">
             <div className="status-levels" role="radiogroup" aria-label={t("Statut du mot", "Word status")}>
               {statusOpts().map((o) => (
@@ -470,16 +446,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
               </button>
             </div>
           </div>
-          </>
         )}
-      </div>
-      <div className="wp-foot">
-        <span className={`dot ${online.words ? "online" : "ok"}`} />
-        {aiState === "nomodel"
-          ? t("Dictionnaire hors ligne", "Offline dictionary")
-          : online.words
-            ? t(`Traduit en ligne par ${online.provider.name} · la phrase lui est envoyée`, `Translated online by ${online.provider.name} · the sentence is sent to it`)
-            : t("Traduit sur votre Mac · aucune donnée envoyée", "Translated on your Mac · no data sent")}
       </div>
     </div>
   );
