@@ -1346,7 +1346,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass} ${illum ? "illuminate" : ""}`}
+      className={`page ${markClass}${illum ? " illuminate" : ""}${settings.blur_known_words === "1" ? " blur-known" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}
@@ -1373,10 +1373,6 @@ export function Reader() {
       onStatus={(k, s) => setStatus(k, s)}
       onTranslation={onTranslation}
       onSelectPhrase={(a, b) => select(a, b)}
-      onAsk={(q) => {
-        setAside("chat");
-        void useChat.getState().ask({ id: lesson.id, title: lesson.title, lang }, q);
-      }}
       onClose={() => setRange(null)}
     />
   );

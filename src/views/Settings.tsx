@@ -790,6 +790,13 @@ function ReadingPane() {
         <div className="set-card">
           <div className="set-row">
             <div className="grow">
+              <strong>{t("Flouter les mots connus", "Blur known words")}</strong>
+              <span>{t("Les mots nouveaux et en apprentissage restent lisibles.", "New words and words you’re learning stay clear.")}</span>
+            </div>
+            <Switch on={settings.blur_known_words === "1"} onChange={(v) => setSetting("blur_known_words", v ? "1" : "0")} label={t("Flouter les mots connus", "Blur known words")} />
+          </div>
+          <div className="set-row">
+            <div className="grow">
               <strong>{t("Avancer et reculer avec ← et →", "Seek with ← and →")}</strong>
               <span>{t(
                 "Dans une leçon avec audio, ← recule de 3 secondes et → avance de 3 secondes. Dans une leçon de texte, les flèches passent d’un mot à l’autre.",

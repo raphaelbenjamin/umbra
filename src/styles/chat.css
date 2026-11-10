@@ -1030,34 +1030,3 @@ button.thought-head:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-/* « Demander au chat », sous la traduction en contexte */
-.wp-ask {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-  padding: 7px 12px 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.3s ease;
-}
-.wp-ask .icon {
-  color: var(--muted);
-}
-.wp-ask:hover {
-  background: var(--light-veil);
-  border-color: var(--border-strong);
-  box-shadow: 0 0 22px var(--light-soft);
-}
-.wp-ask .wp-ask-go {
-  transition: transform 0.25s var(--ease-out);
-}
-.wp-ask:hover .wp-ask-go {
-  transform: translateX(2px);
-}

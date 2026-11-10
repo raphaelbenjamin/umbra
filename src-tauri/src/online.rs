@@ -182,11 +182,20 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, role: Role) -> Option<R
     if key.is_empty() && !custom && p.dialect != Dialect::ChatGpt {
         return Some(Err(tr!("Ajoutez votre clé {name} dans Réglages › IA.", "Add your {name} key in Settings › AI.")));
     }
-    let model = set(&format!("online_model_{}", p.id)).unwrap_or_else(|| p.fallback.to_string());
+    let model = model_for(p, role, set);
     if model.is_empty() {
         return Some(Err(t("Choisissez un modèle dans Réglages › IA.", "Choose a model in Settings › AI.").into()));
     }
     Some(Ok(Config { provider: p, name, base, key, model }))
+}
+
+fn model_for(p: &Provider, role: Role, setting: impl Fn(&str) -> Option<String>) -> String {
+    if p.dialect == Dialect::ChatGpt && role == Role::Chat {
+        if let Some(model) = setting("online_model_chatgpt_chat") {
+            return model;
+        }
+    }
+    setting(&format!("online_model_{}", p.id)).unwrap_or_else(|| p.fallback.to_string())
 }
 
 pub fn config(c: &rusqlite::Connection, role: Role) -> Option<Result<Config, String>> {
@@ -901,6 +910,22 @@ mod tests {
         s.insert("online_model_custom", "qwen3:8b");
         let c = config_from(get(&s), Role::Chat).unwrap().unwrap();
         assert_eq!((c.base.as_str(), c.name.as_str(), c.key.as_str()), ("http://localhost:11434/v1", "localhost:11434", ""));
+    }
+
+    #[test]
+    fn chatgpt_model_selection_preserves_the_existing_translation_model() {
+        let chatgpt = find("chatgpt").unwrap();
+        let old = |key: &str| (key == "online_model_chatgpt").then(|| "quick".into());
+        assert_eq!(model_for(chatgpt, Role::Words, old), "quick");
+        assert_eq!(model_for(chatgpt, Role::Chat, old), "quick");
+
+        let split = |key: &str| match key {
+            "online_model_chatgpt" => Some("quick".into()),
+            "online_model_chatgpt_chat" => Some("detailed".into()),
+            _ => None,
+        };
+        assert_eq!(model_for(chatgpt, Role::Words, split), "quick");
+        assert_eq!(model_for(chatgpt, Role::Chat, split), "detailed");
     }
 
     #[test]

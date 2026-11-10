@@ -267,6 +267,7 @@ function ChatGptAccount() {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const model = settings.online_model_chatgpt ?? "";
+  const chatModel = settings.online_model_chatgpt_chat ?? "";
   const models = savedModels(settings.online_models_chatgpt);
   const [busy, setBusy] = useState<"in" | "out" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -274,20 +275,21 @@ function ChatGptAccount() {
   const [welcome, setWelcome] = useState(false);
   const ready = !!status?.signed_in && status.plan && !status.expired;
 
-  const check = async (wanted = model, previous?: string) => {
+  const check = async (wanted = model, role: "translation" | "chat" = "translation") => {
     setBusy("check");
     setError(null);
     setDone(null);
     try {
       const r = await api().onlineCheck("chatgpt", "", undefined, wanted || undefined);
-      void setSetting("online_model_chatgpt", r.model);
       void setSetting("online_models_chatgpt", JSON.stringify(r.models));
+      if (role === "chat" && r.model !== wanted) {
+        setError(t("Ce modèle n’est plus disponible pour ce compte.", "This model is no longer available to this account."));
+        return;
+      }
+      await setSetting(role === "chat" ? "online_model_chatgpt_chat" : "online_model_chatgpt", r.model);
       setDone(r);
     } catch (e) {
-      if (previous) {
-        void setSetting("online_model_chatgpt", previous);
-        setError(`${errorText(e)} ${t(`Lumen garde ${previous}.`, `Lumen keeps ${previous}.`)}`);
-      } else setError(errorText(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }
@@ -332,12 +334,8 @@ function ChatGptAccount() {
     }
   };
 
-  const choose = (m: string) => {
-    if (!m || m === model) return;
-    void setSetting("online_model_chatgpt", m);
-    void check(m, model || undefined);
-  };
   const options = model && !models.includes(model) ? [model, ...models] : models;
+  const chatOptions = chatModel && !models.includes(chatModel) ? [chatModel, ...models] : models;
   const manage = (e: React.MouseEvent) => {
     e.preventDefault();
     void openSource(status?.manage_url || "https://chatgpt.com/#settings/Usage");
@@ -418,16 +416,28 @@ function ChatGptAccount() {
       </AnimatePresence>
 
       {ready && options.length > 0 && (
-        <div className="online-model">
-          <span>{t("Modèle", "Model")}</span>
-          <select className="select" value={model} onChange={(e) => choose(e.target.value)} aria-label={t("Modèle", "Model")} disabled={!!busy}>
-            {options.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <label className="online-model">
+            <span>{t("Traduction rapide", "Quick translation")}</span>
+            <select className="select" value={model} onChange={(e) => void check(e.target.value)} disabled={!!busy}>
+              {options.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <label className="online-model">
+            <span>{t("Chat et Simplifier", "Chat and Simplify")}</span>
+            <select className="select" value={chatModel} disabled={!!busy} onChange={(e) => {
+              if (e.target.value) void check(e.target.value, "chat");
+              else {
+                setError(null);
+                setDone(null);
+                void setSetting("online_model_chatgpt_chat", "");
+              }
+            }}>
+              <option value="">{t("Même modèle que la traduction", "Same as translation")}</option>
+              {chatOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+        </>
       )}
 
       <span className="import-hint">
@@ -445,8 +455,8 @@ function ChatGptAccount() {
           </>
         )}
         {t(
-          "Lumen va doucement : un mot touché ne part qu'au bout d'un tiers de seconde, et si vous en touchez plusieurs à la suite, seul celui où vous vous arrêtez est envoyé. Au plus 30 traductions par minute, chacune gardée : un mot déjà traduit ne repart pas.",
-          "Lumen takes it easy: a tapped word only goes out after a third of a second, and if you tap several in a row, only the one you stop on is sent. At most 30 translations a minute, each one kept: a word already translated isn't sent again.",
+          "Choisissez un modèle rapide pour les mots et les phrases. Une traduction déjà en cache s’affiche immédiatement. Jusqu’à 30 nouvelles traductions par minute.",
+          "Choose a fast model for words and sentences. Cached translations appear immediately. Up to 30 new translations per minute.",
         )}
       </span>
 

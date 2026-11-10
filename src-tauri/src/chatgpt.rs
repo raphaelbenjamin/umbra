@@ -84,7 +84,7 @@ pub struct Pace {
     pub cooldown: Duration,
 }
 
-pub const PACE: Pace = Pace { settle: Duration::from_millis(350), per_minute: 30, cooldown: Duration::from_secs(15 * 60) };
+pub const PACE: Pace = Pace { settle: Duration::from_millis(120), per_minute: 30, cooldown: Duration::from_secs(15 * 60) };
 
 #[cfg(test)]
 thread_local! {

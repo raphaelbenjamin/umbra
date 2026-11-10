@@ -141,6 +141,7 @@ export const LOOK_DEFAULTS: Record<string, string> = {
   // couleur de la page : "auto" suit le thème de Lumen
   read_paper: "auto",
   word_style: "tint",
+  blur_known_words: "0",
   // panneau du mot : "auto" flotte au-dessus du mot quand la fenêtre est étroite
   word_panel: "auto",
 };

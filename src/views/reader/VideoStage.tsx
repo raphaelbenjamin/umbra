@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
 import { api, errorText, isTauri } from "../../lib/api";
+import { onlineState } from "../../lib/online";
 import { isMobile } from "../../lib/platform";
 import { useApp } from "../../lib/store";
 import { displayText, sentenceBounds } from "../../lib/tokenize";
@@ -73,6 +74,10 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
   const [fetching, setFetching] = useState<number | null>(null);
   const [subTr, setSubTr] = useState("");
   const showTr = settings.video_translate === "1";
+  const online = onlineState(settings);
+  const translationSource = online.words
+    ? `${online.provider.id}:${online.model}:${online.ready}`
+    : settings.llm_model;
   const trCache = useRef(new Map<string, string>());
   // phrase en cours (pour la traduction) et groupe de mots affiché
   const [shown, setShown] = useState<{ sentence: [number, number]; chunk: [number, number] } | null>(null);
@@ -178,7 +183,8 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
       setSubTr("");
       return;
     }
-    const cached = trCache.current.get(sentenceText);
+    const cacheKey = JSON.stringify([translationSource, sentenceText]);
+    const cached = trCache.current.get(cacheKey);
     if (cached) {
       setSubTr(cached);
       return;
@@ -193,7 +199,7 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
           if (alive) setSubTr(acc);
         })
         .then((r) => {
-          trCache.current.set(sentenceText, r);
+          if (r) trCache.current.set(cacheKey, r);
           if (alive) setSubTr(r);
         })
         .catch(() => {});
@@ -202,7 +208,7 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
       alive = false;
       window.clearTimeout(t);
     };
-  }, [sentenceText, showTr, cinema, lesson.lang]);
+  }, [sentenceText, showTr, cinema, lesson.lang, translationSource]);
 
   // plein écran : la fenêtre prend tout l'écran et la barre latérale s'efface.
   // Une fenêtre déjà en plein écran avant reste ainsi à la sortie.
@@ -382,7 +388,7 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
                       transition={lamp.jump ? { duration: 0 } : LANTERN_SPRING}
                     />
                   )}
-                  <p key={shown.chunk[0]} className="sub-line" lang={lesson.lang} onContextMenu={onWordContextMenu}>
+                  <p key={shown.chunk[0]} className={`sub-line${settings.blur_known_words === "1" ? " blur-known" : ""}`} lang={lesson.lang} onContextMenu={onWordContextMenu}>
                     {tokens.slice(shown.chunk[0], shown.chunk[1]).map((t, j) => {
                       const i = shown.chunk[0] + j;
                       if (!t.w) return <span key={i}>{displayText(t.t, lesson.lang)}</span>;

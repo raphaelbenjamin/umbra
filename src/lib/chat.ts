@@ -111,21 +111,6 @@ export function suggestions(lang: LangCode, withLesson: boolean): Suggestion[] {
   ];
 }
 
-/** Question préparée sur un mot, une expression ou un passage du lecteur ;
- *  `sense` : la traduction en contexte déjà trouvée, qui guide l'explication. */
-export function askAbout(surface: string, sentence: string, passage: boolean, sense = ""): string {
-  const s = sentence.trim();
-  // en anglais, guillemets “ ” : le chat y repère les mots cités, comme dans « »
-  if (t("fr", "en") === "en") {
-    if (passage) return `Explain this passage: “${surface}”`;
-    const word = sense ? `“${surface}” (translated here as “${sense}”)` : `“${surface}”`;
-    return s && s !== surface ? `Explain ${word} in this sentence: “${s}”` : `Explain ${word}`;
-  }
-  if (passage) return `Explique-moi ce passage : « ${surface} »`;
-  const word = sense ? `« ${surface} » (traduit ici par « ${sense} »)` : `« ${surface} »`;
-  return s && s !== surface ? `Explique-moi ${word} dans cette phrase : « ${s} »` : `Explique-moi ${word}`;
-}
-
 /** conversation de leçon en cours de recherche (évite d'en ouvrir deux à la fois) */
 let finding: { lesson: number; done: Promise<void> } | null = null;
 

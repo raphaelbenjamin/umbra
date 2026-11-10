@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { Icon } from "../../components/Icon";
-import { Segmented } from "../../components/ui";
+import { Segmented, Switch } from "../../components/ui";
 import { t } from "../../lib/i18n";
 import { glyphSample, LOOK_DEFAULTS, PAPERS, panelMode, panelOptions, readFont, readFonts, SIZE_MAX, SIZE_MIN, type ReaderLayout } from "../../lib/reading";
 import { useApp } from "../../lib/store";
@@ -249,6 +249,10 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
                   { value: "line", label: t("Soulignés", "Underlined") },
                 ]}
               />
+            </div>
+            <div className="look-row">
+              <span>{t("Flouter les mots connus", "Blur known words")}</span>
+              <Switch on={settings.blur_known_words === "1"} onChange={(v) => set("blur_known_words")(v ? "1" : "0")} label={t("Flouter les mots connus", "Blur known words")} />
             </div>
             {/* sur iPhone, le mot s'ouvre toujours en carte : pas de choix (mobile.css) */}
             <div className="look-row panel-choice">
