@@ -6,7 +6,7 @@ import { api, errorText, isTauri } from "../lib/api";
 import { prepareCover, youtubeId } from "../lib/covers";
 import { pickFiles } from "../lib/dialogs";
 import { cleanTitle, useDiscover } from "../lib/discover";
-import { stageText } from "../lib/imports";
+import { MEASURED, stageText, useImports, type JobSpec } from "../lib/imports";
 import {
   MEDIA_EXT,
   baseName,
@@ -64,7 +64,6 @@ interface Found {
   /** éléments cochés d'une liste, dans l'ordre de la liste */
   picked: number[];
   videoHeight?: number;
-  batch?: { imported: number[]; failures: { index: number; reason: string }[] };
 }
 
 /** Livre ouvert dans la feuille : ses chapitres à cocher, sa couverture. */
@@ -329,7 +328,7 @@ export function ImportSheet() {
   /** `hint` : l'élément de Découvrir derrière ce lien (son, collection, texte de la page) */
   const probeLink = (address = url, hint?: DiscoverItem) =>
     run(t("Lecture du lien", "Reading the link"), async () => {
-      const info = await api().linkProbe(address.trim(), onImportEvent(""));
+      const info = await api().linkProbe(address.trim(), onImportEvent);
       // la page d'un épisode ne montre pas toujours son lecteur : le son du flux le remplace
       if (hint && hint.kind !== "text" && !info.media.length) info.media = [itemMedia(hint)];
       if (hint && !info.site) info.site = hint.source_name;
@@ -371,43 +370,24 @@ export function ImportSheet() {
     }
     const indices = info.list ? found.picked : [0];
     const text = choice === "both" && article ? article.text : null;
-    void run(t("Préparation", "Preparing"), async () => {
-      const ids: number[] = [];
-      const imported = [...(found.batch?.imported ?? [])];
-      const failures: NonNullable<Found["batch"]>["failures"] = [];
-      const captions = choice === "captions" || choice === "videoCaptions";
-      for (const [i, index] of indices.entries()) {
-        const source = info.media[index];
-        const prefix = indices.length > 1 ? `${i + 1}/${indices.length} · ` : "";
-        try {
-          const item = choice === "captions" ? { ...source, video: false } : source;
-          ids.push(await api().importLink(lang, item, text, onImportEvent(prefix), captions, item.video ? found.videoHeight : undefined));
-          imported.push(index);
-        } catch (e) {
-          if (!info.list) throw e;
-          failures.push({ index, reason: errorText(e) });
-        }
-      }
-      if (failures.length) {
-        if (ids.length) bump();
-        setFound({
-          ...found,
-          picked: failures.map(({ index }) => index),
-          batch: { imported, failures },
-        });
-        return;
-      }
-      finish(
-        ids,
-        imported.length > 1
-          ? t(`${imported.length} leçons créées`, `${imported.length} lessons created`)
-          : captions
-            ? t("Leçon avec sous-titres créée", "Captioned lesson created")
-            : info.media[indices[0]].video
-              ? t("Vidéo transcrite", "Video transcribed")
-              : t("Transcription prête", "Transcript ready"),
-      );
-    });
+    const youtubeCaptions = choice === "captions" || choice === "videoCaptions";
+    queueImports(indices.map((index, i) => {
+      const source = info.media[index];
+      const media = choice === "captions" ? { ...source, video: false } : source;
+      return {
+        key: JSON.stringify(["link", lang, source.url, choice, found.videoHeight]),
+        lang,
+        title: source.title || youtubeId(source.url) || t(`Élément ${index + 1}`, `Item ${index + 1}`),
+        image: source.image,
+        media,
+        text,
+        youtubeCaptions,
+        videoHeight: media.video ? found.videoHeight : undefined,
+        discoverId: i === 0 ? item?.id : undefined,
+        quiet: indices.length > 1,
+        removeOnSuccess: true,
+      };
+    }));
   };
 
   // ---------- fichiers ----------
@@ -471,22 +451,30 @@ export function ImportSheet() {
     if (paths.length) setMediaFiles((m) => [...m, ...paths.filter((p) => !m.includes(p))]);
   };
 
-  const onImportEvent = (stagePrefix: string) => (e: ImportEvent) => {
+  const onImportEvent = (e: ImportEvent) => {
     if (e.type === "stage") {
-      setBusy(`${stagePrefix}${stageText(e.stage)}`);
-      setProgress(["transcribe", "timing", "text", "download", "file", "tools"].includes(e.stage) ? 0 : null);
+      setBusy(stageText(e.stage));
+      setProgress(MEASURED.includes(e.stage) ? 0 : null);
     } else setProgress(e.value);
   };
 
-  const transcribeAll = () =>
-    run(t("Préparation", "Preparing"), async () => {
-      const ids: number[] = [];
-      for (let i = 0; i < mediaFiles.length; i++) {
-        const prefix = mediaFiles.length > 1 ? `${i + 1}/${mediaFiles.length} · ` : "";
-        ids.push(await api().importMedia(lang, mediaFiles[i], null, onImportEvent(prefix)));
-      }
-      finish(ids, ids.length > 1 ? t(`${ids.length} transcriptions prêtes`, `${ids.length} transcripts ready`) : t("Transcription prête", "Transcript ready"));
-    });
+  const queueImports = (specs: JobSpec[]) => {
+    const added = useImports.getState().enqueueMany(specs);
+    close();
+    toast(added
+      ? count(added, "import ajouté à la file", "imports ajoutés à la file", "import queued", "imports queued")
+      : t("Import déjà dans la file.", "Already in the import queue."));
+  };
+
+  const transcribeAll = () => queueImports(mediaFiles.map((path) => ({
+    key: JSON.stringify(["file", lang, path]),
+    lang,
+    title: baseName(path),
+    image: "",
+    localMedia: path,
+    quiet: mediaFiles.length > 1,
+    removeOnSuccess: true,
+  })));
 
   const AsrMissing = () => {
     const d = asrModel ? downloads[asrModel.id] : undefined;
@@ -847,7 +835,7 @@ const LIST_TOOLS = 12;
 const fold = (s: string) => s.toLocaleLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
 /** Les épisodes, vidéos ou morceaux d'une liste, à cocher. */
-function MediaList({ media, picked, onPick, youtube, imported }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void; youtube: boolean; imported?: number[] }) {
+function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void; youtube: boolean }) {
   const [extraDates, setExtraDates] = useState<Record<string, string>>({});
   const [loadingDates, setLoadingDates] = useState(false);
   const [dateError, setDateError] = useState(false);
@@ -906,12 +894,10 @@ function MediaList({ media, picked, onPick, youtube, imported }: { media: LinkMe
     listRef.current?.scrollTo({ top: 0 });
   }, [q, newest]);
 
-  const done = useMemo(() => new Set(imported), [imported]);
-  const selectable = order.filter((i) => !done.has(i));
-  const allOn = selectable.length > 0 && selectable.every((i) => on.has(i));
+  const allOn = order.length > 0 && order.every((i) => on.has(i));
   const checkAll = () => {
     const next = new Set(on);
-    for (const i of selectable) {
+    for (const i of order) {
       if (allOn) next.delete(i);
       else next.add(i);
     }
@@ -947,7 +933,7 @@ function MediaList({ media, picked, onPick, youtube, imported }: { media: LinkMe
           {t(`${formatNumber(picked.length)} sur ${formatNumber(n)}`, `${formatNumber(picked.length)} of ${formatNumber(n)}`)}
           {q.trim() && ` · ${count(order.length, "trouvé", "trouvés", "match", "matches")}`}
         </span>
-        {selectable.length > 0 && (
+        {order.length > 0 && (
           <button className="btn ghost sm" onClick={checkAll}>
             {allOn ? t("Tout décocher", "Uncheck all") : q.trim() ? t("Cocher ceux-ci", "Check these") : t("Tout cocher", "Check all")}
           </button>
@@ -965,9 +951,8 @@ function MediaList({ media, picked, onPick, youtube, imported }: { media: LinkMe
           const m = rows[i];
           return (
             <label key={`${i}-${m.url}`} className="chapter-item">
-              <input type="checkbox" disabled={done.has(i)} checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
+              <input type="checkbox" checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
               <span className="link-item-title">{m.title || t("Sans titre", "Untitled")}</span>
-              {done.has(i) && <span className="muted link-item-meta">{t("Importé", "Imported")}</span>}
               {m.date && <span className="muted num link-item-meta">{shortDate(m.date)}</span>}
               {m.duration > 0 && <span className="muted num link-item-meta">{formatDuration(m.duration)}</span>}
             </label>
@@ -1108,29 +1093,7 @@ function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: 
           </select>
         </label>
       )}
-      {found.batch && (
-        <section className="link-batch-report" aria-label={t("Résultat de l’import", "Import results")}>
-          <strong role="status">
-            {t(
-              `${found.batch.imported.length} importés · ${found.batch.failures.length} en échec`,
-              `${found.batch.imported.length} imported · ${found.batch.failures.length} failed`,
-            )}
-          </strong>
-          <span className="muted">{t(
-            "Les leçons réussies sont dans votre bibliothèque. Seuls les éléments en échec ont été recochés.",
-            "Successful lessons are in your library. Only failed items were selected for retry.",
-          )}</span>
-          <ul>
-            {found.batch.failures.map(({ index, reason }) => (
-              <li key={index}>
-                <strong dir="auto">{info.media[index].title || youtubeId(info.media[index].url) || t(`Élément ${index + 1}`, `Item ${index + 1}`)}</strong>
-                <span>{reason}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {info.list && choice !== "article" && <MediaList key={info.url} youtube={captionsAvailable} media={info.media} picked={picked} imported={found.batch?.imported} onPick={(p) => onChange({ ...found, picked: p })} />}
+      {info.list && choice !== "article" && <MediaList key={info.url} youtube={captionsAvailable} media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
 
       {asrMissing}
     </>

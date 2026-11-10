@@ -1,46 +1,85 @@
-import { AnimatePresence, motion } from "motion/react";
-import { t } from "../lib/i18n";
+import { useEffect, useId, useRef, useState } from "react";
+import { formatNumber, t } from "../lib/i18n";
 import { stageText, useImports } from "../lib/imports";
+import { Icon } from "./Icon";
 
-/** Leçons en préparation, dans la barre latérale : on continue d'explorer pendant ce temps. */
 export function ImportQueueCard() {
   const jobs = useImports((s) => s.jobs);
-  const running = jobs.find((j) => j.status === "running");
-  const waiting = jobs.filter((j) => j.status === "waiting" || j.status === "model").length;
-  const visible = !!running || waiting > 0;
-  const shown = running ?? jobs.find((j) => j.status === "waiting" || j.status === "model");
-  const pct = running?.progress ?? null;
+  const retry = useImports((s) => s.retry);
+  const dismiss = useImports((s) => s.dismiss);
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const visible = jobs.filter((job) => job.status !== "done");
+  const hasErrors = visible.some((job) => job.status === "error");
+  const label = t("File d’import", "Import queue");
+
+  useEffect(() => {
+    if (!visible.length) setOpen(false);
+  }, [visible.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (e: PointerEvent) => {
+      if (e.target instanceof Node && !anchor.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
+
+  if (!visible.length) return null;
   return (
-    <AnimatePresence>
-      {visible && shown && (
-        <motion.div
-          className="update-card queue-card"
-          role="status"
-          initial={{ opacity: 0, y: 12, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 26 }}
-        >
-          <div className="update-head">
-            <span className="update-dot" />
-            <strong>{t("Leçon en préparation", "Lesson in the making")}</strong>
-          </div>
-          <span className="queue-title" title={shown.spec.title}>
-            {shown.spec.title}
-          </span>
-          <span className="muted" style={{ fontSize: 11.5 }}>
-            {running
-              ? `${stageText(running.stage)}${pct !== null ? t(` · ${Math.round(pct)} %`, ` · ${Math.round(pct)}%`) : "…"}`
-              : shown.status === "model"
-                ? t("En attente du modèle de transcription", "Waiting for the transcription model")
-                : t("En attente", "Waiting")}
-            {waiting > (running ? 0 : 1) ? t(` · ${waiting - (running ? 0 : 1)} ensuite`, ` · ${waiting - (running ? 0 : 1)} next`) : ""}
-          </span>
-          <div className={`bar live ${pct === null ? "indeterminate" : ""}`}>
-            <i style={{ width: `${pct ?? 30}%` }} />
-          </div>
-        </motion.div>
+    <div ref={anchor} className="import-queue" onKeyDown={(e) => {
+      if (e.key === "Escape" && open) {
+        e.stopPropagation();
+        setOpen(false);
+        button.current?.focus();
+      }
+    }}>
+      <button
+        ref={button}
+        type="button"
+        className={`import-queue-toggle ${hasErrors ? "has-errors" : ""}`}
+        aria-label={`${label} (${formatNumber(visible.length)})`}
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        title={label}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name="download" size={16} />
+        <span className="num">{formatNumber(visible.length)}</span>
+      </button>
+      {open && (
+        <section id={panelId} className="import-queue-panel" aria-label={label}>
+          <header><strong>{label}</strong></header>
+          <ul>
+            {visible.map(({ spec, status, stage, progress, error }) => (
+              <li key={spec.key}>
+                <strong dir="auto">{spec.title}</strong>
+                <span className={status === "error" ? "import-queue-error" : "muted"}>
+                  {status === "error"
+                    ? error
+                    : status === "model"
+                      ? t("En attente du modèle de transcription", "Waiting for the transcription model")
+                      : `${stageText(stage)}${progress === null ? "" : ` · ${Math.round(progress)}%`}`}
+                </span>
+                {status === "running" && (
+                  <div className={`bar live ${progress === null ? "indeterminate" : ""}`} aria-hidden="true">
+                    <i style={{ width: `${progress ?? 30}%` }} />
+                  </div>
+                )}
+                {status === "error" && (
+                  <div className="import-queue-actions">
+                    <button className="btn sm soft" onClick={() => retry(spec.key)}>{t("Réessayer", "Retry")}</button>
+                    <button className="btn sm ghost" onClick={() => dismiss(spec.key)}>{t("Retirer", "Dismiss")}</button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
-    </AnimatePresence>
+    </div>
   );
 }

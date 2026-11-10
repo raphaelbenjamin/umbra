@@ -13,7 +13,6 @@ import { Avatar } from "./Avatar";
 import { Icon, type IconName } from "./Icon";
 import { CountUp, Menu, Orb } from "./ui";
 import { BackupCard } from "./BackupCard";
-import { ImportQueueCard } from "./ImportQueueCard";
 import { LingqCard } from "./LingqCard";
 import { count, formatNumber, t } from "../lib/i18n";
 import { studyTime } from "../lib/progress";
@@ -226,7 +225,6 @@ export function Sidebar() {
       )}
 
       <div className="side-bottom">
-        <ImportQueueCard />
         <LingqCard />
         <BackupCard />
         <button className="ai-card" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => openSettings("ai")}>

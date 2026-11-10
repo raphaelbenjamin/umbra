@@ -16,6 +16,7 @@ import { setUiLang, t, type UiLang } from "./lib/i18n";
 import { useAppMenu, useWindowsKeys } from "./lib/menu";
 import { isMobile, playableCodecs } from "./lib/platform";
 import { useApp } from "./lib/store";
+import { ImportQueueCard } from "./components/ImportQueueCard";
 import { ImportSheet } from "./views/ImportSheet";
 import { Preview } from "./components/Preview";
 import { Chat } from "./views/Chat";
@@ -201,6 +202,7 @@ export function App() {
         </AnimatePresence>
       </main>
       {compact && <MobileNav />}
+      <ImportQueueCard />
       <ImportSheet />
       <Preview />
       <Guide />

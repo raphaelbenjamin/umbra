@@ -22,6 +22,12 @@ export interface JobSpec {
   /** vidéo ou son à transcrire ; `text` : texte de la page, gardé si le son le suit */
   media?: LinkMedia;
   text?: string | null;
+  youtubeCaptions?: boolean;
+  videoHeight?: number;
+  localMedia?: string;
+  removeOnSuccess?: boolean;
+  /** Large batches use the queue indicator instead of a toast per episode. */
+  quiet?: boolean;
   /** page dont lire le texte d'abord (épisode publié avec son texte : DW, RFI…) */
   textFrom?: string;
   /** chanson : paroles pour texte */
@@ -84,12 +90,13 @@ function transcriber(): boolean {
 
 /** Le son ou la vidéo se transcrit (une chanson garde ses paroles, un article son texte). */
 function needsTranscriber(spec: JobSpec): boolean {
-  return !!spec.media;
+  return !!spec.localMedia || (!!spec.media && !spec.youtubeCaptions);
 }
 
 interface ImportStore {
   jobs: Job[];
   enqueue(spec: JobSpec): void;
+  enqueueMany(specs: JobSpec[]): number;
   retry(key: string): void;
   dismiss(key: string): void;
 }
@@ -103,9 +110,23 @@ export const useImports = create<ImportStore>((set, get) => ({
       if (known.status === "done" && known.lessonId) useApp.getState().openLesson(known.lessonId);
       return;
     }
-    const job: Job = { spec, status: "waiting", stage: "", progress: null };
-    set((s) => ({ jobs: [...s.jobs.filter((j) => j.spec.key !== spec.key), job] }));
+    get().enqueueMany([spec]);
+  },
+
+  enqueueMany(specs) {
+    const jobs = get().jobs;
+    const occupied = new Set(jobs.filter((job) => job.status !== "error").map((job) => job.spec.key));
+    const added: Job[] = [];
+    for (const spec of specs) {
+      if (occupied.has(spec.key)) continue;
+      occupied.add(spec.key);
+      added.push({ spec, status: "waiting", stage: "", progress: null });
+    }
+    if (!added.length) return 0;
+    const replaced = new Set(added.map((job) => job.spec.key));
+    set({ jobs: [...jobs.filter((job) => !replaced.has(job.spec.key)), ...added] });
     void pump();
+    return added.length;
   },
 
   retry(key) {
@@ -179,13 +200,14 @@ async function run(job: Job): Promise<number[]> {
   }
   if (spec.podcast) return [await api().podcastCreate(spec.lang, spec.podcast, onEvent)];
   if (spec.song) return [await api().importSong(spec.lang, spec.song, onEvent)];
+  if (spec.localMedia) return [await api().importMedia(spec.lang, spec.localMedia, null, onEvent)];
   if (spec.media) {
     let text = spec.text ?? null;
     if (text === null && spec.textFrom) {
       patch(spec.key, { stage: "page" });
       text = await pageText(spec.textFrom);
     }
-    return [await api().importLink(spec.lang, spec.media, text, onEvent)];
+    return [await api().importLink(spec.lang, spec.media, text, onEvent, spec.youtubeCaptions, spec.videoHeight)];
   }
   throw new Error(t("Rien à importer.", "Nothing to import."));
 }
@@ -210,10 +232,15 @@ async function pump() {
       const app = useApp.getState();
       try {
         const ids = await run(job);
-        patch(job.spec.key, { status: "done", lessonId: ids[0], lessons: ids.length, stage: "", progress: null });
+        if (job.spec.removeOnSuccess) {
+          useImports.setState((s) => ({ jobs: s.jobs.filter((j) => j.spec.key !== job.spec.key) }));
+        } else {
+          patch(job.spec.key, { status: "done", lessonId: ids[0], lessons: ids.length, stage: "", progress: null });
+        }
         if (job.spec.discoverId && ids.length) void useDiscover.getState().mark(job.spec.lang, job.spec.discoverId, ids[0]);
         app.bumpLibrary();
         void app.refreshKnown();
+        if (job.spec.quiet) continue;
         const title = job.spec.title;
         app.toast(
           job.spec.podcast
@@ -227,7 +254,7 @@ async function pump() {
       } catch (e) {
         const msg = errorText(e);
         patch(job.spec.key, { status: "error", error: msg, stage: "", progress: null });
-        app.toast(t(`« ${job.spec.title} » : ${msg}`, `“${job.spec.title}”: ${msg}`), "error");
+        if (!job.spec.quiet) app.toast(t(`« ${job.spec.title} » : ${msg}`, `“${job.spec.title}”: ${msg}`), "error");
       }
     }
   } finally {

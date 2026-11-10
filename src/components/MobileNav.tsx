@@ -14,7 +14,6 @@ import { Avatar } from "./Avatar";
 import { BackupCard } from "./BackupCard";
 import { Cover } from "./Cover";
 import { Icon, type IconName } from "./Icon";
-import { ImportQueueCard } from "./ImportQueueCard";
 import { LingqCard } from "./LingqCard";
 import { CountUp } from "./ui";
 
@@ -298,7 +297,6 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose(): void }) {
             </div>
 
             <div className="m-cards">
-              <ImportQueueCard />
               <LingqCard />
               <BackupCard />
             </div>

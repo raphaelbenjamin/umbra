@@ -1426,15 +1426,67 @@ button.chip.on {
   }
 }
 
-/* leçon en préparation, dans la barre latérale */
-.queue-card .queue-title {
-  font-weight: 600;
-  font-size: 12.5px;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* File d’import accessible aussi quand la barre latérale est masquée. */
+.import-queue {
+  position: fixed;
+  right: 16px;
+  bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+}
+.app.compact .import-queue {
+  bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+}
+.import-queue-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 12px;
+  box-shadow: 0 4px 18px #0002;
+  cursor: pointer;
+}
+.import-queue-toggle.has-errors {
+  color: var(--danger);
+}
+.import-queue-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 10px 34px #0003;
+  font-size: 13px;
+}
+.import-queue-panel header {
+  padding: 12px 14px;
+}
+.import-queue-panel ul {
+  list-style: none;
+  max-height: min(48vh, 360px);
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: contain;
+}
+.import-queue-panel li {
+  display: grid;
+  gap: 5px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.import-queue-actions {
+  display: flex;
+  gap: 4px;
+}
+.import-queue-error {
+  color: var(--danger);
 }
 
 /* ==========================================================================
