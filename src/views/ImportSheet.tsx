@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, type IconName } from "../components/Icon";
 import { Sheet } from "../components/ui";
 import { api, errorText, isTauri } from "../lib/api";
@@ -52,8 +52,8 @@ interface Pending {
 type Choice = "both" | "media" | "article" | "captions" | "videoCaptions";
 
 function canUseCaptions(info: LinkInfo): boolean {
-  const item = info.media[0];
-  return isTauri && !isMobile && !info.list && !!item && !item.direct && !!youtubeId(item.url);
+  return isTauri && !isMobile && info.media.length > 0 &&
+    info.media.every((item) => !item.direct && !!youtubeId(item.url));
 }
 
 /** Lien analysé : ce qu'il contient et ce que l'utilisateur en garde. */
@@ -392,7 +392,9 @@ export function ImportSheet() {
         ids,
         ids.length > 1
           ? t(`${ids.length} leçons créées`, `${ids.length} lessons created`)
-          : items[0].video
+          : choice === "captions" || choice === "videoCaptions"
+            ? t("Leçon avec sous-titres créée", "Captioned lesson created")
+            : items[0].video
             ? t("Vidéo transcrite", "Video transcribed")
             : t("Transcription prête", "Transcript ready"),
       );
@@ -841,25 +843,57 @@ const LIST_TOOLS = 12;
 const fold = (s: string) => s.toLocaleLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
 /** Les épisodes, vidéos ou morceaux d'une liste, à cocher. */
-function MediaList({ media, picked, onPick }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void }) {
+function MediaList({ media, picked, onPick, youtube }: { media: LinkMedia[]; picked: number[]; onPick(p: number[]): void; youtube: boolean }) {
+  const [extraDates, setExtraDates] = useState<Record<string, string>>({});
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [dateError, setDateError] = useState(false);
+  const initialLoad = useRef(false);
+  const dateIds = useMemo(() => youtube ? [...new Set(media.filter((item) => !item.date)
+    .map((item) => youtubeId(item.url)).filter((id): id is string => !!id))] : [], [media, youtube]);
+  const loadDates = useCallback(async () => {
+    const batch = dateIds.filter((id) => !(id in extraDates)).slice(0, 10);
+    if (!batch.length || loadingDates) return;
+    setLoadingDates(true);
+    setDateError(false);
+    try {
+      const dates = await api().youtubeDates(batch);
+      setExtraDates((old) => ({ ...old, ...Object.fromEntries(batch.map((id) => [id, dates[id] ?? ""])) }));
+    } catch {
+      setDateError(true);
+    } finally {
+      setLoadingDates(false);
+    }
+  }, [dateIds, extraDates, loadingDates]);
+  useEffect(() => {
+    if (initialLoad.current || !dateIds.length) return;
+    initialLoad.current = true;
+    void loadDates();
+  }, [dateIds, loadDates]);
+  const rows = useMemo(() => youtube ? media.map((item) => item.date ? item :
+    { ...item, date: extraDates[youtubeId(item.url) ?? ""] ?? "" }) : media, [media, extraDates, youtube]);
   const n = media.length;
   const on = useMemo(() => new Set(picked), [picked]);
-  const dates = media.map((m) => m.date).filter(Boolean);
+  const dates = rows.map((m) => m.date).filter(Boolean);
   const dated = dates.length >= 2;
   // d'abord dans l'ordre du flux : du plus récent au plus ancien d'ordinaire, l'inverse pour un feuilleton
-  const [newest, setNewest] = useState(() => !dated || dates[0] >= dates[dates.length - 1]);
+  const [newest, setNewest] = useState<boolean | null>(() => youtube ? null : !dated || dates[0] >= dates[dates.length - 1]);
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(LIST_BATCH);
   const tools = n >= LIST_TOOLS;
 
   const order = useMemo(() => {
     const needle = fold(q.trim());
-    const idx = media.map((_, i) => i).filter((i) => !needle || fold(media[i].title).includes(needle) || media[i].date.includes(needle));
-    if (!dated) return idx;
+    const idx = rows.map((_, i) => i).filter((i) => !needle || fold(rows[i].title).includes(needle) || rows[i].date.includes(needle));
+    if (!dated || newest === null) return idx;
     const dir = newest ? -1 : 1;
-    // même date, ou pas de date : l'ordre du flux
-    return idx.sort((a, b) => (media[a].date === media[b].date ? a - b : media[a].date < media[b].date ? -dir : dir));
-  }, [media, q, newest, dated]);
+    return idx.sort((a, b) => {
+      const first = rows[a].date;
+      const second = rows[b].date;
+      if (first === second) return a - b;
+      if (youtube && (!first || !second)) return first ? -1 : 1;
+      return first < second ? -dir : dir;
+    });
+  }, [rows, q, newest, dated, youtube]);
 
   const listRef = useRef<HTMLDivElement>(null);
   // nouvelle recherche, autre ordre : la liste repart du haut
@@ -897,7 +931,7 @@ function MediaList({ media, picked, onPick }: { media: LinkMedia[]; picked: numb
           {dated && (
             <button className="btn ghost sm" onClick={() => setNewest(!newest)} title={t("Changer l'ordre", "Change the order")}>
               <Icon name="clock" size={14} />
-              {newest ? t("Plus récents d'abord", "Newest first") : t("Plus anciens d'abord", "Oldest first")}
+              {newest === null ? t("Trier par date", "Sort by date") : newest ? t("Plus récents d'abord", "Newest first") : t("Plus anciens d'abord", "Oldest first")}
             </button>
           )}
         </div>
@@ -913,9 +947,16 @@ function MediaList({ media, picked, onPick }: { media: LinkMedia[]; picked: numb
           </button>
         )}
       </div>
+      {dateIds.some((id) => !(id in extraDates)) && (
+        <button className="btn ghost sm" disabled={loadingDates} onClick={() => void loadDates()}>
+          {loadingDates ? t("Recherche des dates…", "Looking up publication dates…")
+            : dateError ? t("Réessayer les dates", "Retry publication dates")
+            : t("Charger d’autres dates", "Load more publication dates")}
+        </button>
+      )}
       <div ref={listRef} className={`chapter-list link-list ${tools ? "tall" : ""}`}>
         {order.slice(0, shown).map((i) => {
-          const m = media[i];
+          const m = rows[i];
           return (
             <label key={`${i}-${m.url}`} className="chapter-item">
               <input type="checkbox" checked={on.has(i)} onChange={(e) => toggle(i, e.target.checked)} />
@@ -1060,7 +1101,7 @@ function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: 
           </select>
         </label>
       )}
-      {info.list && choice !== "article" && <MediaList media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
+      {info.list && choice !== "article" && <MediaList key={info.url} youtube={captionsAvailable} media={info.media} picked={picked} onPick={(p) => onChange({ ...found, picked: p })} />}
 
       {asrMissing}
     </>

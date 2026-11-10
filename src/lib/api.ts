@@ -152,6 +152,7 @@ export interface Api {
   importMedia(lang: LangCode, path: string, title: string | null, onEvent: (e: ImportEvent) => void): Promise<number>;
   /** regarde ce qu'il y a derrière un lien : article, vidéo, podcast, Spotify… */
   linkProbe(url: string, onEvent: (e: ImportEvent) => void): Promise<LinkInfo>;
+  youtubeDates(ids: string[]): Promise<Record<string, string>>;
   /** importe un son ou une vidéo trouvé par linkProbe ; `text` : texte de la page, gardé si le son le suit */
   importLink(lang: LangCode, item: LinkMedia, text: string | null, onEvent: (e: ImportEvent) => void, youtubeCaptions?: boolean, videoHeight?: number): Promise<number>;
   /** télécharge l'image d'une vidéo ; `replace` : celle qui est là ne se lit pas sur cet ordinateur */
@@ -298,6 +299,7 @@ async function createTauriApi(): Promise<Api> {
     importMedia: (lang, path, title, onEvent) =>
       invoke("import_media", { lang, path, title, onEvent: ch<ImportEvent>(onEvent) }),
     linkProbe: (url, onEvent) => invoke("link_probe", { url, onEvent: ch<ImportEvent>(onEvent) }),
+    youtubeDates: (ids) => invoke("youtube_dates", { ids }),
     importLink: (lang, item, text, onEvent, youtubeCaptions, videoHeight) => invoke("import_link", { lang, item, text, youtubeCaptions: youtubeCaptions ?? false, videoHeight: videoHeight ?? null, onEvent: ch<ImportEvent>(onEvent) }),
     lessonFetchVideo: (id, onEvent, replace) => invoke("lesson_fetch_video", { id, replace: replace ?? false, onEvent: ch<ImportEvent>(onEvent) }),
     mediaCodecs: (codecs) => invoke("media_codecs", { codecs }),

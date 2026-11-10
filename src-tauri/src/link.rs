@@ -500,6 +500,14 @@ fn ymd(s: &str) -> String {
     String::new()
 }
 
+pub(crate) fn youtube_date(release: &str, upload: &str) -> String {
+    [release, upload]
+        .into_iter()
+        .find_map(|value| chrono::NaiveDate::parse_from_str(value, "%Y%m%d").ok())
+        .map(|date| date.to_string())
+        .unwrap_or_default()
+}
+
 fn from_ytdlp(v: &Value, url: &str, video_site: bool) -> LinkInfo {
     let title = str_of(v, "title");
     let site = ["channel", "uploader", "playlist_uploader", "extractor_key"].iter().map(|k| str_of(v, k)).find(|s| !s.is_empty()).unwrap_or_default();
@@ -563,6 +571,12 @@ fn ytdlp_entry(e: &Value, collection: &str, video_site: bool) -> Option<MediaIte
             return None;
         }
     }
+    let upload_date = str_of(e, "upload_date");
+    let date = if is_youtube(&u) {
+        youtube_date(&str_of(e, "release_date"), &upload_date)
+    } else {
+        ymd(&upload_date)
+    };
     Some(MediaItem {
         url: u.clone(),
         title: str_of(e, "title"),
@@ -570,7 +584,7 @@ fn ytdlp_entry(e: &Value, collection: &str, video_site: bool) -> Option<MediaIte
         video: video_site,
         direct: false,
         image: thumb_of(e),
-        date: ymd(&str_of(e, "upload_date")),
+        date,
         page: u,
         collection: collection.into(),
     })
@@ -1632,6 +1646,20 @@ pub(crate) fn shrink_image(bytes: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn youtube_playlist_dates_prefer_publication_and_fall_back_to_upload() {
+        let playlist = serde_json::json!({
+            "entries": [
+                { "ie_key": "Youtube", "id": "aaaaaaaaaaa", "release_date": "20261109", "upload_date": "20261101" },
+                { "ie_key": "Youtube", "id": "bbbbbbbbbbb", "release_date": "NA", "upload_date": "20261102" },
+                { "ie_key": "Youtube", "id": "ccccccccccc", "upload_date": "20261131" }
+            ]
+        });
+        let info = from_ytdlp(&playlist, "https://www.youtube.com/playlist?list=sample", true);
+        let dates: Vec<_> = info.media.iter().map(|item| item.date.as_str()).collect();
+        assert_eq!(dates, ["2026-11-09", "2026-11-02", ""]);
+    }
 
     #[test]
     fn covers_are_shrunk_to_jpeg() {

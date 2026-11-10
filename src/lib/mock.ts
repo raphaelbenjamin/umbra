@@ -998,6 +998,9 @@ export function createMockApi(): Api {
     async importMedia() {
       throw t("La transcription fonctionne dans l'application Mac.", "Transcription works in the Mac app.");
     },
+    async youtubeDates() {
+      return {};
+    },
     async linkProbe(url, onEvent) {
       onEvent({ type: "stage", stage: "probe" });
       await sleep(900);

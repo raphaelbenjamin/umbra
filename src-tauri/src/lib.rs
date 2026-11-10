@@ -154,6 +154,7 @@ pub fn run() {
             commands::read_file,
             commands::import_media,
             commands::link_probe,
+            commands::youtube_dates,
             commands::import_link,
             commands::lesson_fetch_video,
             commands::media_codecs,

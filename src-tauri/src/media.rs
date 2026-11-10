@@ -960,7 +960,7 @@ async fn run_ytdlp(
     }
     let status = child.wait().await?;
     let errs = err_task.await.unwrap_or_default();
-    if !status.success() {
+    if !status.success() && !(args.iter().any(|arg| arg == "--ignore-errors") && !out.is_empty()) {
         let msg = errs.iter().rev().find(|l| l.contains("ERROR")).cloned().unwrap_or_else(|| errs.last().cloned().unwrap_or_default());
         return Err(anyhow!("{}", msg.trim_start_matches("ERROR: ").trim()));
     }
@@ -1004,6 +1004,26 @@ pub async fn yt_info(data_dir: &Path, ytdlp: &Path, url: &str, browser: Option<&
         .find(|l| l.starts_with('{'))
         .ok_or_else(|| anyhow!(crate::i18n::t("rien à télécharger à cette adresse", "nothing to download at this address")))?;
     Ok(serde_json::from_str(json)?)
+}
+
+pub async fn yt_dates(data_dir: &Path, ytdlp: &Path, ids: &[String], browser: Option<&str>) -> Result<HashMap<String, String>> {
+    anyhow::ensure!(ids.len() <= 10 && ids.iter().all(|id| id.len() == 11
+        && id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))), "Invalid YouTube video IDs");
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let mut args = ["--skip-download", "--ignore-errors", "--ignore-no-formats-error", "--socket-timeout", "8",
+        "--retries", "0", "--extractor-retries", "0", "--print", "%(id)s\t%(release_date)s\t%(upload_date)s", "--"]
+        .map(str::to_owned).to_vec();
+    args.extend(ids.iter().map(|id| format!("https://www.youtube.com/watch?v={id}")));
+    let lines = tokio::time::timeout(std::time::Duration::from_secs(60),
+        run_with_fallback(data_dir, ytdlp, &args, browser, &mut |_| {})).await??;
+    Ok(lines.iter().filter_map(|line| {
+        let mut fields = line.split('\t');
+        let id = fields.next()?;
+        let date = crate::link::youtube_date(fields.next()?, fields.next()?);
+        (!date.is_empty() && ids.iter().any(|requested| requested == id)).then(|| (id.to_owned(), date))
+    }).collect())
 }
 
 /// Langue de l'interface de YouTube (`youtube:lang`) : le chinois s'y dit « zh-CN »

@@ -1165,6 +1165,14 @@ pub async fn link_probe(state: State<'_, AppState>, url: String, on_event: Chann
     link::probe(&state.data_dir, &url, browser.as_deref(), &mut send).await.map_err(err)
 }
 
+#[tauri::command]
+pub async fn youtube_dates(state: State<'_, AppState>, ids: Vec<String>) -> R<HashMap<String, String>> {
+    let browser = db::setting(&state.db.lock(), "youtube_browser").filter(|b| !b.is_empty());
+    let ytdlp = crate::tools::find_ytdlp(&state.data_dir)
+        .ok_or_else(|| t("yt-dlp est introuvable", "yt-dlp can't be found").to_owned())?;
+    media::yt_dates(&state.data_dir, &ytdlp, &ids, browser.as_deref()).await.map_err(err)
+}
+
 /// Importe un son ou une vidéo trouvé par `link_probe` : téléchargement (le
 /// fichier tel quel, ou par yt-dlp avec l'image en parallèle), transcription,
 /// couverture. `text` : le texte de la page, qui devient celui de la leçon si
