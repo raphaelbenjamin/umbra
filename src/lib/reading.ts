@@ -22,7 +22,7 @@ export interface ReadFont {
 
 /** Polices de lecture : celles livrées avec Lumen et celles de macOS. */
 export const READ_FONTS: ReadFont[] = [
-  { id: "literata", label: "Literata", stack: '"Literata Variable", Georgia, serif', kind: "serif" },
+  { id: "pingfang", label: "PingFang SC", stack: "var(--font-chinese)", kind: "sans" },
   { id: "newsreader", label: "Newsreader", stack: '"Newsreader Variable", "Literata Variable", Georgia, serif', kind: "serif" },
   { id: "newyork", label: "New York", stack: 'ui-serif, "New York", Georgia, serif', kind: "serif", mac: true },
   { id: "georgia", label: "Georgia", stack: 'Georgia, "Times New Roman", serif', kind: "serif" },
@@ -134,7 +134,7 @@ export const SIZE_MAX = 40;
 export const LOOK_DEFAULTS: Record<string, string> = {
   // "pages" : pages qui tiennent dans l'écran, sans défilement ; "scroll" : une longue page à faire défiler
   reader_layout: "pages",
-  read_font: "literata",
+  read_font: "pingfang",
   font_size: "23",
   line_height: "1.75",
   read_width: "normal",
@@ -142,6 +142,8 @@ export const LOOK_DEFAULTS: Record<string, string> = {
   read_paper: "auto",
   word_style: "tint",
   blur_known_words: "0",
+  chinese_pinyin: "1",
+  chinese_gloss: "1",
   // panneau du mot : "auto" flotte au-dessus du mot quand la fenêtre est étroite
   word_panel: "auto",
 };

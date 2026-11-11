@@ -5,6 +5,7 @@ import { Segmented, Switch } from "../../components/ui";
 import { t } from "../../lib/i18n";
 import { fontSizeKey, readerFontSize, glyphSample, LOOK_DEFAULTS, PAPERS, panelMode, panelOptions, readFont, readFonts, SIZE_MAX, SIZE_MIN, type ReaderLayout } from "../../lib/reading";
 import { useApp } from "../../lib/store";
+import { ChineseStudyOptions } from "./ChineseStudy";
 
 const RING = { type: "spring", stiffness: 520, damping: 40 } as const;
 
@@ -158,7 +159,9 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
   const ref = useRef<HTMLDivElement>(null);
   const set = (k: string) => (v: string) => void setSetting(k, v);
   const size = readerFontSize(settings, lang);
-  const changed = Object.entries(LOOK_DEFAULTS).some(([k, v]) => (k === "font_size" ? String(size) : settings[k] ?? v) !== v);
+  const defaults = Object.entries(LOOK_DEFAULTS).filter(([key]) => lang === "zh" || !key.startsWith("chinese_"));
+  const value = (key: string) => key === "font_size" ? String(size) : key === "read_font" ? readFont(settings.read_font).id : settings[key];
+  const changed = defaults.some(([key, initial]) => (value(key) ?? initial) !== initial);
 
   useEffect(() => {
     if (!open) return;
@@ -183,10 +186,8 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
   }, [open, onClose]);
 
   const reset = () => {
-    for (const [k, v] of Object.entries(LOOK_DEFAULTS)) {
-      if (k === "font_size") {
-        if (String(size) !== v) void setSetting(fontSizeKey(lang), v);
-      } else if ((settings[k] ?? v) !== v) void setSetting(k, v);
+    for (const [key, initial] of defaults) {
+      if ((value(key) ?? initial) !== initial) void setSetting(key === "font_size" ? fontSizeKey(lang) : key, initial);
     }
   };
 
@@ -221,7 +222,7 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
 
           <section>
             <span className="eyebrow">{t("Police", "Font")}</span>
-            <FontPicker id="pop" lang={lang} value={settings.read_font || "literata"} onChange={set("read_font")} />
+            <FontPicker id="pop" lang={lang} value={readFont(settings.read_font).id} onChange={set("read_font")} />
           </section>
 
           <section>
@@ -235,12 +236,7 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
           </section>
 
           <section className="look-rows">
-            {lang === "zh" && (
-              <div className="look-row">
-                <span>{t("Mode débutant", "Beginner mode")}</span>
-                <Switch on={settings.chinese_beginner === "1"} onChange={(v) => set("chinese_beginner")(v ? "1" : "0")} label={t("Mode débutant chinois", "Chinese beginner mode")} />
-              </div>
-            )}
+            {lang === "zh" && <ChineseStudyOptions compact />}
             <div className="look-row">
               <span>{t("Interligne", "Line spacing")}</span>
               <Segmented id="pop-lh" value={settings.line_height} onChange={set("line_height")} options={lineHeightOptions()} />

@@ -21,6 +21,7 @@ import { formatBytes, useApp, type SettingsTab } from "../lib/store";
 import { naturalVoiceFor, naturalVoices, naturalVoiceSpeaks, pronounce } from "../lib/pronounce";
 import { loadVoices, sayWord, voicesFor } from "../lib/tts";
 import { fontSizeKey, readerFontSize, panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
+import { ChineseStudyOptions } from "./reader/ChineseStudy";
 import { FontPicker, LayoutPicker, PaperPicker, lineHeightOptions, widthOptions } from "./reader/Display";
 import type { GpuInfo, LangCode, ModelRow } from "../lib/types";
 import { BackupSection } from "./BackupSection";
@@ -704,15 +705,7 @@ function ReadingPane() {
       <LookPreview />
       <Section title={t("La page", "The page")}>
         <div className="set-card">
-          {lang === "zh" && (
-            <div className="set-row">
-              <div className="grow">
-                <strong>{t("Mode débutant chinois", "Chinese beginner mode")}</strong>
-                <span>{t("Grands caractères espacés par mot, avec pinyin et traduction.", "Large characters grouped by word, with pinyin and a short meaning.")}</span>
-              </div>
-              <Switch on={settings.chinese_beginner === "1"} onChange={(v) => setSetting("chinese_beginner", v ? "1" : "0")} label={t("Mode débutant chinois", "Chinese beginner mode")} />
-            </div>
-          )}
+          {lang === "zh" && <ChineseStudyOptions />}
           <div className="set-row set-stack">
             <div className="grow">
               <strong>{t("Mise en page", "Layout")}</strong>
@@ -729,7 +722,7 @@ function ReadingPane() {
             <div className="grow">
               <strong>{t("Police", "Font")}</strong>
             </div>
-            <FontPicker id="set" lang={lang} value={settings.read_font || "literata"} onChange={(v) => setSetting("read_font", v)} />
+            <FontPicker id="set" lang={lang} value={readFont(settings.read_font).id} onChange={(v) => setSetting("read_font", v)} />
           </div>
           <div className="set-row set-stack">
             <div className="grow">

@@ -4,6 +4,7 @@
 
 :root {
   --font-ui: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-chinese: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", var(--font-ui);
   --font-read: "Literata Variable", "Newsreader Variable", Georgia, serif;
   --font-display: "Newsreader Variable", "Literata Variable", Georgia, serif;
 

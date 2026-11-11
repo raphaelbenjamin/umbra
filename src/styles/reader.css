@@ -2109,8 +2109,14 @@ span.player-voice .icon-btn {
   line-height: 1.04;
   border-radius: 0.16em;
 }
+.zh-no-pinyin .zh-study-word {
+  padding-top: 0.12em;
+}
+.zh-no-gloss .zh-study-word {
+  padding-bottom: 0.12em;
+}
 .zh-study-hanzi {
-  font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-chinese);
   font-weight: 600;
   white-space: nowrap;
 }

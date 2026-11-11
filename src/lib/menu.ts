@@ -15,7 +15,7 @@ import { isEn, t } from "./i18n";
 import { MEDIA_EXT, TEXT_EXT } from "./importers";
 import { langInfo } from "./langs";
 import { isMobile, isWindows, joinPath } from "./platform";
-import { fontSizeKey, readerFontSize, LOOK_DEFAULTS, PAPERS, playbackRates, READ_FONTS, SIZE_MAX, SIZE_MIN } from "./reading";
+import { fontSizeKey, readFont, readerFontSize, LOOK_DEFAULTS, PAPERS, playbackRates, READ_FONTS, SIZE_MAX, SIZE_MIN } from "./reading";
 import { useApp, type View } from "./store";
 import { canUpdate, useUpdate } from "./updater";
 import type { LangCode } from "./types";
@@ -248,7 +248,11 @@ function snapshot() {
   const b = useBackup.getState().status;
   const s = app.settings;
   const fontLang = m.lesson?.lang ?? app.lang();
-  const get = (k: string) => k === "font_size" ? String(readerFontSize(s, fontLang)) : app.setting(k);
+  const get = (key: string) => {
+    if (key === "font_size") return String(readerFontSize(s, fontLang));
+    if (key === "read_font") return readFont(s.read_font).id;
+    return app.setting(key);
+  };
   return {
     en: isEn(),
     // accueil, nouvel accueil ou visite guidée : seulement l'essentiel

@@ -20,7 +20,7 @@ import { chooseCover } from "../../lib/covers";
 import { confirmAsk } from "../../lib/dialogs";
 import { useLessonMenu, useMenu } from "../../lib/menu";
 import { AddToPlaylist } from "../../components/AddToPlaylist";
-import { ChineseWord, useChineseAnnotations } from "./ChineseStudy";
+import { ChineseWord, shortChineseGloss, useChineseAnnotations } from "./ChineseStudy";
 import { DisplayMenu } from "./Display";
 import { PlaylistStrip, UpNext, toggleLoop, usePlaylist } from "./PlaylistBar";
 import { AsideTabs, ReaderChat, type AsideTab } from "./ReaderChat";
@@ -247,7 +247,10 @@ export function Reader() {
   const pr = pages[page] ?? { start: 0, end: 0, words: 0 };
   const lang = lesson?.lang ?? "en";
   const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
-  const annotations = useChineseAnnotations(chineseStudy, tokens, pr.start, pr.end);
+  const showPinyin = chineseStudy && settings.chinese_pinyin !== "0";
+  const showGloss = chineseStudy && settings.chinese_gloss !== "0";
+  const studyClass = chineseStudy ? ` zh-study${showPinyin ? "" : " zh-no-pinyin"}${showGloss ? "" : " zh-no-gloss"}` : "";
+  const annotations = useChineseAnnotations(showPinyin || showGloss, tokens, pr.start, pr.end);
   const pl = usePlaylist(lesson);
   pageNow.current = page;
 
@@ -382,7 +385,7 @@ export function Reader() {
     }
     fit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick, chineseStudy]);
+  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick, studyClass]);
 
   // fenêtre, vidéo ou barre latérale qui changent la place du texte ; police arrivée après coup
   useEffect(() => {
@@ -1164,7 +1167,7 @@ export function Reader() {
       setLanternOut(0);
     } else setLanternOut(sc ? lanternSide() : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, page, pr.start, pr.end, relayout, chineseStudy]);
+  }, [cursor, page, pr.start, pr.end, relayout, studyClass]);
 
   /** Mode défilement : la lanterne est-elle au-dessus (-1), en vue (0) ou au-dessous (1) ? */
   function lanternSide() {
@@ -1279,10 +1282,13 @@ export function Reader() {
     if (i === cursor) cls += " cur";
     if (i === resumeAt) cls += " resume";
     if (glowKeys.has(t.k)) cls += " known-glow";
+    const annotation = annotations[t.t];
+    const pinyin = showPinyin ? annotation?.pinyin : undefined;
+    const gloss = showGloss && annotation?.gloss ? shortChineseGloss(annotation.gloss) : undefined;
     current.push({
       known: blurKnown && !selected && (st === 4 || blurLiteral(visible)),
-      node: <span key={i} className={cls} data-i={i} title={chineseStudy ? [annotations[t.t]?.pinyin, annotations[t.t]?.gloss].filter(Boolean).join(" · ") || undefined : undefined} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
-        {chineseStudy ? <ChineseWord text={visible} annotation={annotations[t.t]} /> : visible}
+      node: <span key={i} className={cls} data-i={i} title={[pinyin, gloss].filter(Boolean).join(" · ") || undefined} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
+        {chineseStudy ? <ChineseWord text={visible} pinyin={pinyin} gloss={gloss} /> : visible}
       </span>,
     });
   }
@@ -1359,7 +1365,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass}${chineseStudy ? " zh-study" : ""}${illum ? " illuminate" : ""}`}
+      className={`page ${markClass}${studyClass}${illum ? " illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}
@@ -1592,7 +1598,7 @@ export function Reader() {
                 <div className="leaf-ghost" ref={ghostRef} aria-hidden="true" inert>
                   {header}
                 </div>
-                <div className={`page leaf-measure ${markClass}${chineseStudy ? " zh-study" : ""}`} ref={measureRef} lang={lang} dir={li.rtl ? "rtl" : undefined} aria-hidden="true" />
+                <div className={`page leaf-measure ${markClass}${studyClass}`} ref={measureRef} lang={lang} dir={li.rtl ? "rtl" : undefined} aria-hidden="true" />
                 <AnimatePresence mode="wait" initial={false} custom={turn * flip}>
                   <motion.div key={page} className="leaf-page" {...turnProps}>
                     {page === 0 && header}
