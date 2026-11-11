@@ -7,6 +7,7 @@ Umbra is a macOS language-learning app for reading, listening and building vocab
 ## What you can do
 
 - Read in Hebrew with right-to-left layout and unpointed display, and look up words in the bundled Hebrew–English dictionary or the contextual AI dictionary.
+- Look up Mandarin words offline with CC-CEDICT and additional English definitions and pinyin from [Kaikki’s Chinese Wiktionary extract](https://kaikki.org/dictionary/Chinese/).
 - Import a YouTube episode as audio with captions, video with captions, or video transcribed by Whisper.
 - Click the speed button to cycle through 1×, 1.5×, 2× and 0.75×. Turn on three-second arrow seeking in Reading settings.
 - Right-click a learning word to mark it known, then right-click again to return it to Learning level 1. Playback rewinds 0.2 seconds when you resume a paused lesson.

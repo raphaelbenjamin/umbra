@@ -1,0 +1,17 @@
+Chinese–English offline dictionary
+
+Primary entries are from the CC-CEDICT project and its contributors, distributed
+by MDBG and compiled to SQLite by Lumen.
+https://cc-cedict.org/
+https://github.com/LivingTwice/lumen/releases/tag/dictionaries-zh-1
+
+Additional Mandarin headwords, English definitions and pinyin are by English
+Wiktionary contributors, extracted by Kaikki / Wiktextract on October 30, 2026
+from the October 1, 2026 Wiktionary dump.
+https://kaikki.org/dictionary/Chinese/
+https://en.wiktionary.org/ (word entries and their revision histories)
+
+Umbra combined the two datasets, filtered and deduplicated the additional
+definitions, and normalized their lookup keys. This adapted dictionary is
+distributed under Creative Commons Attribution-ShareAlike 4.0.
+https://creativecommons.org/licenses/by-sa/4.0/

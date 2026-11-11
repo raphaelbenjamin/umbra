@@ -79,7 +79,7 @@ export function featuredLangs(): LangCode[] {
 /** Dictionnaire livré avec l'application (définitions en français de six langues) ; les
  *  autres se téléchargent au premier usage. */
 export function bundledDict(code: string): boolean {
-  return t("en it de pt ru es", "").split(" ").includes(code);
+  return code === "he" || t("en it de pt ru es", "zh").split(" ").includes(code);
 }
 
 /** « italien » ou « Italian », au milieu d'une phrase. */

@@ -51,3 +51,14 @@ The dictionary shows plausible prefix analyses alongside exact matches. When `ב
 - The transcription pipeline passes `he` to multilingual Whisper. The current Qwen3-ASR and Parakeet language gates already exclude Hebrew. Whisper supplies both text and timestamps. The existing timestamp alignment uses the same word keys as the reader.
 - The Wiktionary build tool can select Hebrew and generate format-2 lookup keys. A one-entry fixture produced a SQLite dictionary with the stored headword `שָׁלוֹם` and lookup key `שלום`. Kaikki publishes [structured Hebrew data extracted from English Wiktionary](https://kaikki.org/dictionary/Hebrew/index.html). The app bundles 12,435 Hebrew–English entries and 125,560 form links. Exact headwords and attested forms take precedence, followed by common attached-prefix lookup. The dictionary uses English definitions in both interface languages. Hebrew uses the existing contextual AI dictionary with Hebrew-specific instructions about unpointed words and prefixes. AI response quality still needs evaluation on podcast vocabulary.
 - Hebrew uses the system speech path. A Web Speech voice must be available as `he` or legacy `iw`. Apple lists [Hebrew (Israel) for accessibility speech features](https://www.apple.com/macos/feature-availability/), but voice exposure in the Tauri webview needs a runtime check. Hebrew is outside the bundled Supertonic language list. If the webview exposes no suitable voice, the next local option on macOS is a native system speech bridge.
+
+## Rebuild the Chinese–English dictionary
+
+Umbra bundles the [Lumen CC-CEDICT database](https://github.com/LivingTwice/lumen/releases/tag/dictionaries-zh-1) with Mandarin headwords missing from it, using the [English Wiktionary extract for Chinese](https://kaikki.org/dictionary/Chinese/). The builder requires English glosses and source-supplied Standard Mandarin pinyin for each new entry. Existing CC-CEDICT definitions and their ordering are preserved. The French interface continues to use CFDICT.
+
+```sh
+python3 tools/build_dicts.py --zh-kaikki en-zh.db.gz Chinese.jsonl.gz \
+  src-tauri/resources/dicts/en-zh-kaikki.db.gz
+```
+
+The bundled snapshot adds 64,709 headword keys. Its [license and attribution](../src-tauri/resources/dicts/CHINESE-DICTIONARY-LICENSE.txt) travel with the database.

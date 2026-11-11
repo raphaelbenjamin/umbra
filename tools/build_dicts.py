@@ -34,6 +34,7 @@ même format, pinyin compris :
 """
 import gzip, json, os, re, shutil, sqlite3, sys, unicodedata
 from collections import defaultdict
+from tempfile import TemporaryDirectory
 try:
     import orjson
     loads, dumps = orjson.loads, orjson.dumps
@@ -1270,6 +1271,72 @@ def write_ja(dst, native, senses_rows, keys, source, lang="ja"):
     print(f"{os.path.basename(dst)}: {len(senses_rows)} entrées, {len(rows)} clés, "
           f"{raw/1e6:.1f} Mo -> {os.path.getsize(dst)/1e6:.1f} Mo gz")
 
+def kaikki_mandarin_reading(sounds):
+    """Use Standard Mandarin pinyin supplied by Wiktionary."""
+    for sound in sounds:
+        tags = set(sound.get("tags", []))
+        if not {"Mandarin", "Pinyin"} <= tags or not tags <= {"Mandarin", "Pinyin", "Standard", "Standard-Chinese"}:
+            continue
+        reading = sound.get("zh_pron", "").split(" (", 1)[0].strip()
+        if reading and all(c.isascii() and c.isalpha() or c in " '-’üÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙ" for c in reading):
+            return reading
+    return ""
+
+
+def build_zh_kaikki(base, extract, dst):
+    """Fill missing CC-CEDICT headwords with English Wiktionary entries."""
+    with TemporaryDirectory() as directory:
+        path = os.path.join(directory, "cedict.db")
+        with gzip.open(base, "rb") as source, open(path, "wb") as output:
+            shutil.copyfileobj(source, output)
+        db = sqlite3.connect(path)
+        try:
+            senses = db.execute("SELECT id,word,ipa,pos,gloss FROM senses ORDER BY id").fetchall()
+            keys = db.execute("""
+                SELECT k.rank,k.k,k.id,IFNULL(k.word,s.word),IFNULL(k.ipa,s.ipa)
+                FROM keys k JOIN senses s ON k.id=s.id
+            """).fetchall()
+        finally:
+            db.close()
+
+    primary_keys = {row[1] for row in keys}
+    next_id = max(row[0] for row in senses) + 1
+    added = defaultdict(list)
+    skip_tags = {"alt-of", "form-of", "no-gloss", "empty-gloss", "Cantonese", "Hokkien", "Hakka", "Wu", "Min", "Classical-Chinese"}
+    opener = gzip.open if extract.endswith(".gz") else open
+    with opener(extract, "rt", encoding="utf-8") as source:
+        for line in source:
+            entry = loads(line)
+            word, pos = entry.get("word", ""), entry.get("pos", "")
+            if entry.get("lang_code") != "zh" or pos in {"soft-redirect", "romanization", "punct", "symbol"} or not 1 <= len(word) <= 48:
+                continue
+            key = key2(word, "zh")
+            if key in primary_keys or len(added.get(key, ())) >= 3:
+                continue
+            if not any(unicodedata.name(c, "").startswith(("CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH")) for c in word):
+                continue
+            reading = kaikki_mandarin_reading(entry.get("sounds", []))
+            if not reading:
+                continue
+            glosses = list(dict.fromkeys(
+                clean_gloss(gloss)
+                for sense in entry.get("senses", [])
+                if not skip_tags.intersection(sense.get("tags", []))
+                for gloss in sense.get("glosses", [])
+            ))
+            glosses = [gloss for gloss in glosses if gloss][:MAX_GLOSS]
+            if not glosses:
+                continue
+            definition = (reading, POS_EN.get(pos, pos.capitalize()), "␞".join(glosses))
+            if definition in added[key]:
+                continue
+            added[key].append(definition)
+            senses.append((next_id, word, *definition))
+            keys.append((len(keys), key, next_id, word, reading))
+            next_id += 1
+    write_ja(dst, "en", senses, keys, "CC-CEDICT (MDBG) and English Wiktionary via Kaikki / Wiktextract (CC BY-SA 4.0)", lang="zh")
+    print(f"Added {len(added):,} new headword keys from Kaikki.")
+
 # ---------- vérification : couverture des mots les plus fréquents ----------
 
 def check(path_gz, lang, freq_path, sizes=(1000, 5000, 20000)):
@@ -1299,6 +1366,9 @@ def check(path_gz, lang, freq_path, sizes=(1000, 5000, 20000)):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if args[:1] == ["--zh-kaikki"]:
+        build_zh_kaikki(args[1], args[2], args[3])
+        sys.exit()
     if args[:1] == ["--zh"]:
         os.makedirs(args[3], exist_ok=True)
         build_zh(args[1], "en", os.path.join(args[3], "en-zh.db.gz"), "CC-CEDICT (MDBG, CC BY-SA 4.0)")

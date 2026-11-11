@@ -169,21 +169,26 @@ pub struct Dicts {
     data_dir: PathBuf,
     /// connexions ouvertes, par « langue des définitions:langue étudiée »
     open: Mutex<HashMap<String, Dict>>,
+    bundled_unpack: Mutex<()>,
     /// dictionnaires en cours de téléchargement (« langue des définitions:langue étudiée »)
     fetching: Mutex<HashSet<String>>,
 }
 
 impl Dicts {
     pub fn new(resource_dir: PathBuf, data_dir: PathBuf) -> Self {
-        Self { resource_dir, data_dir, open: Mutex::new(HashMap::new()), fetching: Mutex::new(HashSet::new()) }
+        Self { resource_dir, data_dir, open: Mutex::new(HashMap::new()), bundled_unpack: Mutex::new(()), fetching: Mutex::new(HashSet::new()) }
     }
 
     fn bundled(&self, native: &str, lang: &str) -> bool {
-        lang == "he" || (native == "fr" && BUNDLED_FR.contains(&lang))
+        lang == "he" || (lang == "zh" && native == "en" && self.bundled_path(lang).is_file()) || (native == "fr" && BUNDLED_FR.contains(&lang))
     }
 
     fn bundled_path(&self, lang: &str) -> PathBuf {
-        let file = if lang == "he" { "en-he.db.gz".into() } else { format!("{lang}.db.gz") };
+        let file = match lang {
+            "he" => "en-he.db.gz".into(),
+            "zh" => "en-zh-kaikki.db.gz".into(),
+            _ => format!("{lang}.db.gz"),
+        };
         self.resource_dir.join(file)
     }
 
@@ -284,7 +289,9 @@ impl Dicts {
             let p = self.remote_db(r, lang);
             return if p.exists() { Ok(p) } else { Err(anyhow!("dictionary not downloaded yet")) };
         }
-        let target = self.data_dir.join(format!("{lang}-v{DICT_VERSION}.db"));
+        let filename = if lang == "zh" { "zh-en-kaikki-v1.db".into() } else { format!("{lang}-v{DICT_VERSION}.db") };
+        let target = self.data_dir.join(filename);
+        let _unpack = self.bundled_unpack.lock();
         if target.exists() {
             return Ok(target);
         }
@@ -1201,6 +1208,11 @@ mod tests {
         let ambiguous = d.lookup_ctx("en", "he", "בשנה", "").unwrap();
         assert_eq!(ambiguous.entries[0].word, "בוש");
         assert!(ambiguous.entries.iter().any(|entry| entry.word == "שנה" && entry.pos == "Noun"));
+        let extra = d.lookup_in("en", "zh", "直播主").unwrap();
+        assert_eq!(extra.pinyin.as_deref(), Some("zhíbōzhǔ"));
+        assert!(extra.entries[0].glosses[0].contains("live streamer"));
+        assert_eq!(d.lookup_in("en", "zh", "手机").unwrap().pinyin.as_deref(), Some("shǒujī"));
+        assert_eq!(d.lookup_in("en", "zh", "八块钱").unwrap().pinyin.as_deref(), Some("bā kuài qián"));
         println!("{:?}", d.lookup_in("fr", "en", "chose").unwrap());
         let _ = std::fs::remove_dir_all(tmp);
     }
