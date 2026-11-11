@@ -1989,7 +1989,7 @@ mod tests {
         let mut ca = db::open(&db::path(&a)).unwrap();
         let id = lesson(&ca, "Il faro", "Storie", Some(&audio), Some(&video), Some(&cover));
         db::terms_mark_known(&mut ca, "it", &["faro".into(), "alto".into()], 3).unwrap();
-        db::term_set(&ca, &db::TermUpdate { lang: "it".into(), term: "è alto".into(), status: 2, translation: Some("est haut".into()), note: None, lemma: None, context: None }).unwrap();
+        db::term_set(&ca, &db::TermUpdate { lang: "it".into(), term: "è alto".into(), status: Some(2), translation: Some("est haut".into()), note: None, lemma: None, context: None }).unwrap();
         db::setting_set(&ca, "lingq_key", "secret").unwrap();
         db::setting_set(&ca, "online_on", "1").unwrap();
         db::setting_set(&ca, "online_key_deepseek", "sk-secret").unwrap();

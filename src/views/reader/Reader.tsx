@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
 import { Duration, Orb, Sheet } from "../../components/ui";
-import { api, errorText, isNoModel } from "../../lib/api";
+import { api, errorText, isNoModel, type TermUpdate } from "../../lib/api";
 import { count, t } from "../../lib/i18n";
 import { LEVELS, langInfo } from "../../lib/langs";
 import { isBook, nextIn } from "../../lib/playlists";
@@ -32,6 +32,22 @@ import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
 interface Range {
   a: number;
   b: number;
+}
+
+const termWrites = new Map<string, Promise<void>>();
+const statusShortcuts = new Map([["0", 0], ["1", 1], ["2", 2], ["3", 3], ["4", 4], ["k", 4], ["x", 5]]);
+
+function saveReaderTerm(update: TermUpdate) {
+  const key = `${update.lang}|${update.term}`;
+  const previous = termWrites.get(key);
+  const write = () => api().termSet(update);
+  const saved = previous ? previous.then(write, write) : write();
+  termWrites.set(key, saved);
+  const clear = () => {
+    if (termWrites.get(key) === saved) termWrites.delete(key);
+  };
+  void saved.then(clear, clear);
+  return saved;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -102,9 +118,20 @@ export function Reader() {
   const chatBusy = useChat((s) => !!s.pending);
 
   const [data, setData] = useState<OpenedLesson | null>(null);
-  const [terms, setTerms] = useState<Record<string, Term>>({});
+  const [terms, setTermsState] = useState<Record<string, Term>>({});
+  const termsRef = useRef(terms);
+  const setTerms = useCallback((update: Record<string, Term> | ((previous: Record<string, Term>) => Record<string, Term>)) => {
+    const next = typeof update === "function" ? update(termsRef.current) : update;
+    termsRef.current = next;
+    setTermsState(next);
+  }, []);
   const [page, setPage] = useState(0);
-  const [range, setRange] = useState<Range | null>(null);
+  const [range, setRangeState] = useState<Range | null>(null);
+  const rangeRef = useRef<Range | null>(null);
+  const setRange = useCallback((next: Range | null) => {
+    rangeRef.current = next;
+    setRangeState(next);
+  }, []);
   const [cursor, setCursor] = useState(-1);
   const [illum, setIllum] = useState(false);
   const [complete, setComplete] = useState<null | { read: number; known: number; lingqs: number; secs: number; next: number | null }>(null);
@@ -549,7 +576,7 @@ export function Reader() {
   const setStatus = useCallback(
     (key: string, status: number, extra?: Partial<Term>) => {
       if (!lesson || !key) return;
-      const wasKnown = statusOf(key) === 4;
+      const wasKnown = termsRef.current[key]?.status === 4;
       setTerms((prev) => {
         const next = { ...prev };
         if (status === 0) delete next[key];
@@ -569,16 +596,13 @@ export function Reader() {
         setGlowKeys(new Set([key]));
         window.setTimeout(() => setGlowKeys(new Set()), 1000);
       }
-      void api()
-        .termSet({ lang: lesson.lang, term: key, status, translation: extra?.translation, note: extra?.note, context: extra?.context })
+      void saveReaderTerm({ lang: lesson.lang, term: key, status, translation: extra?.translation, note: extra?.note, context: extra?.context })
         .then(() => (status === 4 || status === 0 || wasKnown ? refreshKnown() : undefined))
         .catch((e) => toast(errorText(e), "error"));
     },
-    [lesson, refreshKnown, statusOf, toast],
+    [lesson, refreshKnown, setTerms, toast],
   );
 
-  const rangeRef = useRef<Range | null>(null);
-  rangeRef.current = range;
   const hearTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(hearTimer.current), []);
 
@@ -617,7 +641,7 @@ export function Reader() {
       if (sound !== false) hear(a, b, sound);
       if (a === b) {
         const k = tokens[a].k;
-        if (statusOf(k) === 0) {
+        if (!termsRef.current[k]) {
           session.current.lingqs++;
           const [sa, sb] = sentenceBounds(tokens, a);
           const ctx = lesson ? lesson.text.slice(tokens[sa].s, tokens[sb - 1].e).replace(/\s+/g, " ").trim() : "";
@@ -625,15 +649,22 @@ export function Reader() {
         }
       }
     },
-    [tokens, statusOf, setStatus, lesson, hear],
+    [tokens, setRange, setStatus, lesson, hear],
   );
 
   const onTranslation = useCallback(
-    (key: string, translation: string, note: string, sentence: string) => {
-      const cur = statusOf(key);
-      setStatus(key, cur === 0 ? 1 : cur, { translation, note, context: sentence });
+    (key: string, translation: string, note: string, sentence: string, automatic = false) => {
+      if (!lesson) return;
+      const term = termsRef.current[key];
+      if (!automatic) {
+        setStatus(key, term?.status ?? 1, { translation, note, context: sentence });
+      } else if (term && !term.translation && translation) {
+        setTerms((prev) => ({ ...prev, [key]: { ...term, translation, note, context: term.context || sentence } }));
+        void saveReaderTerm({ lang: lesson.lang, term: key, translation, note, context: sentence })
+          .catch((e) => toast(errorText(e), "error"));
+      }
     },
-    [statusOf, setStatus],
+    [lesson, setStatus, setTerms, toast],
   );
 
   // ---------- souris : clic et glisser pour les expressions ----------
@@ -953,7 +984,7 @@ export function Reader() {
   };
 
   // ---------- clavier ----------
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey) return;
@@ -969,12 +1000,20 @@ export function Reader() {
         playerRef.current?.skip(e.key === "ArrowLeft" ? -3 : 3);
         return;
       }
+      const range = rangeRef.current;
+      const key = e.key.toLowerCase();
+      const status = statusShortcuts.get(key);
+      if (status !== undefined && range) {
+        const selected = tokens.slice(range.a, range.b + 1).filter((token) => token.w);
+        if (selected.length > 0 && selected.length <= EXPR_MAX_WORDS) {
+          e.preventDefault();
+          setStatus(selected.map((token) => token.k).join(" "), status);
+        }
+        return;
+      }
       const words: number[] = [];
       for (let i = pr.start; i < pr.end; i++) if (tokens[i].w) words.push(i);
       const cur = range ? words.indexOf(range.a) : -1;
-      const key = e.key.toLowerCase();
-      // statut au clavier : un mot, ou une sélection assez courte pour devenir une expression
-      const canStatus = !!selection && selection.words <= EXPR_MAX_WORDS;
       if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && e.shiftKey && range) {
         // Maj + flèches : la sélection s'allonge ou se raccourcit d'un mot par la fin
         e.preventDefault();
@@ -993,14 +1032,6 @@ export function Reader() {
         e.preventDefault();
         const n = e.key === "ArrowRight" ? (cur < 0 ? 0 : Math.min(words.length - 1, cur + 1)) : cur < 0 ? words.length - 1 : Math.max(0, cur - 1);
         if (words[n] !== undefined) select(words[n], words[n], 250);
-      } else if (["1", "2", "3"].includes(key) && canStatus) {
-        setStatus(selection.key, Number(key));
-      } else if ((key === "k" || key === "4") && canStatus) {
-        setStatus(selection.key, 4);
-      } else if (key === "x" && canStatus) {
-        setStatus(selection.key, 5);
-      } else if (key === "0" && canStatus) {
-        setStatus(selection.key, 0);
       } else if (key === "c") {
         // le chat sur la leçon, prêt à écrire
         e.preventDefault();

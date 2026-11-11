@@ -92,6 +92,10 @@ pub struct DictResult {
     pub form_note: Option<String>,
     /// dictionnaire en cours de téléchargement
     pub pending: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pinyin: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub breakdown: bool,
 }
 
 impl DictResult {
@@ -332,10 +336,14 @@ impl Dicts {
                 if word.trim().is_empty() || word.len() > 128 || annotations.contains_key(&word) {
                     continue;
                 }
-                let result = dict.find_with_variants(native, "zh", &word)?;
-                if let Some(entry) = result.entries.into_iter().next() {
-                    let gloss = entry.glosses.into_iter().next().unwrap_or_default();
-                    annotations.insert(word, ChineseAnnotation { pinyin: entry.ipa, gloss });
+                let result = dict.lookup_zh(native, &word)?;
+                if let Some(pinyin) = result.pinyin {
+                    let gloss = if result.breakdown {
+                        String::new()
+                    } else {
+                        result.entries.into_iter().next().and_then(|entry| entry.glosses.into_iter().next()).unwrap_or_default()
+                    };
+                    annotations.insert(word, ChineseAnnotation { pinyin, gloss });
                 }
             }
             Ok(annotations)
@@ -352,6 +360,9 @@ impl Dicts {
             return Ok(DictResult::default());
         }
         self.with_dict(native, lang, |d| {
+            if lang == "zh" && d.v2 {
+                return d.lookup_zh(native, surface);
+            }
             let mut long = DictResult::default();
             if d.v2 {
                 for span in longer_spans(lang, surface, after) {
@@ -365,9 +376,6 @@ impl Dicts {
             let mut own = d.find_with_variants(native, lang, surface)?;
             if lang == "he" && d.v2 {
                 own = d.hebrew_context(surface, after, own)?;
-            }
-            if lang == "zh" && d.v2 && !own.found() && surface.chars().count() > 1 {
-                own.entries = d.parts_zh(surface)?;
             }
             if lang == "ja" && d.v2 && surface.chars().count() == 1 {
                 // sens et lectures du kanji, juste après le premier mot
@@ -401,6 +409,19 @@ impl Dicts {
 }
 
 impl Dict {
+    fn lookup_zh(&self, native: &str, surface: &str) -> Result<DictResult> {
+        let mut exact = self.find_with_variants(native, "zh", surface)?;
+        if exact.found() {
+            if surface == "多少" {
+                // The common question word has a neutral second syllable.
+                exact.entries.sort_by_key(|entry| entry.ipa != "duōshao");
+            }
+            exact.pinyin = exact.entries.iter().find(|entry| !entry.ipa.is_empty()).map(|entry| entry.ipa.clone());
+            return Ok(exact);
+        }
+        self.parts_zh(native, surface)
+    }
+
     fn hebrew_context(&self, surface: &str, after: &str, mut exact: DictResult) -> Result<DictResult> {
         let key = key(surface, "he");
         let Some(stem) = key.strip_prefix('ב').filter(|s| s.chars().count() >= 3) else {
@@ -450,23 +471,51 @@ impl Dict {
 
     /// Chinois : un mot que le dictionnaire n'a pas (jieba en connaît davantage : « 我们的 »,
     /// « 这个人 ») se lit par ses parties, la plus longue d'abord, de gauche à droite.
-    fn parts_zh(&self, word: &str) -> Result<Vec<DictEntry>> {
+    fn parts_zh(&self, native: &str, word: &str) -> Result<DictResult> {
         let chars: Vec<char> = word.chars().collect();
-        let mut out: Vec<DictEntry> = Vec::new();
+        let mut result = DictResult::default();
+        let mut complete = true;
         let mut i = 0;
-        while i < chars.len() && out.len() < 4 {
+        while i < chars.len() && result.entries.len() < 24 {
+            if chars[i].is_whitespace() || (!chars[i].is_alphanumeric() && !crate::text::is_han(chars[i])) {
+                i += 1;
+                continue;
+            }
             let mut step = 1;
+            let mut found = false;
             for n in (1..=(chars.len() - i).min(8)).rev() {
                 let piece: String = chars[i..i + n].iter().collect();
-                if let Some(e) = self.entries(&self.key(&piece, "zh"), false)?.into_iter().next() {
-                    out.push(e);
+                if let Some(mut entry) = self.entries(&self.key(&piece, "zh"), false)?.into_iter().next() {
+                    let next = chars.get(i + n);
+                    let after_number = i > 0 && "零〇一二两兩三四五六七八九十百千万萬億亿".contains(chars[i - 1]);
+                    let after_demonstrative = i > 0 && "这這那哪".contains(chars[i - 1]);
+                    let sense = match (piece.as_str(), next) {
+                        ("本", Some('书' | '書')) if after_number || after_demonstrative => Some(("classificateur des livres", "classifier for books")),
+                        ("本", Some('书' | '書')) => Some(("ce ; classificateur des livres après un nombre ou un démonstratif", "this; classifier for books after a number or demonstrative")),
+                        ("台" | "臺", _) if after_number => Some(("classificateur des appareils", "classifier for machines and devices")),
+                        ("块" | "塊", Some('钱' | '錢')) if after_number => Some(("yuan (unité monétaire familière)", "yuan (colloquial currency unit)")),
+                        ("钱" | "錢", _) if i > 0 && matches!(chars[i - 1], '块' | '塊') => Some(("argent", "money")),
+                        _ => None,
+                    };
+                    if let Some((fr, en)) = sense {
+                        let gloss = if native == "fr" { fr } else { en };
+                        entry.glosses = vec![gloss.into()];
+                    }
+                    complete &= !entry.ipa.is_empty();
+                    result.entries.push(entry);
                     step = n;
+                    found = true;
                     break;
                 }
             }
+            complete &= found;
             i += step;
         }
-        Ok(out)
+        result.breakdown = !result.entries.is_empty();
+        if complete && i == chars.len() && result.breakdown {
+            result.pinyin = Some(result.entries.iter().map(|entry| entry.ipa.as_str()).collect::<Vec<_>>().join(" "));
+        }
+        Ok(result)
     }
 
     /// Formes de base d'une forme fléchie, avec leur description.
@@ -578,7 +627,7 @@ impl Dict {
                 }
             }
             if !entries.is_empty() {
-                return Ok(DictResult { lemma: Some(cand), form_note: Some(ja::describe(&chain, native)), entries, pending: false });
+                return Ok(DictResult { lemma: Some(cand), form_note: Some(ja::describe(&chain, native)), entries, ..Default::default() });
             }
         }
         Ok(DictResult::default())
@@ -1346,6 +1395,37 @@ mod tests {
         let parts: Vec<&str> = r.entries.iter().map(|e| e.word.as_str()).collect();
         assert_eq!(parts, ["我们", "的"], "{r:?}");
         let _ = std::fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn chinese_phrase_readings_cover_every_part() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("
+            CREATE TABLE entries (k TEXT, word TEXT, pos TEXT, ipa TEXT, gloss TEXT, rank INTEGER);
+            CREATE TABLE forms (k TEXT, lemma TEXT, note INTEGER);
+            CREATE TABLE notes (id INTEGER, text TEXT);
+            INSERT INTO entries VALUES
+                ('本','本','','běn','root',0), ('书','书','','shū','book',0),
+                ('一','一','','yī','one',0), ('台','台','','tái','platform',0),
+                ('八','八','','bā','eight',0), ('块','块','','kuài','lump',0),
+                ('钱','钱','','qián','coin',0),
+                ('多少','多少','','duōshǎo','amount',0), ('多少','多少','','duōshao','how much?',1);
+        ").unwrap();
+        let dict = Dict { conn, v2: true };
+        for (word, reading, part, gloss) in [
+            ("本书", "běn shū", 0, "this; classifier for books after a number or demonstrative"),
+            ("一台", "yī tái", 1, "classifier for machines and devices"),
+            ("八块钱", "bā kuài qián", 1, "yuan (colloquial currency unit)"),
+        ] {
+            let result = dict.lookup_zh("en", word).unwrap();
+            assert!(result.breakdown);
+            assert_eq!(result.pinyin.as_deref(), Some(reading));
+            assert_eq!(result.entries[part].glosses[0], gloss);
+        }
+        let amount = dict.lookup_zh("en", "多少").unwrap();
+        assert_eq!(amount.pinyin.as_deref(), Some("duōshao"));
+        assert_eq!(amount.entries[1].ipa, "duōshǎo");
+        assert!(dict.lookup_zh("en", "八龘").unwrap().pinyin.is_none());
     }
 
     /// Format 2 : définitions en français et en anglais des 24 autres langues.

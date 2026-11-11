@@ -50,7 +50,7 @@ interface Props {
   sel: Selection | null;
   term: Term | undefined;
   onStatus(key: string, status: number): void;
-  onTranslation(key: string, translation: string, note: string, sentence: string): void;
+  onTranslation(key: string, translation: string, note: string, sentence: string, automatic?: boolean): void;
   /** ouvre l'expression enregistrée [a, b] */
   onSelectPhrase(a: number, b: number): void;
   onClose(): void;
@@ -116,7 +116,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           setAiState("done");
           // expression déjà enregistrée sans traduction : on la complète
           if (res && termRef.current && !termRef.current.translation) {
-            onTranslation(sel.key, res, "", sel.sentence);
+            onTranslation(sel.key, res, "", sel.sentence, true);
           }
           return;
         }
@@ -134,7 +134,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
         setAiState("done");
         // une sélection de plusieurs mots ne devient une expression que sur demande
         if (res.translation && !termRef.current?.translation && (!sel.isPhrase || termRef.current)) {
-          onTranslation(sel.key, res.translation, res.note, sel.sentence);
+          onTranslation(sel.key, res.translation, res.note, sel.sentence, true);
         }
       } catch (e) {
         if (id !== reqId.current) return;
@@ -292,7 +292,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
 
   const status = term?.status ?? 0;
   const entries = dict?.entries ?? [];
-  const pinyin = lang === "zh" ? entries.find((entry) => entry.ipa.trim())?.ipa : undefined;
+  const pinyin = dict?.pinyin;
 
   return (
     <div className="wp-pane" aria-label={t("Détail du mot", "Word details")}>
@@ -402,9 +402,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
 
         {entries.length > 0 && (
           <div className="wp-block">
-            <span className="eyebrow">{t("Dictionnaire", "Dictionary")}</span>
+            <span className="eyebrow">{dict?.breakdown ? t("Éléments du dictionnaire", "Dictionary breakdown") : t("Dictionnaire", "Dictionary")}</span>
             <div className="wp-gloss">
-              {entries.slice(0, 2).map((e, i) => (
+              {entries.slice(0, dict?.breakdown ? 8 : 2).map((e, i) => (
                 <div key={i}>
                   {(entries.length > 1 || e.word !== sel.surface.toLowerCase()) && (
                     <div className="pos">
@@ -414,7 +414,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
                       {e.pos && ` · ${e.pos}`}
                     </div>
                   )}
-                  {e.glosses.slice(0, 3).map((g, j) => (
+                  {e.glosses.slice(0, 3).map((g, j) => dict?.breakdown ? (
+                    <div key={j} className="wp-part-gloss"><span className="n">{j + 1}</span><span>{g}</span></div>
+                  ) : (
                     <button key={j} onClick={() => onTranslation(sel.key, g, term?.note ?? aiNote, sel.sentence)} title={t("Utiliser comme ma traduction", "Use as my translation")}>
                       <span className="n">{j + 1}</span>
                       <span>{g}</span>

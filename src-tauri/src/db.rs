@@ -1122,7 +1122,7 @@ pub fn terms_for_keys(c: &Connection, lang: &str, keys: &[String]) -> Result<Has
 pub struct TermUpdate {
     pub lang: String,
     pub term: String,
-    pub status: i64,
+    pub status: Option<i64>,
     pub translation: Option<String>,
     pub note: Option<String>,
     pub lemma: Option<String>,
@@ -1144,10 +1144,21 @@ fn bump(c: &Connection, lang: &str, col: &str, n: i64) -> Result<()> {
 /// Met à jour (ou crée) un terme. Statut 0 = supprimer (redevient « nouveau »).
 pub fn term_set(c: &Connection, u: &TermUpdate) -> Result<()> {
     let term = text::normalize_for(&u.term, &u.lang);
+    let Some(status) = u.status else {
+        if let Some(translation) = u.translation.as_deref().filter(|text| !text.is_empty()) {
+            c.execute(
+                "UPDATE terms SET translation=?3, note=COALESCE(?4,note),
+                    context=CASE WHEN context='' THEN COALESCE(?5,'') ELSE context END, updated_at=?6
+                 WHERE lang=?1 AND term=?2 AND translation=''",
+                params![u.lang, term, translation, u.note, u.context, now()],
+            )?;
+        }
+        return Ok(());
+    };
     let prev: Option<i64> = c
         .query_row("SELECT status FROM terms WHERE lang=?1 AND term=?2", params![u.lang, term], |r| r.get(0))
         .optional()?;
-    if u.status == 0 {
+    if status == 0 {
         c.execute("DELETE FROM terms WHERE lang=?1 AND term=?2", params![u.lang, term])?;
         if prev.is_some() {
             tombstone(c, "term", &format!("{}|{}", u.lang, term))?;
@@ -1168,15 +1179,15 @@ pub fn term_set(c: &Connection, u: &TermUpdate) -> Result<()> {
             lemma=COALESCE(?6, terms.lemma),
             context=CASE WHEN terms.context='' THEN COALESCE(?7,'') ELSE terms.context END,
             updated_at=excluded.updated_at",
-        params![u.lang, term, u.status, u.translation, u.note, u.lemma, u.context, t],
+        params![u.lang, term, status, u.translation, u.note, u.lemma, u.context, t],
     )?;
-    if prev.is_none() && (1..=3).contains(&u.status) {
+    if prev.is_none() && (1..=3).contains(&status) {
         bump(c, &u.lang, "lingqs", 1)?;
     }
-    if prev != Some(STATUS_KNOWN) && u.status == STATUS_KNOWN {
+    if prev != Some(STATUS_KNOWN) && status == STATUS_KNOWN {
         bump(c, &u.lang, "known_added", 1)?;
     }
-    if prev == Some(STATUS_KNOWN) && u.status != STATUS_KNOWN {
+    if prev == Some(STATUS_KNOWN) && status != STATUS_KNOWN {
         bump(c, &u.lang, "known_added", -1)?;
     }
     Ok(())
@@ -1663,6 +1674,31 @@ pub fn export_csv(c: &Connection, lang: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_late_automatic_translation_preserves_the_chosen_status() {
+        let c = open(Path::new(":memory:")).unwrap();
+        let mut word = TermUpdate {
+            lang: "zh".into(), term: "手机".into(), status: Some(1),
+            translation: None, note: None, lemma: None, context: None,
+        };
+        term_set(&c, &word).unwrap();
+        word.status = Some(4);
+        term_set(&c, &word).unwrap();
+        word.status = None;
+        word.translation = Some("phone".into());
+        term_set(&c, &word).unwrap();
+        word.translation = Some("cell phone".into());
+        term_set(&c, &word).unwrap();
+        let saved: (i64, String) = c.query_row("SELECT status,translation FROM terms", [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+        assert_eq!(saved, (4, "phone".into()));
+        word.status = Some(0);
+        term_set(&c, &word).unwrap();
+        word.status = None;
+        term_set(&c, &word).unwrap();
+        assert_eq!(c.query_row("SELECT COUNT(*) FROM terms", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
+    }
+
     #[test]
     fn lesson_and_terms_flow() {
         let path = std::env::temp_dir().join(format!("lumen-db-test-{}.db", std::process::id()));
@@ -1674,7 +1710,7 @@ mod tests {
         let l = lessons_list(&c, "en").unwrap();
         assert_eq!(l[0].new_words, 5);
         assert_eq!(l[0].new_pct, 100);
-        term_set(&c, &TermUpdate { lang: "en".into(), term: "Cat".into(), status: 1, translation: Some("chat".into()), note: None, lemma: None, context: Some("The cat sat.".into()) }).unwrap();
+        term_set(&c, &TermUpdate { lang: "en".into(), term: "Cat".into(), status: Some(1), translation: Some("chat".into()), note: None, lemma: None, context: Some("The cat sat.".into()) }).unwrap();
         let added = terms_mark_known(&mut c, "en", &["the".into(), "sat".into(), "cat".into()], 6).unwrap();
         assert_eq!(added, 2);
         let s = stats(&c, "en").unwrap();
@@ -2014,8 +2050,8 @@ mod tests {
         let it = |term: &str, status: i64, tr: &str| ImportedTerm {
             term: term.into(), status, translation: tr.into(), note: String::new(), context: String::new(),
         };
-        term_set(&c, &TermUpdate { lang: "en".into(), term: "cat".into(), status: 4, translation: None, note: None, lemma: None, context: None }).unwrap();
-        term_set(&c, &TermUpdate { lang: "en".into(), term: "dog".into(), status: 5, translation: None, note: None, lemma: None, context: None }).unwrap();
+        term_set(&c, &TermUpdate { lang: "en".into(), term: "cat".into(), status: Some(4), translation: None, note: None, lemma: None, context: None }).unwrap();
+        term_set(&c, &TermUpdate { lang: "en".into(), term: "dog".into(), status: Some(5), translation: None, note: None, lemma: None, context: None }).unwrap();
         let n = terms_import(&mut c, "en", &[it("Cat", 2, "chat"), it("dog", 1, "chien"), it("Bird", 3, "oiseau"), it("the", 4, ""), it("", 4, "")]).unwrap();
         assert_eq!(n, 4);
         let all = terms_for_keys(&c, "en", &["cat".into(), "dog".into(), "bird".into(), "the".into()]).unwrap();

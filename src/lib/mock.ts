@@ -672,7 +672,10 @@ export function createMockApi(): Api {
       const term = normalize(u.term, u.lang);
       const k = `${u.lang}|${term}`;
       const prev = db.terms[k];
-      if (u.status === 0) {
+      if (u.status === undefined) {
+        if (!prev || prev.translation || !u.translation) return;
+        db.terms[k] = { ...prev, translation: u.translation, note: u.note ?? prev.note, context: prev.context || u.context || "", updated_at: Date.now() / 1000 };
+      } else if (u.status === 0) {
         delete db.terms[k];
       } else {
         db.terms[k] = {

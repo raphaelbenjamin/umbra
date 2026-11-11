@@ -1644,7 +1644,8 @@ span.player-voice .icon-btn {
   flex-direction: column;
   gap: 4px;
 }
-.wp-gloss button {
+.wp-gloss button,
+.wp-part-gloss {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1660,7 +1661,7 @@ span.player-voice .icon-btn {
 .wp-gloss button:hover {
   background: var(--chip);
 }
-.wp-gloss button .n {
+.wp-gloss .n {
   font-size: 11px;
   color: var(--muted);
   min-width: 12px;

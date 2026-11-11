@@ -5602,7 +5602,7 @@ dependencies = [
 
 [[package]]
 name = "umbra"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

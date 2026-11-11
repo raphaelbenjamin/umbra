@@ -162,6 +162,8 @@ export interface DictEntry {
 
 export interface DictResult {
   entries: DictEntry[];
+  pinyin?: string;
+  breakdown?: boolean;
   lemma?: string | null;
   form_note?: string | null;
   /** dictionnaire en cours de téléchargement */

@@ -66,7 +66,7 @@ export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in
 export interface TermUpdate {
   lang: LangCode;
   term: string;
-  status: number;
+  status?: number;
   translation?: string | null;
   note?: string | null;
   lemma?: string | null;
