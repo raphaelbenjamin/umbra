@@ -38,7 +38,7 @@ import { shortName, writerFor } from "../lib/writers";
    Chaque page ne montre que son domaine ; la recherche du menu retrouve un réglage. */
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
-/** Dépôt public du code de Lumen (GPL-3.0). */
+/** Dépôt public du code d’Umbra (GPL-3.0). */
 const SOURCE_URL = "https://github.com/raphaelbenjamin/umbra";
 
 interface Tab {
@@ -61,8 +61,8 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         icon: "user",
         label: t("Profil", "Profile"),
         lead: t(
-          "Votre nom, votre avatar, ce qui vous motive. Il rend Lumen un peu plus à vous, et il reste à vous : sur ce Mac et dans votre sauvegarde, jamais ailleurs.",
-          "Your name, your avatar, what motivates you. It makes Lumen a little more yours, and it stays yours: on this Mac and in your backup, nowhere else.",
+          "Votre nom, votre avatar, ce qui vous motive. Il rend Umbra un peu plus à vous, et il reste à vous : sur ce Mac et dans votre sauvegarde, jamais ailleurs.",
+          "Your name, your avatar, what motivates you. It makes Umbra a little more yours, and it stays yours: on this Mac and in your backup, nowhere else.",
         ),
         keys: "profil nom prenom pseudo avatar photo image initiale teinte couleur motivation pourquoi apprendre centres interet passions loisirs accords feminin masculin chat icloud profile name first nickname picture photo initial hue color motivation why learning interests hobbies agreement feminine masculine gender",
       },
@@ -75,7 +75,7 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         id: "general",
         icon: "settings",
         label: t("Général", "General"),
-        lead: t("La langue de Lumen et sa lumière, de l'aube à la nuit.", "Lumen's language and its light, from dawn to night."),
+        lead: t("La langue d’Umbra et sa lumière, de l'aube à la nuit.", "Umbra's language and its light, from dawn to night."),
         keys: "langue interface francais anglais theme apparence clair sombre systeme bibliotheque presentation cartes grandes petites liste finder tri language french english appearance light dark system library view cards large small list sort",
       },
     ],
@@ -171,8 +171,8 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         icon: "cloud",
         label: t("Sauvegarde", "Backup"),
         lead: t(
-          "Une copie de votre progression dans votre iCloud Drive, votre Dropbox, Google Drive ou OneDrive : mots, expressions, leçons, playlists, conversations et réglages. Si ce Mac est effacé ou remplacé, vous la retrouvez en un clic. Elle ne passe par aucun serveur de Lumen : seul votre compte la reçoit.",
-          "A copy of your progress in your iCloud Drive, Dropbox, Google Drive or OneDrive: words, phrases, lessons, playlists, conversations and settings. If this Mac is wiped or replaced, you get it back in one click. It goes through no Lumen server: only your account receives it.",
+          "Une copie de votre progression dans votre iCloud Drive, votre Dropbox, Google Drive ou OneDrive : mots, expressions, leçons, playlists, conversations et réglages. Si ce Mac est effacé ou remplacé, vous la retrouvez en un clic. Elle ne passe par aucun serveur d’Umbra : seul votre compte la reçoit.",
+          "A copy of your progress in your iCloud Drive, Dropbox, Google Drive or OneDrive: words, phrases, lessons, playlists, conversations and settings. If this Mac is wiped or replaced, you get it back in one click. It goes through no Umbra server: only your account receives it.",
         ),
         keys: "sauvegarde icloud drive dropbox google drive onedrive box proton pcloud nextcloud nuage cloud dossier cle usb disque emplacement restaurer historique audio videos synchroniser synchronisation fusionner appareils iphone ipad mac backup folder usb disk location restore history sync merge devices",
       },
@@ -181,8 +181,8 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         icon: "disk",
         label: t("Stockage", "Storage"),
         lead: t(
-          "Ce que Lumen garde sur ce Mac, et des vidéos et des sons importés bien plus légers, à qualité presque identique.",
-          "What Lumen keeps on this Mac, and imported videos and sounds that take far less space, at nearly identical quality.",
+          "Ce que Umbra garde sur ce Mac, et des vidéos et des sons importés bien plus légers, à qualité presque identique.",
+          "What Umbra keeps on this Mac, and imported videos and sounds that take far less space, at nearly identical quality.",
         ),
         keys: "stockage espace disque place occupee go mo videos sons audio compression compresser alleger allegement leger lourd hevc h265 aac mono qualite originale compacte 720p 1080p modeles dictionnaires storage disk space used compress lighten lighter heavy quality original compact models dictionaries",
       },
@@ -191,8 +191,8 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         icon: "import",
         label: "LingQ",
         lead: t(
-          "Retrouvez dans Lumen tout votre parcours LingQ : mots connus et ignorés, LingQ avec leurs traductions et leurs notes, et les leçons de tous vos cours avec leur audio.",
-          "Bring your whole LingQ journey into Lumen: known and ignored words, LingQs with their translations and notes, and the lessons of all your courses with their audio.",
+          "Retrouvez dans Umbra tout votre parcours LingQ : mots connus et ignorés, LingQ avec leurs traductions et leurs notes, et les leçons de tous vos cours avec leur audio.",
+          "Bring your whole LingQ journey into Umbra: known and ignored words, LingQs with their translations and notes, and the lessons of all your courses with their audio.",
         ),
         keys: "lingq import cle api vocabulaire lecons key vocabulary lessons",
       },
@@ -205,7 +205,7 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         id: "about",
         icon: "orb",
         label: t("À propos", "About"),
-        lead: t("Lumen, ses nouveautés, sa visite guidée et ceux qui le rendent possible.", "Lumen, what's new, its guided tour and those who make it possible."),
+        lead: t("Umbra, ses nouveautés, sa visite guidée et ceux qui le rendent possible.", "Umbra, what's new, its guided tour and those who make it possible."),
         keys: "a propos version mises a jour nouveautes visite guidee guide raccourcis clavier touches accueil credits dossier donnees about updates what's new whats new tour keyboard shortcuts keys welcome credits data folder code source logiciel libre licence gpl github source code free software license open source",
       },
     ],
@@ -483,7 +483,7 @@ function GeneralPane() {
         <div className="set-card">
           <div className="set-row">
             <div className="grow">
-              <strong>{t("Lumen en", "Lumen in")}</strong>
+              <strong>{t("Umbra en", "Umbra in")}</strong>
             </div>
             <Segmented
               id="ui-lang"
@@ -534,7 +534,7 @@ function GeneralPane() {
   );
 }
 
-/** Thème : trois petites fenêtres de Lumen, en clair, en sombre, ou partagées. */
+/** Thème : trois petites fenêtres d’Umbra, en clair, en sombre, ou partagées. */
 function ThemePicker({ value, onChange }: { value: string; onChange(v: string): void }) {
   const opts = [
     { v: "system", label: t("Système", "System") },
@@ -725,7 +725,7 @@ function ReadingPane() {
           <div className="set-row set-stack">
             <div className="grow">
               <strong>{t("Couleur de la page", "Page color")}</strong>
-              <span>{t("« Auto » suit le thème de Lumen. Le fond et le texte vont ensemble, pour bien se lire.", "“Auto” follows Lumen's theme. Background and text come as a pair, so they stay easy to read.")}</span>
+              <span>{t("« Auto » suit le thème d’Umbra. Le fond et le texte vont ensemble, pour bien se lire.", "“Auto” follows Umbra's theme. Background and text come as a pair, so they stay easy to read.")}</span>
             </div>
             <PaperPicker id="set" value={settings.read_paper || "auto"} onChange={(v) => setSetting("read_paper", v)} font={readFont(settings.read_font).stack} />
           </div>
@@ -960,8 +960,8 @@ function DiscoverPane() {
   return (
     <Section
       note={t(
-        "Lumen regarde ce que publient des chaînes, des podcasts et des journaux choisis pour vos langues, et vous le propose dans Découvrir. Il lit seulement des listes publiques, sans rien envoyer de personnel ; une vidéo ou un épisode n'est téléchargé que si vous en faites une leçon.",
-        "Lumen looks at what channels, podcasts and newspapers chosen for your languages publish, and suggests it in Discover. It only reads public lists and sends nothing personal; a video or an episode is downloaded only if you make it a lesson.",
+        "Umbra regarde ce que publient des chaînes, des podcasts et des journaux choisis pour vos langues, et vous le propose dans Découvrir. Il lit seulement des listes publiques, sans rien envoyer de personnel ; une vidéo ou un épisode n'est téléchargé que si vous en faites une leçon.",
+        "Umbra looks at what channels, podcasts and newspapers chosen for your languages publish, and suggests it in Discover. It only reads public lists and sends nothing personal; a video or an episode is downloaded only if you make it a lesson.",
       )}
     >
       <div className="set-card">
@@ -1006,8 +1006,8 @@ function LevelExplained({ lang, forms }: { lang: LangCode; forms: string }) {
   const span = e.next ? e.next - e.floor : 0;
   const pct = span ? Math.min(100, Math.max(3, ((e.units - e.floor) / span) * 100)) : 100;
   let how: string;
-  if (e.unit === "kanji") how = t("En japonais, Lumen compte les kanji que vous connaissez : c'est eux qui ouvrent les textes.", "In Japanese, Lumen counts the kanji you know: they are what opens up texts.");
-  else if (e.unit === "syllables") how = t("En vietnamien, Lumen compte les syllabes que vous connaissez : un mot en compte une ou deux.", "In Vietnamese, Lumen counts the syllables you know: a word has one or two.");
+  if (e.unit === "kanji") how = t("En japonais, Umbra compte les kanji que vous connaissez : c'est eux qui ouvrent les textes.", "In Japanese, Umbra counts the kanji you know: they are what opens up texts.");
+  else if (e.unit === "syllables") how = t("En vietnamien, Umbra compte les syllabes que vous connaissez : un mot en compte une ou deux.", "In Vietnamese, Umbra counts the syllables you know: a word has one or two.");
   else if (lang === "zh")
     how = t(
       "En chinois, les mots ne changent pas de forme : chacun de vos mots connus compte une fois. Les paliers suivent ceux du HSK (environ 1 300 mots au niveau 2, 4 300 au niveau 5).",
@@ -1020,8 +1020,8 @@ function LevelExplained({ lang, forms }: { lang: LangCode; forms: string }) {
     );
   else
     how = t(
-      `Le dictionnaire ${inLang(lang)} n'est pas encore sur ce Mac : Lumen estime le nombre de mots de base d'après vos ${forms}, selon le nombre de formes qu'ont les mots dans cette langue.`,
-      `The ${langLower(lang)} dictionary isn't on this Mac yet: Lumen estimates the number of base words from your ${forms}, based on how many forms words have in this language.`,
+      `Le dictionnaire ${inLang(lang)} n'est pas encore sur ce Mac : Umbra estime le nombre de mots de base d'après vos ${forms}, selon le nombre de formes qu'ont les mots dans cette langue.`,
+      `The ${langLower(lang)} dictionary isn't on this Mac yet: Umbra estimates the number of base words from your ${forms}, based on how many forms words have in this language.`,
     );
   return (
     <div className="set-row level-explained">
@@ -1178,8 +1178,8 @@ function AiPane() {
         title={t("Texte des transcriptions", "Transcript text")}
         note={
           t(
-            "Facultatif, conseillé : un second modèle écrit le texte, plus juste et sans phrase sautée, et Whisper repère chaque mot dans le temps pour la lanterne. Qwen3-ASR sert dans 15 langues, dont le japonais, le coréen et l'arabe ; Parakeet, plus léger et plus rapide, dans 18 langues européennes, dont l'ukrainien, le croate et le lituanien. Chacun ne sert que là où il a été mesuré au moins aussi juste que Whisper seul ; avec les deux, Lumen prend le meilleur.",
-            "Optional, recommended: a second model writes the text, more accurately and without skipped sentences, and Whisper times each word for the lantern. Qwen3-ASR works in 15 languages, including Japanese, Korean and Arabic; Parakeet, lighter and faster, in 18 European languages, including Ukrainian, Croatian and Lithuanian. Each one is only used where it was measured at least as accurate as Whisper alone; with both, Lumen picks the better one.",
+            "Facultatif, conseillé : un second modèle écrit le texte, plus juste et sans phrase sautée, et Whisper repère chaque mot dans le temps pour la lanterne. Qwen3-ASR sert dans 15 langues, dont le japonais, le coréen et l'arabe ; Parakeet, plus léger et plus rapide, dans 18 langues européennes, dont l'ukrainien, le croate et le lituanien. Chacun ne sert que là où il a été mesuré au moins aussi juste que Whisper seul ; avec les deux, Umbra prend le meilleur.",
+            "Optional, recommended: a second model writes the text, more accurately and without skipped sentences, and Whisper times each word for the lantern. Qwen3-ASR works in 15 languages, including Japanese, Korean and Arabic; Parakeet, lighter and faster, in 18 European languages, including Ukrainian, Croatian and Lithuanian. Each one is only used where it was measured at least as accurate as Whisper alone; with both, Umbra picks the better one.",
           ) +
           " " +
           (writer
@@ -1266,15 +1266,15 @@ function VideosPane() {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const info = useApp((s) => s.info);
-  // iPhone et iPad : ni yt-dlp ni cookies du navigateur, Lumen lit lui-même YouTube et Dailymotion
+  // iPhone et iPad : ni yt-dlp ni cookies du navigateur, Umbra lit lui-même YouTube et Dailymotion
   if (isIOS)
     return (
-      <Section note={t("Collez un lien dans « Importer » : Lumen en fait une leçon que vous regardez avec la transcription synchronisée.", "Paste a link in “Import”: Lumen turns it into a lesson you watch with the transcript in sync.")}>
+      <Section note={t("Collez un lien dans « Importer » : Umbra en fait une leçon que vous regardez avec la transcription synchronisée.", "Paste a link in “Import”: Umbra turns it into a lesson you watch with the transcript in sync.")}>
         <div className="set-card">
           <div className="set-row">
             <div className="grow">
               <strong>{t("YouTube et Dailymotion", "YouTube and Dailymotion")}</strong>
-              <span>{t("Lus directement par Lumen, rien à installer. Le son est transcrit sur ce Mac, l'image téléchargée dans un format que l'écran lit sans effort.", "Read directly by Lumen, nothing to install. The sound is transcribed on this Mac, the picture downloaded in a format the screen plays effortlessly.")}</span>
+              <span>{t("Lus directement par Umbra, rien à installer. Le son est transcrit sur ce Mac, l'image téléchargée dans un format que l'écran lit sans effort.", "Read directly by Umbra, nothing to install. The sound is transcribed on this Mac, the picture downloaded in a format the screen plays effortlessly.")}</span>
             </div>
             <span className="dot ok" />
           </div>
@@ -1288,14 +1288,14 @@ function VideosPane() {
           <div className="set-row">
             <div className="grow">
               <strong>{t("Autres sites vidéo", "Other video sites")}</strong>
-              <span>{t("TikTok, Instagram, Vimeo… : importez la leçon depuis Lumen sur votre ordinateur, elle arrivera ici avec la sauvegarde.", "TikTok, Instagram, Vimeo…: import the lesson from Lumen on your computer, it will arrive here with the backup.")}</span>
+              <span>{t("TikTok, Instagram, Vimeo… : importez la leçon depuis Umbra sur votre ordinateur, elle arrivera ici avec la sauvegarde.", "TikTok, Instagram, Vimeo…: import the lesson from Umbra on your computer, it will arrive here with the backup.")}</span>
             </div>
           </div>
         </div>
       </Section>
     );
   return (
-    <Section note={t("Collez un lien dans « Importer » : Lumen en fait une leçon que vous regardez avec la transcription synchronisée.", "Paste a link in “Import”: Lumen turns it into a lesson you watch with the transcript in sync.")}>
+    <Section note={t("Collez un lien dans « Importer » : Umbra en fait une leçon que vous regardez avec la transcription synchronisée.", "Paste a link in “Import”: Umbra turns it into a lesson you watch with the transcript in sync.")}>
       <div className="set-card">
         <div className="set-row">
           <div className="grow">
@@ -1364,7 +1364,7 @@ function AboutPane() {
         </div>
       </div>
 
-      <Section title={t("Découvrir Lumen", "Getting to know Lumen")}>
+      <Section title={t("Découvrir Umbra", "Getting to know Umbra")}>
         <div className="set-card">
           <div className="set-row">
             <span className="set-row-icon">
@@ -1372,7 +1372,7 @@ function AboutPane() {
             </span>
             <div className="grow">
               <strong>{t("Nouveautés", "What's new")}</strong>
-              <span>{t("Ce qui a changé dans chaque version de Lumen.", "What changed in each version of Lumen.")}</span>
+              <span>{t("Ce qui a changé dans chaque version d’Umbra.", "What changed in each version of Umbra.")}</span>
             </div>
             <button className="btn sm soft" onClick={() => openNews("all")}>
               {t("Voir les nouveautés", "See what's new")}
@@ -1396,7 +1396,7 @@ function AboutPane() {
             </span>
             <div className="grow">
               <strong>{t("Petit guide", "Short guide")}</strong>
-              <span>{t("Le principe de Lumen et le rôle de chaque modèle d'IA, en quatre images.", "How Lumen works and what each AI model does, in four pictures.")}</span>
+              <span>{t("Le principe d’Umbra et le rôle de chaque modèle d'IA, en quatre images.", "How Umbra works and what each AI model does, in four pictures.")}</span>
             </div>
             <button className="btn sm soft" onClick={() => openGuide()}>
               {t("Ouvrir le guide", "Open the guide")}
@@ -1474,7 +1474,7 @@ function AboutPane() {
             </span>
             <div className="grow">
               <strong>{t("Code source", "Source code")}</strong>
-              <span>{t("Lumen est un logiciel libre, sous licence GPL-3.0 : son code est public, chacun peut le lire et vérifier ce qui reste sur ce Mac.", "Lumen is free software, under the GPL-3.0 licence: its code is public, anyone can read it and check what stays on this Mac.")}</span>
+              <span>{t("Umbra est un logiciel libre, sous licence GPL-3.0 : son code est public, chacun peut le lire et vérifier ce qui reste sur ce Mac.", "Umbra is free software, under the GPL-3.0 licence: its code is public, anyone can read it and check what stays on this Mac.")}</span>
             </div>
             <button className="btn sm soft" onClick={() => void openSource(SOURCE_URL)}>
               {t("Voir sur GitHub", "View on GitHub")}

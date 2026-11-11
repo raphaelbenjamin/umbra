@@ -1,6 +1,6 @@
 # Umbra development guide
 
-The fork uses the name **Umbra** and the application identifier **`com.raphaelbenjamin.lumenhebrew`**. Its desktop executable is named `lumen-hebrew`. The macOS build launcher leaves the bundle in the source checkout. The desktop updater plugin, update endpoints, signing-key scripts and update controls have been removed. The macOS development bundle uses ad hoc signing. The existing dictionary and model downloads for other languages still use their upstream asset URLs.
+The desktop app uses the name **Umbra**, bundle identifier **`com.raphaelbenjamin.umbra`**, and executable **`umbra`**. GitHub builds the signed macOS updater. Local development builds use ad hoc signing. Some dictionaries and models are downloaded from upstream Lumen releases.
 
 ## Build and verify on Apple silicon
 
@@ -19,7 +19,7 @@ The bundle is at `src-tauri/target/release/bundle/macos/Umbra.app`. Before openi
   'src-tauri/target/release/bundle/macos/Umbra.app/Contents/Info.plist'
 ```
 
-Expect `com.raphaelbenjamin.lumenhebrew`. Open the bundle from the checkout. In Settings → About, reveal the app database and confirm it is inside `~/Library/Application Support/com.raphaelbenjamin.lumenhebrew`. On Windows the expected folder is `%APPDATA%\com.raphaelbenjamin.lumenhebrew`. Keep backups off while testing. If you test backups later, select a new empty folder. Umbra uses a subfolder named `Lumen Hebrew`.
+Expect `com.raphaelbenjamin.umbra`. A fresh desktop installation stores its library under that identifier. An upgrade opens the previous Umbra library in its existing `com.raphaelbenjamin.lumenhebrew` directory so that media paths and progress remain valid. New backup folders are named `Umbra`, and existing backups can still be opened in their previous folder. The iOS bundle retains its original identifier to preserve its app container.
 
 For a browser-only preview, run `npm run dev` and open `http://localhost:1428`. The preview uses a separate browser storage key and a mock backend.
 

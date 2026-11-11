@@ -79,7 +79,7 @@ for (const tool of ["xcodegen", "pod"]) {
 const args = process.argv.slice(2);
 if (args.includes("--check")) {
   step("Vérification : tout compile pour iPhone et iPad (simulateur)");
-  run("cargo check -p lumen --lib --target aarch64-apple-ios-sim --target-dir target/ios", tauriDir);
+  run("cargo check -p umbra --lib --target aarch64-apple-ios-sim --target-dir target/ios", tauriDir);
   console.log("\n✓ Lumen compile pour iOS.");
   process.exit(0);
 }

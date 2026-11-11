@@ -16,7 +16,7 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::sampling::LlamaSampler;
 use llama_cpp_2::{list_llama_ggml_backend_devices, LlamaBackendDeviceType};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use serde::Serialize;
 
 static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
@@ -174,9 +174,20 @@ struct Loaded {
 pub struct Engine {
     loaded: Mutex<Option<Loaded>>,
     run_lock: Mutex<()>,
+    transcriptions: RwLock<()>,
+    shutting_down: AtomicBool,
     /// incrémenté à chaque requête interactive : une requête plus récente
     /// interrompt la précédente (clics rapides sur plusieurs mots).
     epoch: AtomicU64,
+}
+
+#[test]
+fn engine_rejects_new_model_work_after_shutdown() {
+    let engine = Engine::new();
+    assert!(engine.begin_transcription().is_ok());
+    engine.shutdown();
+    assert!(engine.begin_transcription().is_err());
+    assert!(engine.load(Path::new("unused.gguf")).is_err());
 }
 
 pub enum Priority {
@@ -237,7 +248,32 @@ pub fn think_budget(effort: &str) -> usize {
 
 impl Engine {
     pub fn new() -> Self {
-        Self { loaded: Mutex::new(None), run_lock: Mutex::new(()), epoch: AtomicU64::new(0) }
+        Self {
+            loaded: Mutex::new(None),
+            run_lock: Mutex::new(()),
+            transcriptions: RwLock::new(()),
+            shutting_down: AtomicBool::new(false),
+            epoch: AtomicU64::new(0),
+        }
+    }
+
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Acquire)
+    }
+
+    // Transcription owns its model between GPU calls. Track its full lifetime.
+    pub fn begin_transcription(&self) -> Result<RwLockReadGuard<'_, ()>> {
+        let active = self.transcriptions.read();
+        anyhow::ensure!(!self.is_shutting_down(), "Umbra is quitting");
+        Ok(active)
+    }
+
+    pub fn shutdown(&self) {
+        self.shutting_down.store(true, Ordering::Release);
+        let _transcriptions = self.transcriptions.write();
+        let _run = self.run_lock.lock();
+        // llama.cpp checks that Metal residency sets have been released at process exit.
+        self.unload();
     }
 
     /// Travail exclusif sur le GPU (un morceau de transcription, par exemple) :
@@ -266,6 +302,7 @@ impl Engine {
 
     pub fn load(&self, path: &Path) -> Result<Arc<LlamaModel>> {
         let mut guard = self.loaded.lock();
+        anyhow::ensure!(!self.is_shutting_down(), "Umbra is quitting");
         if let Some(l) = guard.as_ref() {
             if l.path == path {
                 return Ok(l.model.clone());
@@ -333,6 +370,7 @@ impl Engine {
         let mut out = Output { thought: String::new(), answer: String::new(), stopped: false };
         // requête dépassée (interactive) ou arrêtée (conversation) pendant l'attente du moteur
         let halted = |out: &mut Output| -> Result<bool> {
+            anyhow::ensure!(!self.is_shutting_down(), "Umbra is quitting");
             match &g.priority {
                 Priority::Interactive(id) if self.epoch.load(Ordering::SeqCst) != *id => Err(anyhow!("interrompu")),
                 Priority::Stoppable(flag) if flag.load(Ordering::Relaxed) => {
@@ -608,7 +646,7 @@ pub fn lang_name_en(code: &str) -> &'static str {
 }
 
 #[allow(dead_code)]
-pub const SYSTEM: &str = "Tu es le moteur de traduction de Lumen, une application d'apprentissage des langues. Tu réponds toujours en français, brièvement et avec exactitude, sans formule de politesse ni commentaire superflu.";
+pub const SYSTEM: &str = "Tu es le moteur de traduction d’Umbra, une application d'apprentissage des langues. Tu réponds toujours en français, brièvement et avec exactitude, sans formule de politesse ni commentaire superflu.";
 
 // Les consignes existent pour un apprenant francophone (`native` = "fr") et
 // anglophone ("en") ; les versions françaises sont celles qui ont été éprouvées.
@@ -717,7 +755,7 @@ pub fn simplify_messages(native: &str, lang: &str, level: &str, text: &str) -> V
 
 // ---------- chat ----------
 
-const CHAT_SYSTEM: &str = "Tu es Lumen, un professeur de langues expert, patient et chaleureux, intégré à une application qui aide à apprendre les langues en lisant et en écoutant. Tu maîtrises la grammaire, la conjugaison, le vocabulaire, la prononciation, les expressions idiomatiques, les registres de langue et la culture des pays concernés, et tu sais rendre tout cela simple.
+const CHAT_SYSTEM: &str = "Tu es Umbra, un professeur de langues expert, patient et chaleureux, intégré à une application qui aide à apprendre les langues en lisant et en écoutant. Tu maîtrises la grammaire, la conjugaison, le vocabulaire, la prononciation, les expressions idiomatiques, les registres de langue et la culture des pays concernés, et tu sais rendre tout cela simple.
 
 Règles :
 - C'est l'apprenant qui mène la conversation. Réponds à ce qu'il demande, et seulement à cela : pas d'exercice, de quiz, de liste de mots ni de nouveau sujet qu'il n'a pas demandés.
@@ -734,7 +772,7 @@ Règles :
 /// juste avant de répondre que la même règle perdue en tête des consignes.
 const CHAT_LEAD: &str = "(Réponds seulement à ce que je demande, sans rien me proposer à la fin.)";
 
-const CHAT_SYSTEM_EN: &str = "You are Lumen, an expert, patient and warm language teacher, built into an app that helps people learn languages by reading and listening. You master grammar, conjugation, vocabulary, pronunciation, idioms, registers and the culture of the countries concerned, and you know how to make all of it simple.
+const CHAT_SYSTEM_EN: &str = "You are Umbra, an expert, patient and warm language teacher, built into an app that helps people learn languages by reading and listening. You master grammar, conjugation, vocabulary, pronunciation, idioms, registers and the culture of the countries concerned, and you know how to make all of it simple.
 
 Rules:
 - The learner leads the conversation. Answer what they ask, and only that: no exercises, quizzes, word lists or new topics they didn't ask for.
@@ -1284,7 +1322,7 @@ mod tests {
     fn chat_prompt_english() {
         let lesson = LessonContext { title: "Il faro", text: "Marta sale le scale.", partial: true };
         let m = chat_messages("en", "it", &Learner::knows(1200), Some(&lesson), &[], "What does « sale » mean here?", &["sale: third-person singular present indicative of salire".into()]);
-        assert!(m[0].1.starts_with("You are Lumen") && m[0].1.contains("already know about 1200 words") && m[0].1.contains("Italian"));
+        assert!(m[0].1.starts_with("You are Umbra") && m[0].1.contains("already know about 1200 words") && m[0].1.contains("Italian"));
         assert!(m[0].1.contains("\"Il faro\"") && m[0].1.contains("<lesson>\nMarta sale le scale.\n</lesson>") && m[0].1.contains("only an excerpt"));
         assert!(!m[1].1.contains("practising") && m[1].1.ends_with(&format!("salire)\n\n{CHAT_LEAD_EN}")));
         let m = chat_messages("en", "it", &Learner::knows(10), None, &[], "Ciao! Io sono andato al mare ieri, e tu?", &[]);

@@ -1,11 +1,11 @@
 //! Sauvegarde de la progression dans iCloud Drive, ou dans un autre nuage
 //! installé sur le Mac (Dropbox, Google Drive, OneDrive… : `places`), ou dans
 //! tout dossier choisi par l'utilisateur (clé USB, disque réseau).
-//! Rien ne passe par un serveur de Lumen : macOS envoie lui-même le dossier
+//! Rien ne passe par un serveur d’Umbra : macOS envoie lui-même le dossier
 //! dans le nuage de l'utilisateur, gratuitement dans la limite de son forfait.
 //!
 //! ```text
-//! Lumen Hebrew/
+//! Umbra/
 //!   <nom du Mac> (<clé>)/     une sauvegarde par Mac et par profil
 //!     Progression.lumen       la base SQLite compressée, sans le cache
 //!     Infos.json              appareil, date, mots et leçons, médias cités
@@ -37,7 +37,8 @@ use crate::media::{self, ImportEvent};
 use crate::state::AppState;
 use crate::user;
 
-const ROOT_NAME: &str = "Lumen Hebrew";
+const ROOT_NAME: &str = "Umbra";
+const LEGACY_ROOT_NAME: &str = "Lumen Hebrew";
 const MEDIA: &str = "Médias";
 const HISTORY: &str = "Historique";
 const SNAPSHOT: &str = "Progression.lumen";
@@ -149,7 +150,7 @@ pub struct Status {
     /// réglage `backup_on` : "1" active, "0" coupée, "" pas encore choisie
     pub enabled: bool,
     pub decided: bool,
-    /// dossier « Lumen Hebrew » de la sauvegarde (aucun : ni iCloud Drive ni dossier choisi)
+    /// dossier « Umbra » de la sauvegarde (aucun : ni iCloud Drive ni dossier choisi)
     pub dir: Option<String>,
     pub icloud: bool,
     pub icloud_available: bool,
@@ -192,7 +193,7 @@ pub struct Info {
     pub counts: Counts,
     /// versions des jours précédents, de la plus récente à la plus ancienne
     pub versions: Vec<Version>,
-    /// faite par une version plus récente de Lumen
+    /// faite par une version plus récente d’Umbra
     pub newer: bool,
     /// nom et avatar de l'apprenant
     #[serde(flatten)]
@@ -229,14 +230,16 @@ pub fn icloud_drive() -> Option<PathBuf> {
     p.is_dir().then_some(p)
 }
 
-/// Dossier « Lumen Hebrew » de la sauvegarde : dans le dossier choisi, sinon dans iCloud Drive.
+/// Umbra's backup folder, with compatibility for a backup already on disk.
 pub fn root(custom: &str) -> Option<PathBuf> {
     let custom = custom.trim();
-    let destination = if !custom.is_empty() {
-        let p = PathBuf::from(custom);
-        if p.file_name().is_some_and(|n| n == ROOT_NAME) { p } else { p.join(ROOT_NAME) }
+    let folder = if custom.is_empty() { icloud_drive()? } else { PathBuf::from(custom) };
+    let destination = if folder.file_name().is_some_and(|name| name == ROOT_NAME || name == LEGACY_ROOT_NAME) {
+        folder
     } else {
-        icloud_drive()?.join(ROOT_NAME)
+        let current = folder.join(ROOT_NAME);
+        let legacy = folder.join(LEGACY_ROOT_NAME);
+        if !current.exists() && std::fs::symlink_metadata(&legacy).is_ok() { legacy } else { current }
     };
     let parent = destination.parent()?;
     let resolved = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
@@ -263,7 +266,7 @@ pub struct Place {
     pub name: String,
     /// compte (adresse, équipe) : il peut y en avoir plusieurs pour un même service
     pub account: Option<String>,
-    /// dossier qui recevra « Lumen Hebrew » (à passer par `place_dir`) ; vide : iCloud Drive
+    /// dossier qui recevra « Umbra » (à passer par `place_dir`) ; vide : iCloud Drive
     pub path: String,
 }
 
@@ -551,13 +554,13 @@ pub fn place_dir(path: &str) -> Result<String, String> {
     let mut dirs: Vec<String> = fs::read_dir(p)
         .map_err(|e| match e.kind() {
             io::ErrorKind::PermissionDenied if cfg!(windows) => crate::i18n::t(
-                "Lumen n'a pas accès à Google Drive. Ouvrez Google Drive, vérifiez que vous êtes connecté, puis réessayez.",
-                "Lumen has no access to Google Drive. Open Google Drive, check that you're signed in, then try again.",
+                "Umbra n'a pas accès à Google Drive. Ouvrez Google Drive, vérifiez que vous êtes connecté, puis réessayez.",
+                "Umbra has no access to Google Drive. Open Google Drive, check that you're signed in, then try again.",
             )
             .into(),
             io::ErrorKind::PermissionDenied => crate::i18n::t(
-                "Lumen n'a pas accès à Google Drive. Autorisez-le dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers, puis réessayez.",
-                "Lumen has no access to Google Drive. Allow it in System Settings › Privacy & Security › Files and Folders, then try again.",
+                "Umbra n'a pas accès à Google Drive. Autorisez-le dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers, puis réessayez.",
+                "Umbra has no access to Google Drive. Allow it in System Settings › Privacy & Security › Files and Folders, then try again.",
             )
             .into(),
             _ => not_ready(),
@@ -598,7 +601,7 @@ fn hardware_uuid() -> Option<String> {
     line.split('"').nth(3).filter(|s| !s.is_empty()).map(String::from)
 }
 
-/// Identifiant de ce Mac, stable même si les données de Lumen sont effacées
+/// Identifiant de ce Mac, stable même si les données d’Umbra sont effacées
 /// (tiré du numéro du matériel, jamais envoyé tel quel).
 pub fn device_id(data_dir: &Path) -> String {
     let f = data_dir.join("device-id");
@@ -1134,7 +1137,7 @@ pub fn restore(live: &Mutex<Connection>, data_dir: &Path, root: &Path, key: &str
     ensure_local(&mf, Duration::from_secs(30))?;
     let manifest = read_manifest(&mf).ok_or_else(|| anyhow!(crate::i18n::t("Les informations de cette sauvegarde sont illisibles.", "The details of this backup are unreadable.")))?;
     if manifest.format > FORMAT {
-        bail!(crate::i18n::t("Cette sauvegarde vient d'une version plus récente de Lumen. Mettez Lumen à jour, puis réessayez.", "This backup comes from a newer version of Lumen. Update Lumen, then try again."));
+        bail!(crate::i18n::t("Cette sauvegarde vient d'une version plus récente d’Umbra. Mettez Umbra à jour, puis réessayez.", "This backup comes from a newer version of Umbra. Update Umbra, then try again."));
     }
     ensure_local(&snap, Duration::from_secs(600))?;
     let scratch = data_dir.join("restauration.tmp");
@@ -1312,8 +1315,8 @@ fn prefs(c: &Connection) -> Prefs {
 fn no_place() -> String {
     if cfg!(target_os = "ios") {
         return crate::i18n::t(
-            "Choisissez le dossier « Lumen Hebrew » où votre Mac sauvegarde (iCloud Drive, Google Drive, Dropbox…), dans Réglages › Sauvegarde.",
-            "Choose the “Lumen Hebrew” folder your Mac backs up to (iCloud Drive, Google Drive, Dropbox…), in Settings › Backup.",
+            "Choisissez le dossier « Umbra » où votre Mac sauvegarde (iCloud Drive, Google Drive, Dropbox…), dans Réglages › Sauvegarde.",
+            "Choose the “Umbra” folder your Mac backs up to (iCloud Drive, Google Drive, Dropbox…), in Settings › Backup.",
         )
         .into();
     }
@@ -1341,14 +1344,14 @@ fn io_message(io: &io::Error, place: &Place) -> Option<String> {
     let name = &place.name;
     match io.kind() {
         io::ErrorKind::PermissionDenied if cloud && cfg!(windows) => Some(crate::tr!(
-            "Lumen n'a pas accès à {name}. Ouvrez {name}, vérifiez que vous êtes connecté, puis réessayez.",
-            "Lumen has no access to {name}. Open {name}, check that you're signed in, then try again."
+            "Umbra n'a pas accès à {name}. Ouvrez {name}, vérifiez que vous êtes connecté, puis réessayez.",
+            "Umbra has no access to {name}. Open {name}, check that you're signed in, then try again."
         )),
         io::ErrorKind::PermissionDenied if cloud => Some(crate::tr!(
-            "Lumen n'a pas accès à {name}. Autorisez-le dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers, puis réessayez.",
-            "Lumen has no access to {name}. Allow it in System Settings › Privacy & Security › Files and Folders, then try again."
+            "Umbra n'a pas accès à {name}. Autorisez-le dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers, puis réessayez.",
+            "Umbra has no access to {name}. Allow it in System Settings › Privacy & Security › Files and Folders, then try again."
         )),
-        io::ErrorKind::PermissionDenied => Some(crate::i18n::t("Lumen ne peut pas écrire dans ce dossier. Choisissez-en un autre.", "Lumen can't write to this folder. Choose another one.").into()),
+        io::ErrorKind::PermissionDenied => Some(crate::i18n::t("Umbra ne peut pas écrire dans ce dossier. Choisissez-en un autre.", "Umbra can't write to this folder. Choose another one.").into()),
         // iCloud Drive absent : `no_place` le dit déjà
         io::ErrorKind::NotFound if place.kind == "icloud" => None,
         io::ErrorKind::NotFound if cloud && cfg!(windows) => Some(crate::tr!(
@@ -1377,7 +1380,7 @@ fn friendly(e: &anyhow::Error, place: &Place, what: (&'static str, &'static str)
     e.to_string()
 }
 
-/// Dossier « Lumen Hebrew » de la sauvegarde, avec l'accès qu'il demande. Sur iPhone et
+/// Dossier « Umbra » de la sauvegarde, avec l'accès qu'il demande. Sur iPhone et
 /// iPad, le dossier vient de l'app Fichiers : iOS n'y laisse entrer que par son
 /// signet, le temps du travail (l'accès se referme avec `Root`).
 struct Root {
@@ -1513,7 +1516,7 @@ pub async fn auto_loop(app: tauri::AppHandle) {
     }
 }
 
-/// À la fermeture de Lumen : dernière sauvegarde si quelque chose a changé.
+/// À la fermeture d’Umbra : dernière sauvegarde si quelque chose a changé.
 pub fn on_exit(state: &AppState) {
     let (on, changes) = {
         let c = state.db.lock();
@@ -1786,7 +1789,7 @@ fn merge_original(live: &Mutex<Connection>, source: &Path, data_dir: &Path, incl
             let from = media::media_dir(source);
             let to = media::media_dir(data_dir);
             fs::create_dir_all(&to)?;
-            anyhow::ensure!(to.canonicalize()?.starts_with(data_dir.canonicalize()?), "Destination media must stay inside Lumen Hebrew");
+            anyhow::ensure!(to.canonicalize()?.starts_with(data_dir.canonicalize()?), "Destination media must stay insid’Umbra");
             for name in names {
                 if Path::new(&name).file_name().and_then(|n| n.to_str()) != Some(name.as_str()) {
                     continue;
@@ -2190,7 +2193,7 @@ mod tests {
         assert_eq!(folder_key(Path::new("/x/Médias")), None);
         assert_eq!(key_of("0123456789ab", "ba9876543210"), "012345ba9876");
         assert!(is_day("2026-10-03") && !is_day("2026-1-03") && !is_day("../../x"));
-        assert_eq!(root("/Users/x/Dropbox").unwrap(), PathBuf::from("/Users/x/Dropbox/Lumen Hebrew"));
+        assert_eq!(root("/Users/x/Dropbox").unwrap(), PathBuf::from("/Users/x/Dropbox/Umbra"));
         assert_eq!(root("/Volumes/Clé/Lumen Hebrew").unwrap(), PathBuf::from("/Volumes/Clé/Lumen Hebrew"));
         assert!(root("/Volumes/Clé/Lumen").is_none());
     }

@@ -333,7 +333,7 @@ function PlatformResults({ lang, platform, compact }: { lang: LangCode; platform
   );
 }
 
-/** Une adresse collée : ce que Lumen y a trouvé (TikTok, Instagram, un article…). */
+/** Une adresse collée : ce que Umbra y a trouvé (TikTok, Instagram, un article…). */
 function LinkResult({ lang }: { lang: LangCode }) {
   const link = useSearch((s) => s.link);
   const open = usePreview((s) => s.open);
@@ -342,7 +342,7 @@ function LinkResult({ lang }: { lang: LangCode }) {
   if (link.loading)
     return (
       <div className="hit-link">
-        <Orb size={26} /> <span>{t("Lumen regarde ce qu'il y a derrière ce lien…", "Lumen is looking at what's behind this link…")}</span>
+        <Orb size={26} /> <span>{t("Umbra regarde ce qu'il y a derrière ce lien…", "Umbra is looking at what's behind this link…")}</span>
       </div>
     );
   if (link.error || !link.info)
@@ -744,7 +744,7 @@ function FilterPanel({ scope, lang, open }: { scope: SearchTab | "feed"; lang: L
             <div className="filter-foot">
               <span className="muted">
                 {feed
-                  ? t("Sans recherche, les filtres s'appliquent aux trouvailles de Lumen.", "Without a search, the filters apply to Lumen's finds.")
+                  ? t("Sans recherche, les filtres s'appliquent aux trouvailles d’Umbra.", "Without a search, the filters apply to Umbra's finds.")
                   : scope === "all"
                     ? t("Chaque plateforme applique ce qu'elle sait faire.", "Each platform applies what it can.")
                     : ""}
@@ -768,7 +768,7 @@ export function SearchResults({ lang, local, onBack, renderLocal }: { lang: Lang
   const tab = useSearch((s) => s.tab);
   const link = useSearch((s) => s.link);
   const f = useFilters();
-  // les trouvailles de Lumen suivent aussi les filtres qu'elles connaissent
+  // les trouvailles d’Umbra suivent aussi les filtres qu'elles connaissent
   const shownLocal = useMemo(() => filterFinds(local, f), [local, f]);
   return (
     <motion.div className="search-results" key={`${query}-${tab}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}>
@@ -788,7 +788,7 @@ export function SearchResults({ lang, local, onBack, renderLocal }: { lang: Lang
                   <h3>
                     <Icon name="sparkle" size={18} /> {t("Dans vos découvertes", "In your finds")}
                   </h3>
-                  <p>{t("Déjà trouvé par Lumen, rangé par niveau", "Already found by Lumen, sorted by level")}</p>
+                  <p>{t("Déjà trouvé par Umbra, rangé par niveau", "Already found by Umbra, sorted by level")}</p>
                 </div>
               </header>
               {renderLocal(shownLocal)}

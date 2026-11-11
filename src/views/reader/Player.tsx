@@ -224,7 +224,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
 
   // ---------- mémoire de la position, à la seconde près ----------
   // La seconde atteinte est écrite au plus une fois par seconde pendant
-  // l'écoute, puis à chaque pause, saut ou sortie : fermer Lumen n'en
+  // l'écoute, puis à chaque pause, saut ou sortie : fermer Umbra n'en
   // perd au pire qu'une seconde.
   const posRef = useRef(lesson.position || 0);
   const savedPos = useRef(lesson.position || 0);
@@ -785,8 +785,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
             punctuate ? (
               <button className="btn sm soft player-resync" onClick={recaler} aria-label={t("Ponctuer le texte", "Add punctuation")}
                 title={t(
-                  "La transcription a oublié la ponctuation sur de longs passages. Lumen réécoute l'audio et remet les points, les virgules et les majuscules entendus. Les mots ne changent pas.",
-                  "The transcription left out punctuation in long passages. Lumen listens to the audio again and puts back the full stops, commas and capitals it hears. The words don't change.",
+                  "La transcription a oublié la ponctuation sur de longs passages. Umbra réécoute l'audio et remet les points, les virgules et les majuscules entendus. Les mots ne changent pas.",
+                  "The transcription left out punctuation in long passages. Umbra listens to the audio again and puts back the full stops, commas and capitals it hears. The words don't change.",
                 )}
               >
                 <Icon name="sparkle" size={14} /> <span className="resync-label">{t("Ponctuer le texte", "Add punctuation")}</span>

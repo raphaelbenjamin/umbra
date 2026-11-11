@@ -47,7 +47,7 @@ function whatHappens(it: DiscoverItem): string {
   if (it.lesson_id) return t("Déjà dans votre bibliothèque : reprenez là où vous en étiez.", "Already in your library: pick up where you left off.");
   if (it.kind === "text") return t("L'article devient une leçon de lecture. Trop riche ? Le bouton « Simplifier » le réécrit à votre niveau.", "The article becomes a reading lesson. Too rich? The “Simplify” button rewrites it at your level.");
   if (it.page_text) return t("Le son et le texte publié par la source : la lanterne suit la voix, mot à mot.", "The sound and the text published by the source: the lantern follows the voice, word by word.");
-  return t("Regardez ou écoutez d'abord ; si ça vous plaît, Lumen en fait une leçon pendant que vous continuez d'explorer.", "Watch or listen first; if you like it, Lumen turns it into a lesson while you keep exploring.");
+  return t("Regardez ou écoutez d'abord ; si ça vous plaît, Umbra en fait une leçon pendant que vous continuez d'explorer.", "Watch or listen first; if you like it, Umbra turns it into a lesson while you keep exploring.");
 }
 
 /** Toucher un élément : la leçon s'il en est déjà une, sinon l'aperçu (regarder, écouter, lire). */
@@ -305,7 +305,7 @@ function Searching({ lang, progress, tools }: { lang: LangCode; progress: number
       <div className="disc-searching-head">
         <Orb size={30} />
         <div>
-          <strong>{tools ? t("Installation des composants vidéo, une seule fois…", "Installing the video components, just once…") : t(`Lumen parcourt les sources ${inLang(lang)}…`, `Lumen is reading the sources ${inLang(lang)}…`)}</strong>
+          <strong>{tools ? t("Installation des composants vidéo, une seule fois…", "Installing the video components, just once…") : t(`Umbra parcourt les sources ${inLang(lang)}…`, `Umbra is reading the sources ${inLang(lang)}…`)}</strong>
           <span className="muted">{t("Chaînes, podcasts et journaux : quelques secondes.", "Channels, podcasts and newspapers: a few seconds.")}</span>
         </div>
       </div>
@@ -521,12 +521,12 @@ export function Discover({ lang }: { lang: LangCode }) {
                 {autoOn ? (
                   <>
                     <h3>{t("Les sources n'ont pas répondu", "The sources didn't answer")}</h3>
-                    <p>{t("Lumen a besoin d'Internet pour trouver de nouvelles leçons. Vos leçons, elles, restent toutes là.", "Lumen needs the Internet to find new lessons. Your own lessons all stay right here.")}</p>
+                    <p>{t("Umbra a besoin d'Internet pour trouver de nouvelles leçons. Vos leçons, elles, restent toutes là.", "Umbra needs the Internet to find new lessons. Your own lessons all stay right here.")}</p>
                   </>
                 ) : (
                   <>
                     <h3>{t(`Des leçons ${inLang(lang)}, venues d'ailleurs`, `Lessons ${inLang(lang)}, from out there`)}</h3>
-                    <p>{t("La recherche en arrière-plan est coupée dans les Réglages : Lumen ne cherche que lorsque vous le lui demandez.", "Background search is turned off in Settings: Lumen only looks when you ask it to.")}</p>
+                    <p>{t("La recherche en arrière-plan est coupée dans les Réglages : Umbra ne cherche que lorsque vous le lui demandez.", "Background search is turned off in Settings: Umbra only looks when you ask it to.")}</p>
                   </>
                 )}
                 <button className="btn primary lg glow" onClick={() => void refresh(lang)}>

@@ -84,7 +84,7 @@ export function GeminiKey({ compact = false }: { compact?: boolean }) {
         {busy && (
           <motion.div key="busy" className="key-note" {...enter}>
             <Orb size={16} />
-            <span>{t("Lumen demande à Google ce que cette clé permet…", "Lumen is asking Google what this key allows…")}</span>
+            <span>{t("Umbra demande à Google ce que cette clé permet…", "Umbra is asking Google what this key allows…")}</span>
           </motion.div>
         )}
         {error && (
@@ -181,8 +181,8 @@ export function PodcastSection() {
             <strong>{t("Et Gemini Notebook ?", "What about Gemini Notebook?")}</strong>
             <span>
               {t(
-                "Gemini Notebook (autrefois NotebookLM) ne s'ouvre pas aux autres applications : Lumen ne peut pas le piloter. Il passe donc par Gemini lui-même, qui a les mêmes voix et tient mieux le niveau. Vous pouvez aussi créer un aperçu audio dans Gemini Notebook et déposer le fichier dans Lumen : il sera transcrit.",
-                "Gemini Notebook (formerly NotebookLM) isn't open to other apps: Lumen can't drive it. So Lumen goes through Gemini itself, which has the same voices and keeps to your level better. You can also make an Audio Overview in Gemini Notebook and drop the file into Lumen: it will be transcribed.",
+                "Gemini Notebook (autrefois NotebookLM) ne s'ouvre pas aux autres applications : Umbra ne peut pas le piloter. Il passe donc par Gemini lui-même, qui a les mêmes voix et tient mieux le niveau. Vous pouvez aussi créer un aperçu audio dans Gemini Notebook et déposer le fichier dans Umbra : il sera transcrit.",
+                "Gemini Notebook (formerly NotebookLM) isn't open to other apps: Umbra can't drive it. So Umbra goes through Gemini itself, which has the same voices and keeps to your level better. You can also make an Audio Overview in Gemini Notebook and drop the file into Umbra: it will be transcribed.",
               )}
             </span>
           </div>

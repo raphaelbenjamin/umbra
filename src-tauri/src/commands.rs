@@ -70,7 +70,7 @@ pub async fn app_info(state: State<'_, AppState>) -> R<AppInfo> {
     })
 }
 
-/// Relance Lumen après une mise à jour, au premier plan (voir `proc::relaunch`).
+/// Relance Umbra après une mise à jour, au premier plan (voir `proc::relaunch`).
 #[tauri::command]
 pub fn app_relaunch(app: tauri::AppHandle) {
     crate::proc::relaunch(&app);
@@ -713,7 +713,7 @@ pub async fn ai_warmup(state: State<'_, AppState>) -> R<bool> {
         return Ok(true);
     }
     let st = state.inner();
-    tokio::task::block_in_place(|| st.ai.load(&path)).map_err(err)?;
+    tokio::task::block_in_place(|| st.ai.exclusive(|| st.ai.load(&path).map(|_| ()))).map_err(err)?;
     Ok(true)
 }
 
@@ -851,7 +851,7 @@ pub async fn chat_send(
     {
         let mut dl = state.downloads.lock();
         if dl.contains_key(&key) {
-            return Err(t("Lumen répond déjà dans cette conversation.", "Lumen is already answering in this conversation.").into());
+            return Err(t("Umbra répond déjà dans cette conversation.", "Umbra is already answering in this conversation.").into());
         }
         dl.insert(key.clone(), cancel.clone());
     }
@@ -1672,7 +1672,7 @@ pub async fn chatgpt_sign_in(app: tauri::AppHandle, state: State<'_, AppState>) 
     state.downloads.lock().insert("chatgpt".into(), cancel.clone());
     #[cfg(not(target_os = "ios"))]
     let open = |url: &str| app.opener().open_url(url, None::<&str>).map_err(|e| anyhow::anyhow!(e.to_string()));
-    // iPhone et iPad : la page de connexion s'ouvre dans Lumen, qui reste au premier
+    // iPhone et iPad : la page de connexion s'ouvre dans Umbra, qui reste au premier
     // plan (dans Safari, iOS endormirait l'adresse locale qui attend la réponse) ;
     // la fermer annule la connexion
     #[cfg(target_os = "ios")]
@@ -1685,7 +1685,7 @@ pub async fn chatgpt_sign_in(app: tauri::AppHandle, state: State<'_, AppState>) 
             Err(anyhow::anyhow!(t("La page de connexion n'a pas pu s'ouvrir.", "The sign-in page couldn't open.")))
         }
     };
-    // retour du navigateur : Lumen repasse devant (Windows le permet ; macOS, depuis
+    // retour du navigateur : Umbra repasse devant (Windows le permet ; macOS, depuis
     // la version 14, peut laisser le navigateur devant, sa page dit alors de revenir)
     let back = || {
         #[cfg(target_os = "ios")]
@@ -1891,7 +1891,7 @@ pub async fn backup_import_original(state: State<'_, AppState>, include_media: b
 }
 
 /// iPhone et iPad : choisir dans l'app Fichiers le dossier de la sauvegarde (le dossier
-/// « Lumen » d'iCloud Drive, où le Mac sauvegarde). Renvoie son chemin ; rien si
+/// « Umbra » d'iCloud Drive, où le Mac sauvegarde). Renvoie son chemin ; rien si
 /// l'apprenant renonce. Ailleurs, l'emplacement se choisit autrement (`backup_places`).
 #[tauri::command]
 pub async fn backup_pick_folder(state: State<'_, AppState>) -> R<Option<String>> {
@@ -2056,8 +2056,8 @@ pub async fn import_song(state: State<'_, AppState>, lang: String, song: SongIte
         }
     };
     let words = found.as_ref().ok_or(t(
-        "Lumen n'a pas trouvé les paroles de cette chanson. Vous pouvez l'importer comme une vidéo : elle sera transcrite.",
-        "Lumen couldn't find the lyrics of this song. You can import it as a video: it will be transcribed.",
+        "Umbra n'a pas trouvé les paroles de cette chanson. Vous pouvez l'importer comme une vidéo : elle sera transcrite.",
+        "Umbra couldn't find the lyrics of this song. You can import it as a video: it will be transcribed.",
     ))?;
     let (text, lrc) = lyrics::layout(words, &lang, song.duration);
     if crate::text::word_keys(&text, &lang).len() < 8 {

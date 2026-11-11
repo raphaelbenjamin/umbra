@@ -343,7 +343,7 @@ export function ImportSheet() {
         }
       }
       if (!info.media.length || hint?.kind === "text") {
-        if (!article) throw info.note || t("Lumen n'a trouvé ni texte ni son à importer à cette adresse.", "Lumen found no text or sound to import at this address.");
+        if (!article) throw info.note || t("Umbra n'a trouvé ni texte ni son à importer à cette adresse.", "Umbra found no text or sound to import at this address.");
         // le titre donné par la source est plus sûr que celui que Readability devine (« … – ANSA.it »)
         setPreview({
           title: hint ? cleanTitle(hint.title) : article.title || info.title,
@@ -737,10 +737,10 @@ export function ImportSheet() {
                 </div>
                 <span className="import-hint">
                   {t(
-                    "Collez n'importe quel lien : Lumen trouve l'article, la vidéo ou les épisodes qui s'y cachent, et vous choisissez quoi importer. Le son est transcrit mot à mot sur votre Mac.",
-                    "Paste any link: Lumen finds the article, video or episodes behind it, and you choose what to import. The sound is transcribed word by word on your Mac.",
+                    "Collez n'importe quel lien : Umbra trouve l'article, la vidéo ou les épisodes qui s'y cachent, et vous choisissez quoi importer. Le son est transcrit mot à mot sur votre Mac.",
+                    "Paste any link: Umbra finds the article, video or episodes behind it, and you choose what to import. The sound is transcribed word by word on your Mac.",
                   )}
-                  {info && !info.ytdlp ? t(" Pour les vidéos, Lumen installe la première fois ses composants (environ 40 Mo).", " For videos, Lumen installs its components the first time (about 40 MB).") : ""}
+                  {info && !info.ytdlp ? t(" Pour les vidéos, Umbra installe la première fois ses composants (environ 40 Mo).", " For videos, Umbra installs its components the first time (about 40 MB).") : ""}
                 </span>
               </>
             )}
@@ -1010,8 +1010,8 @@ function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: 
         icon: "sparkle",
         label: video ? t("La vidéo, avec le texte de la page", "The video, with the page's text") : t("Le son, avec le texte de la page", "The sound, with the page's text"),
         hint: t(
-          "Le texte de la page devient la leçon et la lanterne suit la voix. S'il ne correspond pas à ce qu'on entend, Lumen transcrit le son.",
-          "The page's text becomes the lesson and the lantern follows the voice. If it doesn't match what is said, Lumen transcribes the sound.",
+          "Le texte de la page devient la leçon et la lanterne suit la voix. S'il ne correspond pas à ce qu'on entend, Umbra transcrit le son.",
+          "The page's text becomes the lesson and the lantern follows the voice. If it doesn't match what is said, Umbra transcribes the sound.",
         ),
       });
     options.push({
@@ -1053,9 +1053,9 @@ function LinkFound({ found, onChange, captionsAvailable, asrMissing }: { found: 
           <span>
             {info.via === "rss"
               ? info.list
-                ? t("Spotify protège ses fichiers : Lumen a retrouvé ce podcast dans son flux public.", "Spotify protects its files: Lumen found this podcast in its public feed.")
-                : t("Spotify protège ses fichiers : Lumen a retrouvé cet épisode dans le flux public du podcast.", "Spotify protects its files: Lumen found this episode in the podcast's public feed.")
-              : t("Spotify protège ses fichiers : Lumen prend le son du même morceau sur YouTube.", "Spotify protects its files: Lumen takes the sound of the same song from YouTube.")}
+                ? t("Spotify protège ses fichiers : Umbra a retrouvé ce podcast dans son flux public.", "Spotify protects its files: Umbra found this podcast in its public feed.")
+                : t("Spotify protège ses fichiers : Umbra a retrouvé cet épisode dans le flux public du podcast.", "Spotify protects its files: Umbra found this episode in the podcast's public feed.")
+              : t("Spotify protège ses fichiers : Umbra prend le son du même morceau sur YouTube.", "Spotify protects its files: Umbra takes the sound of the same song from YouTube.")}
           </span>
         </p>
       )}

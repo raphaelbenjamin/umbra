@@ -360,8 +360,8 @@ function whatHappens(p: Previewable, synced: boolean): string {
       : t("Les paroles deviennent le texte de la leçon ; la lanterne se cale sur la voix si Whisper l'entend.", "The lyrics become the lesson's text; the lantern syncs with the voice if Whisper can hear it.");
   if (p.pageText) return t("Le son et le texte publié par la source : la lanterne suit la voix, mot à mot.", "The sound and the text published by the source: the lantern follows the voice, word by word.");
   return p.kind === "video"
-    ? t("Lumen télécharge la vidéo, la transcrit sur votre Mac et cale chaque mot sur la voix.", "Lumen downloads the video, transcribes it on your Mac and syncs every word with the voice.")
-    : t("Lumen télécharge le son, le transcrit sur votre Mac et cale chaque mot sur la voix.", "Lumen downloads the sound, transcribes it on your Mac and syncs every word with the voice.");
+    ? t("Umbra télécharge la vidéo, la transcrit sur votre Mac et cale chaque mot sur la voix.", "Umbra downloads the video, transcribes it on your Mac and syncs every word with the voice.")
+    : t("Umbra télécharge le son, le transcrit sur votre Mac et cale chaque mot sur la voix.", "Umbra downloads the sound, transcribes it on your Mac and syncs every word with the voice.");
 }
 
 /** Part de mots connus : une jauge qui s'éclaire. */

@@ -212,7 +212,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
               >
                 <div className="update-head">
                   <span className="update-dot" />
-                  <strong>{t("Nouveau dans Lumen ?", "New to Lumen?")}</strong>
+                  <strong>{t("Nouveau dans Umbra ?", "New to Umbra?")}</strong>
                 </div>
                 <button className="icon-btn close" onClick={() => void setSetting("guide_seen", "1")} aria-label={t("Plus tard", "Later")}>
                   <Icon name="close" size={12} />
@@ -282,7 +282,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           </div>
           {guideSeen && (
             <button className="guide-link" onClick={() => openGuide()}>
-              <Icon name="bulb" size={14} /> {t("Comment marche Lumen ?", "How does Lumen work?")}
+              <Icon name="bulb" size={14} /> {t("Comment marche Umbra ?", "How does Umbra work?")}
             </button>
           )}
         </div>

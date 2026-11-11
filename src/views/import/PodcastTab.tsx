@@ -165,7 +165,7 @@ function PodcastIntro({ lang }: { lang: LangCode }) {
         </span>
         <ol className="pod-steps">
           <li>{t("Créez une clé gratuite sur Google AI Studio.", "Create a free key on Google AI Studio.")}</li>
-          <li>{t("Collez-la ci-dessous : Lumen la vérifie et la garde sur ce Mac.", "Paste it below: Lumen checks it and keeps it on this Mac.")}</li>
+          <li>{t("Collez-la ci-dessous : Umbra la vérifie et la garde sur ce Mac.", "Paste it below: Umbra checks it and keeps it on this Mac.")}</li>
           <li>{t("Choisissez un sujet. Le podcast vous attend dans la bibliothèque.", "Choose a topic. The podcast will wait for you in the library.")}</li>
         </ol>
       </div>
@@ -275,8 +275,8 @@ function PodcastFields({ form }: { form: PodcastForm }) {
 
 /**
  * Le chemin par Gemini Notebook : il ne s'ouvre pas aux autres applications,
- * mais Lumen peut préparer les consignes de l'aperçu audio ; le fichier
- * téléchargé, déposé dans Lumen, est transcrit comme tout son.
+ * mais Umbra peut préparer les consignes de l'aperçu audio ; le fichier
+ * téléchargé, déposé dans Umbra, est transcrit comme tout son.
  */
 function NotebookRoute({ form }: { form: PodcastForm }) {
   const [open, setOpen] = useState(false);
@@ -321,8 +321,8 @@ function NotebookRoute({ form }: { form: PodcastForm }) {
             <div className="pod-notebook-inner">
               <p>
                 {t(
-                  "Gemini Notebook ne s'ouvre pas aux autres applications : Lumen ne peut pas le piloter. Mais il peut préparer vos consignes.",
-                  "Gemini Notebook isn't open to other apps: Lumen can't drive it. But it can prepare your instructions.",
+                  "Gemini Notebook ne s'ouvre pas aux autres applications : Umbra ne peut pas le piloter. Mais il peut préparer vos consignes.",
+                  "Gemini Notebook isn't open to other apps: Umbra can't drive it. But it can prepare your instructions.",
                 )}
               </p>
               <ol className="pod-steps">
@@ -333,7 +333,7 @@ function NotebookRoute({ form }: { form: PodcastForm }) {
                     `In Gemini Notebook, add a source on the topic, then Audio Overview › Customize: choose ${theLang(form.lang)} and paste the instructions.`,
                   )}
                 </li>
-                <li>{t("Téléchargez l'aperçu et déposez le fichier dans Lumen : Whisper, avec Qwen3-ASR ou Parakeet, le transcrit en leçon.", "Download the overview and drop the file into Lumen: Whisper, with Qwen3-ASR or Parakeet, turns it into a lesson.")}</li>
+                <li>{t("Téléchargez l'aperçu et déposez le fichier dans Umbra : Whisper, avec Qwen3-ASR ou Parakeet, le transcrit en leçon.", "Download the overview and drop the file into Umbra: Whisper, with Qwen3-ASR or Parakeet, turns it into a lesson.")}</li>
               </ol>
               <div className="pod-notebook-actions">
                 <button className="btn sm" onClick={() => void copy()}>

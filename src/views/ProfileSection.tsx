@@ -64,7 +64,7 @@ export function useDraft(key: string, max: number): [string, (v: string) => void
   return [draft, change, () => commit()];
 }
 
-/** « Sur Lumen depuis mars 2026 · 4 210 mots connus en italien et en anglais » */
+/** « Sur Umbra depuis mars 2026 · 4 210 mots connus en italien et en anglais » */
 function useJourney(): string {
   const langs = useApp((s) => s.langs)();
   const version = useApp((s) => s.libraryVersion);
@@ -79,7 +79,7 @@ function useJourney(): string {
       const parts: string[] = [];
       if (firsts[0]) {
         const since = new Date(firsts[0] + "T12:00:00").toLocaleDateString(locale(), { month: "long", year: "numeric" });
-        parts.push(t(`Sur Lumen depuis ${since}`, `On Lumen since ${since}`));
+        parts.push(t(`Sur Umbra depuis ${since}`, `On Umbra since ${since}`));
       }
       if (known > 0) parts.push(count(known, "mot connu", "mots connus", "known word", "known words"));
       setLine(parts.join(" · "));
@@ -142,7 +142,7 @@ export function ProfileSection() {
         </span>
         <div className="me-hero-text">
           <label className="me-name-label" htmlFor="me-name">
-            {t("Comment Lumen vous appelle", "What Lumen calls you")}
+            {t("Comment Umbra vous appelle", "What Umbra calls you")}
           </label>
           <input
             id="me-name"
@@ -176,8 +176,8 @@ export function ProfileSection() {
         <h3>{t("Ce qui vous fait apprendre", "Why you're learning")}</h3>
         <p>
           {t(
-            "Une phrase, pour vous. Lumen vous la rappelle dans Progrès, et le chat s'en souvient pour choisir ses exemples.",
-            "One sentence, for you. Lumen reminds you of it in Progress, and the chat keeps it in mind when choosing examples.",
+            "Une phrase, pour vous. Umbra vous la rappelle dans Progrès, et le chat s'en souvient pour choisir ses exemples.",
+            "One sentence, for you. Umbra reminds you of it in Progress, and the chat keeps it in mind when choosing examples.",
           )}
         </p>
         <div className="me-why-field">
@@ -403,7 +403,7 @@ function WhereItLives() {
         </span>
         <div className="grow">
           <strong>{t("Sur ce Mac", "On this Mac")}</strong>
-          <span>{t("Dans les données de Lumen, avec vos mots et vos leçons.", "In Lumen's data, with your words and lessons.")}</span>
+          <span>{t("Dans les données d’Umbra, avec vos mots et vos leçons.", "In Umbra's data, with your words and lessons.")}</span>
         </div>
         <span className="dot ok" />
       </div>
@@ -441,8 +441,8 @@ function WhereItLives() {
           <strong>{t("Visible de vous seul", "Seen by you alone")}</strong>
           <span>
             {t(
-              "Lumen n'a ni compte ni communauté : votre profil n'est envoyé à personne. Seul le chat de ce Mac le lit, pour vous répondre plus personnellement.",
-              "Lumen has no account and no community: your profile is sent to no one. Only the chat on this Mac reads it, to answer you more personally.",
+              "Umbra n'a ni compte ni communauté : votre profil n'est envoyé à personne. Seul le chat de ce Mac le lit, pour vous répondre plus personnellement.",
+              "Umbra has no account and no community: your profile is sent to no one. Only the chat on this Mac reads it, to answer you more personally.",
             )}
           </span>
         </div>

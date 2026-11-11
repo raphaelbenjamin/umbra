@@ -70,7 +70,7 @@ function OnlineKey({ provider: p }: { provider: OnlineProvider }) {
       if (previous) {
         void setSetting(modelKey, previous);
         setTyped(previous);
-        setError(`${errorText(e)} ${t(`Lumen garde ${previous}.`, `Lumen keeps ${previous}.`)}`);
+        setError(`${errorText(e)} ${t(`Umbra garde ${previous}.`, `Umbra keeps ${previous}.`)}`);
       } else setError(errorText(e));
     } finally {
       setBusy(false);
@@ -138,7 +138,7 @@ function OnlineKey({ provider: p }: { provider: OnlineProvider }) {
         {busy && (
           <motion.div key="busy" className="key-note" {...enter}>
             <Orb size={16} />
-            <span>{custom ? t("Lumen pose une petite question au serveur…", "Lumen is asking the server a little question…") : t(`Lumen pose une petite question à ${p.name}…`, `Lumen is asking ${p.name} a little question…`)}</span>
+            <span>{custom ? t("Umbra pose une petite question au serveur…", "Umbra is asking the server a little question…") : t(`Umbra pose une petite question à ${p.name}…`, `Umbra is asking ${p.name} a little question…`)}</span>
           </motion.div>
         )}
         {error && (

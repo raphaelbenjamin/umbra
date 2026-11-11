@@ -107,7 +107,7 @@ if (process.argv.includes("--check") || process.argv.includes("--tests")) {
   mkdirSync(join(tauriDir, "binaries"), { recursive: true });
   if (!existsSync(placeholder)) writeFileSync(placeholder, "");
   run(`cargo xwin check --workspace --target ${TARGET}`, tauriDir);
-  if (process.argv.includes("--tests")) run(`cargo xwin test --no-run --release --lib --target ${TARGET} -p lumen`, tauriDir);
+  if (process.argv.includes("--tests")) run(`cargo xwin test --no-run --release --lib --target ${TARGET} -p umbra`, tauriDir);
   console.log("\n✓ Lumen compile pour Windows");
   process.exit(0);
 }

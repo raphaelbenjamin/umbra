@@ -8,6 +8,15 @@ if (!bundle || !output) throw new Error("Usage: node scripts/umbra-release-asset
 const config = JSON.parse(readFileSync(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
 const app = join(bundle, "Umbra.app");
 const tar = join(bundle, "Umbra.app.tar.gz");
+const plist = join(app, "Contents", "Info.plist");
+for (const [key, expected] of Object.entries({
+  CFBundleIdentifier: "com.raphaelbenjamin.umbra",
+  CFBundleExecutable: "umbra",
+  CFBundleShortVersionString: config.version,
+})) {
+  const actual = execFileSync("/usr/libexec/PlistBuddy", ["-c", `Print :${key}`, plist], { encoding: "utf8" }).trim();
+  if (actual !== expected) throw new Error(`${key} is ${actual}, expected ${expected}`);
+}
 const signature = readFileSync(tar + ".sig", "utf8").trim();
 if (!signature) throw new Error("The Umbra updater archive has no signature.");
 execFileSync("codesign", ["--verify", "--deep", "--strict", app], { stdio: "inherit" });

@@ -75,10 +75,10 @@ export const useLingq = create<LingqState>((set, get) => ({
     try {
       const account = await api().lingqScan(key);
       if (!account.length) {
-        set({ phase: "idle", error: t("Ce compte LingQ ne contient rien dans les langues que Lumen propose.", "This LingQ account has nothing in the languages Lumen offers.") });
+        set({ phase: "idle", error: t("Ce compte LingQ ne contient rien dans les langues que Umbra propose.", "This LingQ account has nothing in the languages Umbra offers.") });
         return;
       }
-      // par défaut, seulement les langues déjà étudiées dans Lumen (les autres se cochent à la main)
+      // par défaut, seulement les langues déjà étudiées dans Umbra (les autres se cochent à la main)
       const studied = useApp.getState().langs();
       const mine = account.map((a) => a.lang).filter((l) => studied.includes(l));
       set({ phase: "ready", account, chosen: mine.length ? mine : account.map((a) => a.lang) });
@@ -110,7 +110,7 @@ export const useLingq = create<LingqState>((set, get) => ({
         else if (e.type === "progress") set({ done: e.done, total: e.total });
         else set({ lastLesson: e.title });
       });
-      // les langues importées rejoignent celles étudiées dans Lumen
+      // les langues importées rejoignent celles étudiées dans Umbra
       const langs = useApp.getState().langs();
       const added = chosen.filter((l) => !langs.includes(l) && !before.includes(l));
       if (added.length) await app.setSetting("langs", [...langs, ...added].join(","));
@@ -118,7 +118,7 @@ export const useLingq = create<LingqState>((set, get) => ({
       app.bumpLibrary();
       await app.refreshKnown();
       const s = summary(report);
-      const fallback = report.skipped ? t("Tout était déjà dans Lumen", "Everything was already in Lumen") : t("Rien de nouveau à importer", "Nothing new to import");
+      const fallback = report.skipped ? t("Tout était déjà dans Umbra", "Everything was already in Umbra") : t("Rien de nouveau à importer", "Nothing new to import");
       app.toast(report.cancelled ? t(`Import interrompu${s ? ` : ${s}` : ""}`, `Import stopped${s ? `: ${s}` : ""}`) : s || fallback, "light");
     } catch (e) {
       set({ phase: "ready", error: errorText(e), stage: null });

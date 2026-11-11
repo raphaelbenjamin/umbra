@@ -519,8 +519,8 @@ function StepText({ step, found }: { step: Step; found: boolean }) {
         <>
           <p>
             {t(
-              "C'est le « cerveau » de l'IA : un gros fichier qui a lu des milliards de phrases, dans des dizaines de langues, et en a tiré le sens des mots. Lumen le télécharge une fois ; ensuite, il travaille ici, même sans Internet. Ce que vous lisez ne quitte jamais votre Mac.",
-              "It's the AI's “brain”: a big file that has read billions of sentences in dozens of languages and learned what words mean. Lumen downloads it once; after that, it works right here, even offline. What you read never leaves your Mac.",
+              "C'est le « cerveau » de l'IA : un gros fichier qui a lu des milliards de phrases, dans des dizaines de langues, et en a tiré le sens des mots. Umbra le télécharge une fois ; ensuite, il travaille ici, même sans Internet. Ce que vous lisez ne quitte jamais votre Mac.",
+              "It's the AI's “brain”: a big file that has read billions of sentences in dozens of languages and learned what words mean. Umbra downloads it once; after that, it works right here, even offline. What you read never leaves your Mac.",
             )}
           </p>
           {modelState}
@@ -609,8 +609,8 @@ function StepText({ step, found }: { step: Step; found: boolean }) {
       body = (
         <p>
           {t(
-            "Un livre, un PDF, un texte collé, un fichier audio ou vidéo : Lumen en fait une leçon. Glissez un fichier n'importe où dans la fenêtre. Avec une clé Gemini, Lumen vous écrit même un podcast à votre niveau.",
-            "A book, a PDF, pasted text, an audio or video file: Lumen turns it into a lesson. Drop a file anywhere in the window. With a Gemini key, Lumen even writes you a podcast at your level.",
+            "Un livre, un PDF, un texte collé, un fichier audio ou vidéo : Umbra en fait une leçon. Glissez un fichier n'importe où dans la fenêtre. Avec une clé Gemini, Umbra vous écrit même un podcast à votre niveau.",
+            "A book, a PDF, pasted text, an audio or video file: Umbra turns it into a lesson. Drop a file anywhere in the window. With a Gemini key, Umbra even writes you a podcast at your level.",
           )}
         </p>
       );
@@ -631,8 +631,8 @@ function StepText({ step, found }: { step: Step; found: boolean }) {
       body = (
         <p>
           {t(
-            "Touchez les mots inconnus, écoutez, terminez la page. ⌘/ montre tous les raccourcis clavier. La visite se rejoue dans Réglages › À propos ; « Comment marche Lumen ? », sous le panneau du mot, rouvre le petit guide.",
-            "Tap the unknown words, listen, finish the page. ⌘/ shows every keyboard shortcut. You can replay the tour in Settings › About; “How does Lumen work?”, under the word panel, reopens the short guide.",
+            "Touchez les mots inconnus, écoutez, terminez la page. ⌘/ montre tous les raccourcis clavier. La visite se rejoue dans Réglages › À propos ; « Comment marche Umbra ? », sous le panneau du mot, rouvre le petit guide.",
+            "Tap the unknown words, listen, finish the page. ⌘/ shows every keyboard shortcut. You can replay the tour in Settings › About; “How does Umbra work?”, under the word panel, reopens the short guide.",
           )}
         </p>
       );

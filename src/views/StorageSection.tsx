@@ -35,8 +35,8 @@ function qualityNote(q: MediaQuality): string {
   switch (q) {
     case "original":
       return t(
-        "Rien n'est réencodé. Les vidéos en ligne arrivent quand même dans le format le plus léger que Lumen sait lire, sans rien perdre.",
-        "Nothing is re-encoded. Online videos still arrive in the lightest format Lumen can play, losing nothing.",
+        "Rien n'est réencodé. Les vidéos en ligne arrivent quand même dans le format le plus léger que Umbra sait lire, sans rien perdre.",
+        "Nothing is re-encoded. Online videos still arrive in the lightest format Umbra can play, losing nothing.",
       );
     case "compact":
       return t(
@@ -68,7 +68,7 @@ function DiskCard({ usage }: { usage: MediaUsage | null }) {
     <div className="set-card disk-card">
       <div className="disk-head">
         <strong className="disk-total num">{usage ? formatBytes(total) : "…"}</strong>
-        <span>{t("utilisés par Lumen sur ce Mac", "used by Lumen on this Mac")}</span>
+        <span>{t("utilisés par Umbra sur ce Mac", "used by Umbra on this Mac")}</span>
       </div>
       <div className="disk-bar" aria-hidden="true">
         {filled.map((p) => (
@@ -115,7 +115,7 @@ function LightenCard({ usage, quality }: { usage: MediaUsage | null; quality: Me
               <span className="num">
                 {run && run.total
                   ? t(`${Math.min(run.done + 1, run.total)} sur ${run.total} · ${formatBytes(run.saved)} gagnés`, `${Math.min(run.done + 1, run.total)} of ${run.total} · ${formatBytes(run.saved)} saved`)
-                  : t("Lumen regarde ce qui peut s'alléger.", "Lumen is looking at what can be lightened.")}
+                  : t("Umbra regarde ce qui peut s'alléger.", "Umbra is looking at what can be lightened.")}
               </span>
               <div className="bar live">
                 <i style={{ width: `${Math.max(3, overall)}%` }} />
@@ -136,7 +136,7 @@ function LightenCard({ usage, quality }: { usage: MediaUsage | null; quality: Me
           <motion.div key="wait" className="set-row" {...enter}>
             <div className="grow">
               <strong>{t("Calcul…", "Measuring…")}</strong>
-              <span>{t("Lumen regarde chaque vidéo et chaque son.", "Lumen is looking at each video and sound.")}</span>
+              <span>{t("Umbra regarde chaque vidéo et chaque son.", "Umbra is looking at each video and sound.")}</span>
             </div>
           </motion.div>
         ) : usage.candidates > 0 ? (
@@ -204,12 +204,12 @@ export function StorageSection() {
         <p>
           {isWindows
             ? t(
-                "Lumen choisit pour chaque vidéo en ligne le format le plus léger que ce PC lit. Les fichiers du PC restent tels quels.",
-                "For each online video, Lumen picks the lightest format this PC can play. Files from the PC stay as they are.",
+                "Umbra choisit pour chaque vidéo en ligne le format le plus léger que ce PC lit. Les fichiers du PC restent tels quels.",
+                "For each online video, Umbra picks the lightest format this PC can play. Files from the PC stay as they are.",
               )
             : t(
-                "À l'import, l'image est réencodée en HEVC par la puce vidéo du Mac, pendant la transcription, et le son en AAC, en mono quand il n'y a qu'une voix. Les vidéos en ligne arrivent d'abord dans le format le plus léger que Lumen sait lire.",
-                "On import, the picture is re-encoded to HEVC by the Mac's video chip, during the transcription, and the sound to AAC, in mono when there's a single voice. Online videos first arrive in the lightest format Lumen can play.",
+                "À l'import, l'image est réencodée en HEVC par la puce vidéo du Mac, pendant la transcription, et le son en AAC, en mono quand il n'y a qu'une voix. Les vidéos en ligne arrivent d'abord dans le format le plus léger que Umbra sait lire.",
+                "On import, the picture is re-encoded to HEVC by the Mac's video chip, during the transcription, and the sound to AAC, in mono when there's a single voice. Online videos first arrive in the lightest format Umbra can play.",
               )}
         </p>
         <div className="set-card">

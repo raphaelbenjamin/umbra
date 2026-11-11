@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Umbra",
-  "version": "2.0.10",
-  "identifier": "com.raphaelbenjamin.lumenhebrew",
+  "version": "2.0.11",
+  "identifier": "com.raphaelbenjamin.umbra",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1428",
@@ -41,9 +41,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$APPDATA/media/**"
-        ]
+        "scope": []
       }
     }
   },

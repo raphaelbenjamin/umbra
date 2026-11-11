@@ -5,7 +5,7 @@ import { isWindows } from "../lib/platform";
 
 type Win = import("@tauri-apps/api/window").Window;
 
-/** La fenêtre de Lumen (rien dans le navigateur). */
+/** La fenêtre d’Umbra (rien dans le navigateur). */
 async function current(): Promise<Win | null> {
   if (!isTauri) return null;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -15,7 +15,7 @@ async function current(): Promise<Win | null> {
 /**
  * Boutons de la fenêtre sous Windows : réduire, agrandir ou restaurer, fermer.
  * La fenêtre n'a pas la barre de titre de Windows (elle garderait sa bande
- * blanche au-dessus de Lumen) : ces boutons en tiennent lieu, en haut à droite,
+ * blanche au-dessus d’Umbra) : ces boutons en tiennent lieu, en haut à droite,
  * à la manière de Windows 11, et la barre du haut de chaque vue sert à déplacer
  * la fenêtre (double-clic : agrandir). Rien sur Mac.
  */

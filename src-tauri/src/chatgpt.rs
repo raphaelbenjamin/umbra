@@ -1,7 +1,7 @@
-//! Sign in with ChatGPT : un abonné à ChatGPT Plus ou Pro relie Lumen à son
+//! Sign in with ChatGPT : un abonné à ChatGPT Plus ou Pro relie Umbra à son
 //! compte, et la traduction des mots, des phrases et le chat puisent dans son
 //! forfait au lieu d'une clé payée à part (aperçu d'OpenAI, ouvert le 29 septembre
-//! 2026 aux applications open source comme Lumen). Les comptes gratuits peuvent se
+//! 2026 aux applications open source comme Umbra). Les comptes gratuits peuvent se
 //! connecter, mais leur forfait ne sert pas aux autres apps.
 //!
 //! Connexion : OAuth avec PKCE dans le navigateur du système, retour sur une
@@ -43,7 +43,7 @@ use crate::i18n::t;
 use crate::online::{until, Ask, Check, Config, Unreachable};
 
 /// Nom présenté à OpenAI à l'enregistrement (modifiable par l'apprenant avant d'accepter).
-const AGENT_NAME: &str = "Lumen";
+const AGENT_NAME: &str = "Umbra";
 const SCOPES: &str = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
 /// Droit d'utiliser le forfait : sans lui, la connexion ne sert qu'à s'identifier.
 const PLAN_SCOPE: &str = "chatgpt.tokens.use.direct";
@@ -359,12 +359,12 @@ struct Callback {
 /// Page montrée dans le navigateur au retour.
 fn page(ok: bool) -> String {
     let (title, body) = if ok {
-        (t("Lumen est relié à ChatGPT", "Lumen is connected to ChatGPT"), t("Vous pouvez fermer cette page et revenir dans Lumen.", "You can close this page and go back to Lumen."))
+        (t("Umbra est relié à ChatGPT", "Umbra is connected to ChatGPT"), t("Vous pouvez fermer cette page et revenir dans Umbra.", "You can close this page and go back to Umbra."))
     } else {
-        (t("La connexion n'a pas abouti", "Sign-in didn't go through"), t("Revenez dans Lumen pour réessayer.", "Go back to Lumen to try again."))
+        (t("La connexion n'a pas abouti", "Sign-in didn't go through"), t("Revenez dans Umbra pour réessayer.", "Go back to Umbra to try again."))
     };
     let html = format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Lumen</title>\
+        "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Umbra</title>\
          <style>body{{margin:0;min-height:100vh;display:grid;place-items:center;font:16px -apple-system,system-ui,sans-serif;\
          background:radial-gradient(circle at 50% 30%,#fff3d6,#f7efe2 60%);color:#3b2f1e}}\
          @media(prefers-color-scheme:dark){{body{{background:radial-gradient(circle at 50% 30%,#3a2a14,#17120c 60%);color:#f3e6cf}}}}\
@@ -376,7 +376,7 @@ fn page(ok: bool) -> String {
 }
 
 /// Attend le retour du navigateur sur l'adresse locale. `back` est appelé dès
-/// qu'il revient, accord ou refus (Lumen repasse devant le navigateur).
+/// qu'il revient, accord ou refus (Umbra repasse devant le navigateur).
 async fn wait_callback(listener: tokio::net::TcpListener, state: &str, cancel: &AtomicBool, limit: Duration, back: impl FnOnce()) -> Result<Callback> {
     let deadline = Instant::now() + limit;
     loop {
@@ -476,7 +476,7 @@ async fn post_form(url: &str, pairs: &[(&str, &str)]) -> Result<(u16, Value)> {
 }
 
 /// Connexion dans le navigateur. `open` ouvre l'adresse dans le navigateur du
-/// système ; `back` ramène Lumen au premier plan quand le navigateur revient ;
+/// système ; `back` ramène Umbra au premier plan quand le navigateur revient ;
 /// `cancel` l'abandonne (bouton « Annuler »).
 pub async fn sign_in(open: impl FnOnce(&str) -> Result<()>, back: impl FnOnce(), cancel: Arc<AtomicBool>) -> Result<Status> {
     sign_in_with(vault()?, open, back, &cancel, Duration::from_secs(600)).await
@@ -502,7 +502,7 @@ async fn sign_in_with(v: &Vault, open: impl FnOnce(&str) -> Result<()>, back: im
     let cb = wait_callback(listener, &attempt.state, cancel, limit, back).await?;
     let client_id = if attempt.client_id == "dynamic_agent_client" {
         if cb.client_id.is_empty() {
-            return Err(anyhow!(t("ChatGPT n'a pas terminé l'enregistrement de Lumen. Réessayez.", "ChatGPT didn't finish registering Lumen. Try again.")));
+            return Err(anyhow!(t("ChatGPT n'a pas terminé l'enregistrement d’Umbra. Réessayez.", "ChatGPT didn't finish registering Umbra. Try again.")));
         }
         cb.client_id.clone()
     } else {
@@ -575,7 +575,7 @@ pub async fn sign_out() -> Result<Status> {
 const DEAD_REFRESH: [&str; 6] = ["invalid_grant", "invalid_refresh_token", "token_expired", "refresh_token_expired", "refresh_token_invalidated", "refresh_token_reused"];
 
 fn reconnect() -> anyhow::Error {
-    anyhow!(t("La connexion de Lumen à ChatGPT a expiré. Reconnectez-vous dans Réglages › IA.", "Lumen's connection to ChatGPT has expired. Sign in again in Settings › AI."))
+    anyhow!(t("La connexion d’Umbra à ChatGPT a expiré. Reconnectez-vous dans Réglages › IA.", "Umbra's connection to ChatGPT has expired. Sign in again in Settings › AI."))
 }
 
 /// Jeton d'accès valable (renouvelé s'il expire dans moins de deux minutes).
@@ -733,8 +733,8 @@ const USAGE_LIMIT: &str = "subscription_sharing_usage_limit_exceeded";
 fn limit_error(minutes: u64) -> anyhow::Error {
     let here = crate::i18n::this_device();
     anyhow::Error::new(Unreachable(tr!(
-        "La limite d'utilisation de votre forfait ChatGPT est atteinte pour Lumen. Lumen traduit avec l'IA de {here} pendant {minutes} min ; vous pouvez relever la limite dans ChatGPT, Réglages › Utilisation.",
-        "Your ChatGPT plan's usage limit for Lumen has been reached. Lumen translates with {here}'s AI for {minutes} min; you can raise the limit in ChatGPT, Settings › Usage."
+        "La limite d'utilisation de votre forfait ChatGPT est atteinte pour Umbra. Umbra traduit avec l'IA de {here} pendant {minutes} min ; vous pouvez relever la limite dans ChatGPT, Réglages › Utilisation.",
+        "Your ChatGPT plan's usage limit for Umbra has been reached. Umbra translates with {here}'s AI for {minutes} min; you can raise the limit in ChatGPT, Settings › Usage."
     )))
 }
 
@@ -1046,7 +1046,7 @@ mod tests {
         assert_eq!(u.as_str().split('?').next(), Some("https://auth.openai.com/api/accounts/authorize"));
         let q: std::collections::HashMap<String, String> = u.query_pairs().map(|(k, v)| (k.to_string(), v.to_string())).collect();
         assert_eq!(q["client_id"], "dynamic_agent_client");
-        assert_eq!(q["agent_name_hint"], "Lumen");
+        assert_eq!(q["agent_name_hint"], "Umbra");
         assert_eq!(q["scope"], SCOPES);
         assert_eq!(q["resource"], RESOURCE);
         assert_eq!(q["code_challenge_method"], "S256");
@@ -1188,7 +1188,7 @@ mod tests {
                         reqwest::Url::parse(&format!("http://x/?{s}")).unwrap().query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect()
                     };
                     let out = if req.starts_with("GET /api/accounts/authorize?") {
-                        // la page d'autorisation : l'apprenant accepte, retour vers Lumen
+                        // la page d'autorisation : l'apprenant accepte, retour vers Umbra
                         let target = req.split_whitespace().nth(1).unwrap_or("");
                         let q = pairs(target.split_once('?').map_or("", |x| x.1));
                         let get = |k: &str| q.get(k).cloned().unwrap_or_default();
@@ -1276,7 +1276,7 @@ mod tests {
     }
 
     /// Le souci d'Ulysse : beaucoup de mots touchés en quelques secondes. Chaque
-    /// mot rend le précédent caduc (comme l'époque des requêtes dans Lumen) : seuls
+    /// mot rend le précédent caduc (comme l'époque des requêtes dans Umbra) : seuls
     /// les mots où l'on s'arrête partent chez ChatGPT, sans erreur ni blocage.
     #[tokio::test]
     async fn bursts_of_taps_send_only_the_words_you_stop_on() {
@@ -1406,8 +1406,8 @@ mod tests {
         });
         let cb = wait_callback(listener, "s1", &cancel, Duration::from_secs(5), back).await.unwrap();
         assert_eq!(cb, Callback { code: "c0de".into(), client_id: "oaiapp_9".into(), scope: "openid".into() });
-        assert!(browser.await.unwrap().contains("Lumen"));
-        assert_eq!(backs.load(Ordering::SeqCst), 1, "Lumen repasse devant au retour, pas pour l'icône");
+        assert!(browser.await.unwrap().contains("Umbra"));
+        assert_eq!(backs.load(Ordering::SeqCst), 1, "Umbra repasse devant au retour, pas pour l'icône");
         // refus dans ChatGPT : le navigateur revient aussi
         let listener = bind_loopback().await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -1416,14 +1416,14 @@ mod tests {
         });
         assert!(wait_callback(listener, "s1", &cancel, Duration::from_secs(5), back).await.is_err());
         assert_eq!(backs.load(Ordering::SeqCst), 2);
-        // annulation par l'apprenant : il est déjà dans Lumen
+        // annulation par l'apprenant : il est déjà dans Umbra
         let listener = bind_loopback().await.unwrap();
         let cancel = AtomicBool::new(true);
         assert_eq!(wait_callback(listener, "s1", &cancel, Duration::from_secs(5), back).await.unwrap_err().to_string(), "annulé");
         assert_eq!(backs.load(Ordering::SeqCst), 2);
     }
 
-    /// La connexion entière, comme sur Mac et Windows : Lumen ouvre le navigateur,
+    /// La connexion entière, comme sur Mac et Windows : Umbra ouvre le navigateur,
     /// l'apprenant accepte chez (un faux) OpenAI, le navigateur revient sur l'adresse
     /// locale, le code est échangé (PKCE vérifié), le jeton d'identité contrôlé, et
     /// le compte gardé dans chatgpt.json. Puis la reconnexion, et un autre compte.
@@ -1458,11 +1458,11 @@ mod tests {
         assert_eq!(st.email, "lea@example.com");
         assert_eq!(backs.load(Ordering::SeqCst), 1);
         let first = f.authorize.lock().clone();
-        assert_eq!((first["client_id"].as_str(), first["agent_name_hint"].as_str()), ("dynamic_agent_client", "Lumen"));
+        assert_eq!((first["client_id"].as_str(), first["agent_name_hint"].as_str()), ("dynamic_agent_client", "Umbra"));
         assert_eq!((first["resource"].as_str(), first["scope"].as_str()), (RESOURCE, SCOPES));
         assert!(first["redirect_uri"].starts_with("http://127.0.0.1:") && first["redirect_uri"].ends_with(CALLBACK));
         tokio::time::sleep(Duration::from_millis(50)).await;
-        assert!(opened.lock().as_deref().is_some_and(|p| p.contains("Lumen")), "page de retour montrée");
+        assert!(opened.lock().as_deref().is_some_and(|p| p.contains("Umbra")), "page de retour montrée");
         // gardé hors de la base, lisible par l'utilisateur seul, relu au lancement suivant
         let saved: Saved = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let acc = saved.account.unwrap();

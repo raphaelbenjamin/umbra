@@ -180,7 +180,7 @@ function NowReading() {
   );
 }
 
-/** « Plus » : le reste de Lumen, et la langue étudiée. */
+/** « Plus » : le reste d’Umbra, et la langue étudiée. */
 function MoreSheet({ open, onClose }: { open: boolean; onClose(): void }) {
   const view = useApp((s) => s.view);
   const go = useApp((s) => s.go);

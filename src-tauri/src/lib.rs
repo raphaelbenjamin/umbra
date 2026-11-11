@@ -49,6 +49,37 @@ use std::collections::HashMap;
 use parking_lot::Mutex;
 use tauri::Manager;
 
+#[cfg(desktop)]
+fn desktop_data_dir(path: std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    if path.file_name().and_then(|name| name.to_str()) != Some("com.raphaelbenjamin.umbra") {
+        return Err("Umbra requires its own application data directory".into());
+    }
+    // Open previous Umbra libraries in place so their database and media paths stay valid.
+    let legacy = path.with_file_name("com.raphaelbenjamin.lumenhebrew");
+    let selected = if !db::path(&path).exists() && std::fs::symlink_metadata(&legacy).is_ok() { legacy } else { path };
+    if std::fs::symlink_metadata(&selected).is_ok_and(|metadata| metadata.is_symlink()) {
+        return Err("Umbra requires a data directory that is not a symbolic link".into());
+    }
+    Ok(selected)
+}
+
+#[cfg(all(test, desktop))]
+#[test]
+fn desktop_identity_preserves_the_previous_umbra_library() {
+    let base = std::env::temp_dir().join(format!("umbra-identity-test-{}", std::process::id()));
+    let current = base.join("com.raphaelbenjamin.umbra");
+    let previous = base.join("com.raphaelbenjamin.lumenhebrew");
+    let official = base.join("app.lumen.reader");
+    assert_eq!(desktop_data_dir(current.clone()).unwrap(), current);
+    std::fs::create_dir_all(&previous).unwrap();
+    std::fs::create_dir_all(&current).unwrap();
+    assert_eq!(desktop_data_dir(current.clone()).unwrap(), previous);
+    std::fs::write(db::path(&current), []).unwrap();
+    assert_eq!(desktop_data_dir(current.clone()).unwrap(), current);
+    assert!(desktop_data_dir(official).is_err());
+    std::fs::remove_dir_all(base).unwrap();
+}
+
 // iPhone et iPad : point d'entrée appelé par le projet Xcode (gen/apple)
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -59,12 +90,9 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             #[cfg(desktop)]
-            if data_dir.file_name().and_then(|n| n.to_str()) != Some("com.raphaelbenjamin.lumenhebrew")
-                || std::fs::symlink_metadata(&data_dir).is_ok_and(|m| m.is_symlink())
-            {
-                return Err("Umbra requires its own application data directory".into());
-            }
+            let data_dir = desktop_data_dir(data_dir)?;
             std::fs::create_dir_all(&data_dir)?;
+            app.asset_protocol_scope().allow_directory(media::media_dir(&data_dir), true)?;
             // connexion à ChatGPT (jetons hors de la base, propres à cet appareil)
             chatgpt::init(&data_dir);
             let conn = db::open(&db::path(&data_dir))?;
@@ -107,7 +135,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
-            commands::app_relaunch,
             commands::app_relaunch,
             commands::settings_get,
             commands::settings_set,
@@ -197,11 +224,12 @@ pub fn run() {
             commands::text_stats,
         ])
         .build(tauri::generate_context!())
-        .expect("Lumen couldn't start")
+        .expect("Umbra couldn't start")
         .run(|app, event| {
             // dernière sauvegarde en quittant, si la progression a changé
             if let tauri::RunEvent::Exit = event {
                 if let Some(st) = app.try_state::<state::AppState>() {
+                    st.ai.shutdown();
                     backup::on_exit(&st);
                 }
                 // « Redémarrer » après une mise à jour : la nouvelle version, au premier plan

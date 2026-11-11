@@ -106,12 +106,12 @@ function Welcome({ lang, lesson, compact }: { lang: LangCode; lesson: LessonRef 
         {frenchSpaces(
           lesson
             ? t(
-                `Lumen a lu « ${lesson.title} ». Demandez le sens d'un mot, une règle de grammaire, un résumé…`,
-                `Lumen has read “${lesson.title}”. Ask for the meaning of a word, a grammar rule, a summary…`,
+                `Umbra a lu « ${lesson.title} ». Demandez le sens d'un mot, une règle de grammaire, un résumé…`,
+                `Umbra has read “${lesson.title}”. Ask for the meaning of a word, a grammar rule, a summary…`,
               )
             : t(
-                `Posez vos questions sur ${langWithArticle(lang)}, ou écrivez ${inLang(lang)} pour vous entraîner : Lumen vous répond et vous corrige.`,
-                `Ask your questions about ${langWithArticle(lang)}, or write ${inLang(lang)} to practise: Lumen answers and corrects you.`,
+                `Posez vos questions sur ${langWithArticle(lang)}, ou écrivez ${inLang(lang)} pour vous entraîner : Umbra vous répond et vous corrige.`,
+                `Ask your questions about ${langWithArticle(lang)}, or write ${inLang(lang)} to practise: Umbra answers and corrects you.`,
               ),
         )}
       </p>
@@ -180,7 +180,7 @@ function Live({ p, withLesson }: { p: Pending; withLesson: boolean }) {
         {p.phase === "read" && (
           <motion.div className="chat-reading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
             <span className="ember" />
-            <span className="shimmer">{withLesson ? t("Lumen relit la leçon…", "Lumen is rereading the lesson…") : t("Lumen prépare sa réponse…", "Lumen is preparing an answer…")}</span>
+            <span className="shimmer">{withLesson ? t("Umbra relit la leçon…", "Umbra is rereading the lesson…") : t("Umbra prépare sa réponse…", "Umbra is preparing an answer…")}</span>
           </motion.div>
         )}
         {p.phase !== "read" && p.think && <Thought text={p.thought} secs={p.thoughtSecs} live={p.phase === "think"} since={p.since} />}

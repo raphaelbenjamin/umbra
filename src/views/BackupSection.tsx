@@ -120,7 +120,7 @@ function BackupRow({ info }: { info: BackupInfo }) {
             <i style={{ width: `${pct}%` }} />
           </div>
         )}
-        {info.newer && <span className="backup-warn">{t("Faite par une version plus récente de Lumen : mettez Lumen à jour pour la restaurer.", "Made by a newer version of Lumen: update Lumen to restore it.")}</span>}
+        {info.newer && <span className="backup-warn">{t("Faite par une version plus récente d’Umbra : mettez Umbra à jour pour la restaurer.", "Made by a newer version of Umbra: update Umbra to restore it.")}</span>}
       </div>
       {info.versions.length > 0 && !progress && (
         <select className="select" value={day} onChange={(e) => setDay(e.target.value)} aria-label={t("Version à restaurer", "Version to restore")}>
@@ -176,7 +176,7 @@ function PlacePicker({ s, onPick }: { s: BackupStatus; onPick(dir: string): Prom
   const [busy, setBusy] = useState<string | null>(null);
   const [missing, setMissing] = useState<(typeof SUGGESTED)[number] | null>(null);
 
-  // un nuage installé pendant que la page est ouverte apparaît au retour dans Lumen
+  // un nuage installé pendant que la page est ouverte apparaît au retour dans Umbra
   useEffect(() => {
     void loadPlaces();
     const again = () => void loadPlaces();
@@ -254,8 +254,8 @@ function PlacePicker({ s, onPick }: { s: BackupStatus; onPick(dir: string): Prom
           >
             <p>
               {t(
-                `${missing.name} n'est pas installé sur ce Mac. Installez l'app ${missing.name} et connectez-vous : il apparaîtra ici, prêt à recevoir la sauvegarde. Lumen n'a besoin d'aucun mot de passe.`,
-                `${missing.name} isn't installed on this Mac. Install the ${missing.name} app and sign in: it will show up here, ready to receive the backup. Lumen needs no password.`,
+                `${missing.name} n'est pas installé sur ce Mac. Installez l'app ${missing.name} et connectez-vous : il apparaîtra ici, prêt à recevoir la sauvegarde. Umbra n'a besoin d'aucun mot de passe.`,
+                `${missing.name} isn't installed on this Mac. Install the ${missing.name} app and sign in: it will show up here, ready to receive the backup. Umbra needs no password.`,
               )}
             </p>
             {isTauri && (
@@ -271,7 +271,7 @@ function PlacePicker({ s, onPick }: { s: BackupStatus; onPick(dir: string): Prom
 }
 
 /**
- * iPhone et iPad : un seul emplacement, le dossier « Lumen Hebrew » d'iCloud Drive choisi dans
+ * iPhone et iPad : un seul emplacement, le dossier « Umbra » d'iCloud Drive choisi dans
  * l'app Fichiers (celui où le Mac sauvegarde déjà ; chaque appareil y a son dossier).
  */
 function IosPlace({ s, onPick }: { s: BackupStatus; onPick(dir: string): Promise<void> }) {
@@ -294,7 +294,7 @@ function IosPlace({ s, onPick }: { s: BackupStatus; onPick(dir: string): Promise
     <div className="ios-place">
       <span className="place-glyph">{busy ? <Orb size={16} /> : <Icon name="cloud" size={20} />}</span>
       <div className="grow">
-        <strong>{s.dir ? placeLabel(s) : t("Le dossier « Lumen Hebrew » de votre sauvegarde", "The “Lumen Hebrew” folder of your backup")}</strong>
+        <strong>{s.dir ? placeLabel(s) : t("Le dossier « Umbra » de votre sauvegarde", "The “Umbra” folder of your backup")}</strong>
         <span>
           {s.dir
             ? t("Choisi dans l'app Fichiers. Vos autres appareils y sauvegardent aussi.", "Chosen in the Files app. Your other devices back up there too.")
@@ -435,7 +435,7 @@ export function BackupSection() {
           <div className="set-row">
             <div className="grow">
               <strong>{t("Importer depuis Lumen", "Import from original Lumen")}</strong>
-              <span>{t("Fusionne vos bibliothèques dans Lumen Hebrew.", "Adds your original library to Lumen Hebrew.")}</span>
+              <span>{t("Fusionne vos bibliothèques dans Umbra.", "Adds your original library to Umbra.")}</span>
               <label>
                 <input type="checkbox" checked={copyMedia} disabled={importingOriginal} onChange={(e) => setCopyMedia(e.target.checked)} />
                 {" "}{t("Copier aussi les fichiers audio, vidéos et couvertures", "Also copy audio, video and covers")}
@@ -493,7 +493,7 @@ export function BackupSection() {
               {s.dir
                 ? placeLabel(s)
                 : isIOS
-                  ? t("Choisissez ci-dessous le dossier « Lumen Hebrew » où votre\u00a0Mac sauvegarde.", "Choose below the “Lumen Hebrew” folder your\u00a0Mac backs up to.")
+                  ? t("Choisissez ci-dessous le dossier « Umbra » où votre\u00a0Mac sauvegarde.", "Choose below the “Umbra” folder your\u00a0Mac backs up to.")
                   : isWindows
                   ? t("Choisissez où sauvegarder : OneDrive, un autre nuage ou un dossier.", "Choose where to back up: OneDrive, another cloud or a folder.")
                   : t(
@@ -513,8 +513,8 @@ export function BackupSection() {
         <div className="set-row backup-foot">
           <span className="backup-note">
             {t(
-              "Toutes les 10 minutes pendant que vous lisez, et en quittant Lumen. Les versions des 14 derniers jours restent disponibles.",
-              "Every 10 minutes while you read, and when you quit Lumen. Versions from the last 14 days stay available.",
+              "Toutes les 10 minutes pendant que vous lisez, et en quittant Umbra. Les versions des 14 derniers jours restent disponibles.",
+              "Every 10 minutes while you read, and when you quit Umbra. Versions from the last 14 days stay available.",
             )}
           </span>
           <button className="btn sm primary" disabled={busy || !s.dir} onClick={() => void save()}>
@@ -546,8 +546,8 @@ export function BackupSection() {
               <div className="grow">
                 <span>
                   {isIOS
-                    ? t("Votre progression est sur votre\u00a0Mac ? Choisissez d'abord le dossier « Lumen Hebrew » de sa sauvegarde.", "Your progress is on your\u00a0Mac? First choose the “Lumen Hebrew” folder of its backup.")
-                    : t("Vous avez déjà utilisé Lumen sur un autre Mac ?", "Have you used Lumen on another Mac before?")}
+                    ? t("Votre progression est sur votre\u00a0Mac ? Choisissez d'abord le dossier « Umbra » de sa sauvegarde.", "Your progress is on your\u00a0Mac? First choose the “Umbra” folder of its backup.")
+                    : t("Vous avez déjà utilisé Umbra sur un autre Mac ?", "Have you used Umbra on another Mac before?")}
                 </span>
               </div>
               <button className="btn sm soft" disabled={listing || !s.dir} onClick={() => void load()}>

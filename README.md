@@ -18,7 +18,7 @@ Extract the Apple silicon download and place **Umbra.app** in Applications. Once
 
 ## Development
 
-On Apple silicon, install Node.js, Rust, CMake and the Xcode command-line tools. Run `npm ci` and `npm run app:dev`, or build an app with `npm run app:build -- --bundles app`. See the [development guide](docs/lumen-hebrew.md) for library migration, media import and test details.
+On Apple silicon, install Node.js, Rust, CMake and the Xcode command-line tools. Run `npm ci` and `npm run app:dev`, or build an app with `npm run app:build -- --bundles app`. See the [development guide](docs/umbra.md) for library migration, media import and test details.
 
 Maintainers publish a release by updating the app version and pushing a matching `v*` tag. The macOS release workflow builds an app and signs the updater archive using the repository’s Umbra signing secret. Keep a separate secure copy of the private key for future releases.
 

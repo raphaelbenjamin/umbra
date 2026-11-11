@@ -14,5 +14,6 @@
     "iOS": {
       "minimumSystemVersion": "17.0"
     }
-  }
+  },
+  "identifier": "com.raphaelbenjamin.lumenhebrew"
 }

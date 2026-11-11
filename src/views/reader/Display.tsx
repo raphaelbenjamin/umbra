@@ -86,7 +86,7 @@ export function PaperPicker({ value, onChange, id, font }: { value: string; onCh
           aria-checked={value === p.id}
           className={`look-paper ${value === p.id ? "on" : ""}`}
           onClick={() => onChange(p.id)}
-          title={p.id === "auto" ? t("Suit le thème de Lumen", "Follows Lumen's theme") : p.label}
+          title={p.id === "auto" ? t("Suit le thème d’Umbra", "Follows Umbra's theme") : p.label}
         >
           <span className="lp-dot">
             {value === p.id && <motion.span layoutId={`${id}-paper`} className="lp-ring" transition={RING} />}

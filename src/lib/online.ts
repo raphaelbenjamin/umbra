@@ -57,8 +57,8 @@ export const onlineProviders = (): OnlineProvider[] => [
     mark: "N",
     note: t("Gratuit, modèles ouverts", "Free, open models"),
     about: t(
-      "Gratuit avec un compte développeur NVIDIA, sans carte bancaire : des modèles ouverts (Nemotron, DeepSeek, Kimi, GLM…) servis par NVIDIA. Environ 40 demandes par minute, assez pour lire. Les modèles les plus demandés font parfois attendre longtemps : Lumen conseille un modèle qui répond tout de suite.",
-      "Free with an NVIDIA developer account, no credit card: open models (Nemotron, DeepSeek, Kimi, GLM…) served by NVIDIA. About 40 requests a minute, plenty for reading. The most popular models sometimes keep you waiting a long time: Lumen suggests a model that answers right away.",
+      "Gratuit avec un compte développeur NVIDIA, sans carte bancaire : des modèles ouverts (Nemotron, DeepSeek, Kimi, GLM…) servis par NVIDIA. Environ 40 demandes par minute, assez pour lire. Les modèles les plus demandés font parfois attendre longtemps : Umbra conseille un modèle qui répond tout de suite.",
+      "Free with an NVIDIA developer account, no credit card: open models (Nemotron, DeepSeek, Kimi, GLM…) served by NVIDIA. About 40 requests a minute, plenty for reading. The most popular models sometimes keep you waiting a long time: Umbra suggests a model that answers right away.",
     ),
     keyUrl: "https://build.nvidia.com/settings/api-keys",
     keySetting: "online_key_nvidia",
@@ -93,8 +93,8 @@ export const onlineProviders = (): OnlineProvider[] => [
     mark: "◎",
     note: t("Votre abonnement Plus ou Pro", "Your Plus or Pro subscription"),
     about: t(
-      "Sans clé : connectez votre compte ChatGPT, et Lumen puise dans votre forfait Plus ou Pro (le même que Codex), dans la limite que vous fixez dans ChatGPT. Les comptes gratuits peuvent se connecter, mais leur forfait ne sert pas aux autres apps. Aperçu d'OpenAI, ouvert aux applications open source comme Lumen.",
-      "No key: connect your ChatGPT account, and Lumen draws on your Plus or Pro plan (the same one as Codex), within the limit you set in ChatGPT. Free accounts can sign in, but their plan can't be used by other apps. An OpenAI preview, open to open-source apps like Lumen.",
+      "Sans clé : connectez votre compte ChatGPT, et Umbra puise dans votre forfait Plus ou Pro (le même que Codex), dans la limite que vous fixez dans ChatGPT. Les comptes gratuits peuvent se connecter, mais leur forfait ne sert pas aux autres apps. Aperçu d'OpenAI, ouvert aux applications open source comme Umbra.",
+      "No key: connect your ChatGPT account, and Umbra draws on your Plus or Pro plan (the same one as Codex), within the limit you set in ChatGPT. Free accounts can sign in, but their plan can't be used by other apps. An OpenAI preview, open to open-source apps like Umbra.",
     ),
     keyUrl: "",
     keySetting: "online_key_chatgpt",

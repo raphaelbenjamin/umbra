@@ -1,4 +1,4 @@
-// Barre des menus du Mac : Lumen, Fichier, Édition, Présentation, Format,
+// Barre des menus du Mac : Umbra, Fichier, Édition, Présentation, Format,
 // Leçon, Fenêtre, Aide. Construite ici plutôt qu'en Rust : elle parle la langue
 // de l'interface, suit l'état de l'app (coches de la vue, de la police, de la
 // couleur de la page… ; menu Leçon actif seulement dans une leçon) et ses
@@ -103,7 +103,7 @@ const onLesson = (run: (a: LessonActions) => void) => () => {
 /** Exporte le vocabulaire de la langue en CSV (compatible Anki). */
 export async function exportVocabulary(lang: LangCode) {
   const { toast } = useApp.getState();
-  const path = await pickSavePath(t(`lumen-${lang}-vocabulaire.csv`, `lumen-${lang}-vocabulary.csv`));
+  const path = await pickSavePath(t(`umbra-${lang}-vocabulaire.csv`, `umbra-${lang}-vocabulary.csv`));
   if (!path) return;
   try {
     await api().exportVocab(lang, path);
@@ -296,7 +296,7 @@ function appMenu(s: Snap): SubmenuOptions {
     sep,
     { item: "Services", text: t("Services", "Services") },
     sep,
-    { item: "Hide", text: t("Masquer Umbra", "Hide Umbra") },
+    { item: "Hide", text: t("Masquer Umbra", "Hid’Umbra") },
     { item: "HideOthers", text: t("Masquer les autres", "Hide Others") },
     { item: "ShowAll", text: t("Tout afficher", "Show All") },
     sep,
@@ -318,7 +318,7 @@ function fileMenu(s: Snap): SubmenuOptions {
     act(t("Exporter le vocabulaire (CSV, Anki)…", "Export Vocabulary (CSV, Anki)…"), () => exportVocabulary(app().lang()), { on }),
     act(s.backup.on ? t("Sauvegarder maintenant", "Back Up Now") : t("Sauvegarder la progression…", "Back Up Progress…"), backupNow, { key: "CmdOrCtrl+S", on }),
     act(t("Afficher la sauvegarde dans le Finder", "Show Backup in Finder"), () => revealBackup(useBackup.getState().status?.dir ?? ""), { on: on && s.backup.saved }),
-    act(t("Afficher les données de Lumen dans le Finder", "Show Lumen Data in Finder"), revealData, { on }),
+    act(t("Afficher les données d’Umbra dans le Finder", "Show Umbra Data in Finder"), revealData, { on }),
     sep,
     { item: "CloseWindow", text: t("Fermer la fenêtre", "Close Window") },
   ]);
@@ -524,9 +524,9 @@ function helpMenu(s: Snap): SubmenuOptions {
   const on = !s.calm;
   return sub(t("Aide", "Help"), [
     act(t("Raccourcis clavier", "Keyboard Shortcuts"), openShortcuts, { key: "CmdOrCtrl+/", on }),
-    act(t("Comment marche Lumen ?", "How Lumen Works"), () => app().openGuide(0), { on }),
+    act(t("Comment marche Umbra ?", "How Umbra Works"), () => app().openGuide(0), { on }),
     act(t("Visite guidée", "Guided Tour"), () => app().startTour(), { on }),
-    act(t("Nouveautés de Lumen", "What's New in Lumen"), () => app().openNews("all"), { on }),
+    act(t("Nouveautés d’Umbra", "What's New in Umbra"), () => app().openNews("all"), { on }),
   ]);
 }
 

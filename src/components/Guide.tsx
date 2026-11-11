@@ -7,7 +7,7 @@ import { shortName } from "../lib/writers";
 import type { LangCode, ModelRow } from "../lib/types";
 import { Icon, type IconName } from "./Icon";
 
-/* Le petit guide : quatre cartes illustrées pour comprendre Lumen en une minute
+/* Le petit guide : quatre cartes illustrées pour comprendre Umbra en une minute
    (le principe, toucher puis tourner la page, la lanterne, les modèles d'IA). */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -348,8 +348,8 @@ const cards = (): Card[] => [
   {
     title: t("Écoutez, la lanterne suit", "Listen, the lantern follows"),
     body: t(
-      "Un halo glisse sur chaque mot prononcé : vous lisez et vous entendez en même temps. Importez un livre, un article, un podcast ou une vidéo YouTube, Lumen en fait une leçon.",
-      "A halo glides over each spoken word, so you read and hear at the same time. Import a book, an article, a podcast or a YouTube video, and Lumen turns it into a lesson.",
+      "Un halo glisse sur chaque mot prononcé : vous lisez et vous entendez en même temps. Importez un livre, un article, un podcast ou une vidéo YouTube, Umbra en fait une leçon.",
+      "A halo glides over each spoken word, so you read and hear at the same time. Import a book, an article, a podcast or a YouTube video, and Umbra turns it into a lesson.",
     ),
   },
   {
@@ -433,7 +433,7 @@ export function Guide() {
             className="guide"
             role="dialog"
             aria-modal="true"
-            aria-label={t("Le petit guide de Lumen", "Lumen's short guide")}
+            aria-label={t("Le petit guide d’Umbra", "Umbra's short guide")}
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}

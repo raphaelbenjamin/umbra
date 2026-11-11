@@ -153,9 +153,9 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, role: Role) -> Option<R
     if p.dialect == Dialect::ChatGpt && !crate::chatgpt::signed_in() {
         let st = crate::chatgpt::status();
         return Some(Err(if st.signed_in && !st.plan {
-            t("Votre compte ChatGPT n'a pas accordé l'usage de son forfait à Lumen. Reconnectez-vous dans Réglages › IA (abonnement Plus ou Pro).", "Your ChatGPT account didn't let Lumen use its plan. Sign in again in Settings › AI (Plus or Pro subscription).").into()
+            t("Votre compte ChatGPT n'a pas accordé l'usage de son forfait à Umbra. Reconnectez-vous dans Réglages › IA (abonnement Plus ou Pro).", "Your ChatGPT account didn't let Umbra use its plan. Sign in again in Settings › AI (Plus or Pro subscription).").into()
         } else if st.signed_in {
-            t("La connexion de Lumen à ChatGPT a expiré. Reconnectez-vous dans Réglages › IA.", "Lumen's connection to ChatGPT has expired. Sign in again in Settings › AI.").into()
+            t("La connexion d’Umbra à ChatGPT a expiré. Reconnectez-vous dans Réglages › IA.", "Umbra's connection to ChatGPT has expired. Sign in again in Settings › AI.").into()
         } else {
             t("Connectez-vous à ChatGPT dans Réglages › IA.", "Sign in to ChatGPT in Settings › AI.").into()
         }));
@@ -336,7 +336,7 @@ fn request(c: &reqwest::Client, cfg: &Config, method: reqwest::Method, path: &st
         // la liste des modèles de Claude ne connaît que cet en-tête
         Dialect::Anthropic => r.header("x-api-key", &cfg.key).header("anthropic-version", "2023-06-01"),
         // présentation facultative demandée par OpenRouter
-        Dialect::OpenRouter => r.header("HTTP-Referer", "https://github.com/LivingTwice/lumen").header("X-Title", "Lumen"),
+        Dialect::OpenRouter => r.header("HTTP-Referer", "https://github.com/raphaelbenjamin/umbra").header("X-Title", "Umbra"),
         _ => r,
     }
 }

@@ -60,7 +60,7 @@ function chunksOf(tokens: Token[], a: number, b: number): [number, number][] {
 /** Ressort de la lanterne, le même que dans le texte. */
 const LANTERN_SPRING = { type: "spring", stiffness: 760, damping: 50, mass: 0.5 } as const;
 
-/** Fenêtre native de Lumen, chargée à la demande. */
+/** Fenêtre native d’Umbra, chargée à la demande. */
 const nativeWindow = () => import("@tauri-apps/api/window").then((m) => m.getCurrentWindow());
 
 /**

@@ -78,6 +78,7 @@ pub fn transcribe(
     cancel: &AtomicBool,
     mut on_progress: impl FnMut(f64),
 ) -> Result<String> {
+    let _active = engine.begin_transcription()?;
     let name = language_name(lang).ok_or_else(|| anyhow!(crate::i18n::t("langue non prise en charge par Qwen3-ASR", "language not supported by Qwen3-ASR")))?;
     let be = backend()?;
     let prof = std::env::var("LUMEN_ASR_PROFILE").is_ok(); // ESSAI
@@ -103,7 +104,7 @@ pub fn transcribe(
     let pieces = split_on_silence(pcm, CHUNK_SECS);
     let mut texts: Vec<String> = Vec::new();
     for (a, b) in pieces {
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::Relaxed) || engine.is_shutting_down() {
             return Err(anyhow!("annulé"));
         }
         let t = engine.exclusive(|| transcribe_piece(&model, &mctx, &pcm[a..b], name, threads))?;

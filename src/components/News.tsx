@@ -79,7 +79,7 @@ export function News() {
             className="news"
             role="dialog"
             aria-modal="true"
-            aria-label={t("Nouveautés de Lumen", "What's new in Lumen")}
+            aria-label={t("Nouveautés d’Umbra", "What's new in Umbra")}
             initial={{ opacity: 0, y: 28, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.98 }}
@@ -112,11 +112,11 @@ export function News() {
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 transition={{ duration: 0.7, delay: 0.35, ease: EASE }}
               >
-                <span className="eyebrow">{which === "update" && older.length === 0 ? t("Nouveau dans Lumen", "New in Lumen") : t("Nouveautés", "What's new")}</span>
+                <span className="eyebrow">{which === "update" && older.length === 0 ? t("Nouveau dans Umbra", "New in Umbra") : t("Nouveautés", "What's new")}</span>
                 <h2 className="display">
-                  <span className="news-version">Lumen {v}</span>
+                  <span className="news-version">Umbra {v}</span>
                   <span className="news-sheen" aria-hidden="true">
-                    Lumen {v}
+                    Umbra {v}
                   </span>
                 </h2>
                 <p className="news-title">{tx(head.title)}</p>
@@ -151,7 +151,7 @@ export function News() {
               {older.map((r) => (
                 <section key={r.version} className="news-older">
                   <div className="news-older-head">
-                    <strong>Lumen {versionOf(r, version)}</strong>
+                    <strong>Umbra {versionOf(r, version)}</strong>
                     <span>{tx(r.title)}</span>
                     {releaseDate(r) && <span className="news-date">{releaseDate(r)}</span>}
                   </div>

@@ -292,10 +292,10 @@ export function statusLine(s: BackupStatus, saving: boolean): string {
   return parts.join(" · ");
 }
 
-/** Emplacement lisible : « iCloud Drive › Lumen », « Google Drive › Mon Drive › Lumen ». */
+/** Emplacement lisible : « iCloud Drive › Umbra », « Google Drive › Mon Drive › Umbra ». */
 export function placeLabel(s: BackupStatus): string {
   if (!s.dir) return t("Aucun", "None");
-  if (s.icloud) return "iCloud Drive › Lumen";
+  if (s.icloud) return "iCloud Drive › Umbra";
   const p = s.place;
   if (p && (isCloud(p) || p.kind === "drive") && inFolder(s.dir, p.path) && s.dir.length > p.path.length) {
     return [p.name, ...pathParts(s.dir.slice(p.path.length))].join(" › ");
@@ -332,7 +332,7 @@ export async function pickBackupFolder(): Promise<string | null> {
   if (isIOS) return api().backupPickFolder();
   if (!isTauri) return isWindows ? t("C:\\Users\\vous\\Dropbox", "C:\\Users\\you\\Dropbox") : t("/Users/vous/Dropbox", "/Users/you/Dropbox");
   const { open } = await import("@tauri-apps/plugin-dialog");
-  const res = await open({ directory: true, multiple: false, title: t("Dossier de sauvegarde de Lumen", "Lumen backup folder") });
+  const res = await open({ directory: true, multiple: false, title: t("Dossier de sauvegarde d’Umbra", "Umbra backup folder") });
   return typeof res === "string" ? res : null;
 }
 

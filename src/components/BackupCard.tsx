@@ -37,7 +37,7 @@ export function BackupCard() {
   const cloud = status?.dir ? (status.icloud ? "iCloud Drive" : isCloud(status.place) ? status.place.name : "") : (fallback?.name ?? "");
 
   const activate = async () => {
-    // iPhone et iPad : choisir le dossier « Lumen » ; la progression du Mac qui s'y trouve
+    // iPhone et iPad : choisir le dossier « Umbra » ; la progression du Mac qui s'y trouve
     // rejoint aussitôt celle de cet appareil, puis les deux restent réunis
     if (isIOS && !status?.dir) {
       const dir = await pickBackupFolder();
@@ -85,8 +85,8 @@ export function BackupCard() {
           <span className="muted" style={{ fontSize: 11.5, lineHeight: 1.45 }}>
             {isIOS && !status?.dir
               ? t(
-                  "Choisissez le dossier « Lumen » où votre\u00a0Mac sauvegarde (iCloud Drive, Google Drive…) : sa progression arrive ici, et celle de cet appareil y sera à l'abri. Les deux restent ensuite réunies.",
-                  "Choose the “Lumen” folder your\u00a0Mac backs up to (iCloud Drive, Google Drive…): its progress comes here, and this device's progress will be safe there. The two then stay together.",
+                  "Choisissez le dossier « Umbra » où votre\u00a0Mac sauvegarde (iCloud Drive, Google Drive…) : sa progression arrive ici, et celle de cet appareil y sera à l'abri. Les deux restent ensuite réunies.",
+                  "Choose the “Umbra” folder your\u00a0Mac backs up to (iCloud Drive, Google Drive…): its progress comes here, and this device's progress will be safe there. The two then stay together.",
                 )
               : t(
                   `Une copie de vos mots et de vos leçons dans votre ${cloud || "dossier de sauvegarde"}, si ce Mac venait à s'effacer.`,
