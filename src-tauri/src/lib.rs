@@ -138,6 +138,7 @@ pub fn run() {
             commands::ai_word,
             commands::ai_sentence,
             commands::ai_simplify,
+            commands::explain_chinese,
             commands::ai_warmup,
             commands::gpu_info,
             commands::chats_list,

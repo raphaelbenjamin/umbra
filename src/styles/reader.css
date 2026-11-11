@@ -2132,3 +2132,46 @@ span.player-voice .icon-btn {
 }
 .zh-study-pinyin { top: 0.19em; }
 .zh-study-gloss { bottom: 0.2em; }
+
+.wp-explain-button {
+  align-self: flex-start;
+}
+.wp-explanation {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.wp-explanation-meaning,
+.wp-explanation-parts {
+  margin: 0;
+}
+.wp-explanation-parts {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.wp-explanation-parts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 7px;
+}
+.wp-explanation-examples {
+  display: grid;
+  gap: 10px;
+}
+.wp-explanation-example {
+  display: grid;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.wp-explanation strong[lang="zh"] {
+  font-family: var(--font-chinese);
+  font-size: 1.18em;
+}

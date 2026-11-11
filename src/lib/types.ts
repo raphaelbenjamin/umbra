@@ -173,6 +173,18 @@ export interface ChineseAnnotation {
   gloss: string;
 }
 
+export interface ChineseExplanationLine {
+  hanzi: string;
+  pinyin: string;
+  english: string;
+}
+
+export interface ChineseExplanation {
+  meaning: string;
+  parts: ChineseExplanationLine[];
+  examples: ChineseExplanationLine[];
+}
+
 /** Dictionnaire d'une langue, dans la langue de l'interface. */
 export interface DictStatus {
   /** un dictionnaire existe pour cette langue */

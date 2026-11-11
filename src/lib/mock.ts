@@ -862,6 +862,20 @@ export function createMockApi(): Api {
       await sleep(200);
       return fakeStream(t(`[Traduction simulée] ${sentence}`, `[Simulated translation] ${sentence}`), onPiece);
     },
+    async explainChinese(selection) {
+      if (selection !== "丈夫") throw new Error("Tutor responses require the Umbra desktop app.");
+      return {
+        meaning: "丈夫 (zhàngfu) means husband.",
+        parts: [
+          { hanzi: "丈", pinyin: "zhàng", english: "traditional unit of length" },
+          { hanzi: "夫", pinyin: "fū", english: "man" },
+        ],
+        examples: [
+          { hanzi: "她的丈夫是老师。", pinyin: "Tā de zhàngfu shì lǎoshī.", english: "Her husband is a teacher." },
+          { hanzi: "我和丈夫去买菜。", pinyin: "Wǒ hé zhàngfu qù mǎi cài.", english: "My husband and I are going to buy groceries." },
+        ],
+      };
+    },
     async aiSimplify(_lang, text, _level, onPiece) {
       online("chat");
       await sleep(400);

@@ -14,6 +14,7 @@ import type {
   CreatedBook,
   DeviceInfo,
   ChineseAnnotation,
+  ChineseExplanation,
   DictResult,
   DictStatus,
   DiscoverFeed,
@@ -128,6 +129,7 @@ export interface Api {
   aiWord(lang: LangCode, word: string, sentence: string, onPiece: (t: string) => void): Promise<WordAnswer>;
   aiSentence(lang: LangCode, sentence: string, onPiece: (t: string) => void): Promise<string>;
   aiSimplify(lang: LangCode, text: string, level: string, onPiece: (t: string) => void): Promise<string>;
+  explainChinese(selection: string, sentence: string): Promise<ChineseExplanation>;
   aiWarmup(): Promise<boolean>;
   /** cartes graphiques que l'IA locale peut employer, et où calcule le modèle chargé (Réglages › IA, sous Windows) */
   gpuInfo(): Promise<GpuInfo>;
@@ -282,6 +284,7 @@ async function createTauriApi(): Promise<Api> {
       invoke("ai_sentence", { lang, sentence, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
     aiSimplify: (lang, text, level, onPiece) =>
       invoke("ai_simplify", { lang, text, level, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
+    explainChinese: (selection, sentence) => invoke("explain_chinese", { selection, sentence }),
     aiWarmup: () => invoke("ai_warmup"),
     gpuInfo: () => invoke("gpu_info"),
     chatsList: (lang) => invoke("chats_list", { lang }),

@@ -1,3 +1,4 @@
+import { ChineseExplain } from "./ChineseExplain";
 import { displayText } from "../../lib/tokenize";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -361,6 +362,10 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
             <div className={`wp-ai ${aiState === "stream" ? "stream" : ""} ${sel.words > SENSE_MAX_WORDS ? "passage" : ""}`}>{ai || "—"}</div>
           )}
         </div>
+
+        {lang === "zh" && (
+          <ChineseExplain key={JSON.stringify([sel.surface, sel.sentence])} selection={sel.surface} sentence={sel.sentence} />
+        )}
 
         {sel.isPhrase &&
           !term &&
