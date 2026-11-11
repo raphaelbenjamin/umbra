@@ -15,13 +15,14 @@ import { isEn, t } from "./i18n";
 import { MEDIA_EXT, TEXT_EXT } from "./importers";
 import { langInfo } from "./langs";
 import { isMobile, isWindows, joinPath } from "./platform";
-import { LOOK_DEFAULTS, PAPERS, playbackRates, READ_FONTS, SIZE_MAX, SIZE_MIN } from "./reading";
+import { fontSizeKey, readerFontSize, LOOK_DEFAULTS, PAPERS, playbackRates, READ_FONTS, SIZE_MAX, SIZE_MIN } from "./reading";
 import { useApp, type View } from "./store";
 import { canUpdate, useUpdate } from "./updater";
 import type { LangCode } from "./types";
 
 /** Ce que la leçon ouverte permet, pour activer les entrées du menu Leçon. */
 export interface LessonMenu {
+  lang: LangCode;
   /** leçon audio ou vidéo (avancer, reculer) */
   media: boolean;
   video: boolean;
@@ -79,10 +80,11 @@ export function useLessonMenu(flags: LessonMenu | null, actions: LessonActions) 
   useEffect(() => {
     lessonActions = actions;
   });
+  const lang = flags?.lang;
   const key = flags ? [flags.media, flags.video, flags.float].map(Number).join("") + (flags.loop === null ? "-" : Number(flags.loop)) : "";
   useEffect(() => {
-    useMenu.setState({ lesson: key ? { media: key[0] === "1", video: key[1] === "1", float: key[2] === "1", loop: key[3] === "-" ? null : key[3] === "1" } : null });
-  }, [key]);
+    useMenu.setState({ lesson: key && lang ? { lang, media: key[0] === "1", video: key[1] === "1", float: key[2] === "1", loop: key[3] === "-" ? null : key[3] === "1" } : null });
+  }, [key, lang]);
   useEffect(
     () => () => {
       lessonActions = null;
@@ -191,9 +193,10 @@ async function toggleFullscreen() {
 
 function setSize(next: (now: number) => number) {
   const app = useApp.getState();
-  const now = Number(app.setting("font_size")) || 23;
+  const lang = useMenu.getState().lesson?.lang ?? app.lang();
+  const now = readerFontSize(app.settings, lang);
   const v = Math.min(SIZE_MAX, Math.max(SIZE_MIN, next(now)));
-  if (v !== now) void app.setSetting("font_size", String(v));
+  if (v !== now) void app.setSetting(fontSizeKey(lang), String(v));
 }
 
 // ---------- construction ----------
@@ -244,7 +247,8 @@ function snapshot() {
   const m = useMenu.getState();
   const b = useBackup.getState().status;
   const s = app.settings;
-  const get = (k: string) => app.setting(k);
+  const fontLang = m.lesson?.lang ?? app.lang();
+  const get = (k: string) => k === "font_size" ? String(readerFontSize(s, fontLang)) : app.setting(k);
   return {
     en: isEn(),
     // accueil, nouvel accueil ou visite guidée : seulement l'essentiel

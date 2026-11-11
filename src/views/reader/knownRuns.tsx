@@ -6,6 +6,11 @@ export interface ReaderPart {
   space?: boolean;
 }
 
+/** Also catches numbers that a tokenizer returns as words. */
+export function blurLiteral(text: string): boolean {
+  return /^[\p{N}\p{P}\p{S}\s]+$/u.test(text) && /\S/u.test(text);
+}
+
 /** A single blur across adjacent known words, with normal inline wrapping. */
 export function knownRuns(parts: ReaderPart[], blur: boolean): ReactNode[] {
   if (!blur) return parts.map(({ node }) => node);

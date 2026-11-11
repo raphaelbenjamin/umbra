@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { Icon } from "../../components/Icon";
 import { Segmented, Switch } from "../../components/ui";
 import { t } from "../../lib/i18n";
-import { glyphSample, LOOK_DEFAULTS, PAPERS, panelMode, panelOptions, readFont, readFonts, SIZE_MAX, SIZE_MIN, type ReaderLayout } from "../../lib/reading";
+import { fontSizeKey, readerFontSize, glyphSample, LOOK_DEFAULTS, PAPERS, panelMode, panelOptions, readFont, readFonts, SIZE_MAX, SIZE_MIN, type ReaderLayout } from "../../lib/reading";
 import { useApp } from "../../lib/store";
 
 const RING = { type: "spring", stiffness: 520, damping: 40 } as const;
@@ -157,7 +157,8 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
   const setSetting = useApp((s) => s.setSetting);
   const ref = useRef<HTMLDivElement>(null);
   const set = (k: string) => (v: string) => void setSetting(k, v);
-  const changed = Object.entries(LOOK_DEFAULTS).some(([k, v]) => (settings[k] ?? v) !== v);
+  const size = readerFontSize(settings, lang);
+  const changed = Object.entries(LOOK_DEFAULTS).some(([k, v]) => (k === "font_size" ? String(size) : settings[k] ?? v) !== v);
 
   useEffect(() => {
     if (!open) return;
@@ -182,7 +183,11 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
   }, [open, onClose]);
 
   const reset = () => {
-    for (const [k, v] of Object.entries(LOOK_DEFAULTS)) if ((settings[k] ?? v) !== v) void setSetting(k, v);
+    for (const [k, v] of Object.entries(LOOK_DEFAULTS)) {
+      if (k === "font_size") {
+        if (String(size) !== v) void setSetting(fontSizeKey(lang), v);
+      } else if ((settings[k] ?? v) !== v) void setSetting(k, v);
+    }
   };
 
   return (
@@ -221,7 +226,7 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
 
           <section>
             <span className="eyebrow">{t("Taille", "Size")}</span>
-            <SizeControl value={Number(settings.font_size) || 23} onChange={(v) => void setSetting("font_size", String(v))} />
+            <SizeControl value={size} onChange={(v) => void setSetting(fontSizeKey(lang), String(v))} />
           </section>
 
           <section>

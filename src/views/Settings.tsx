@@ -20,7 +20,7 @@ import { PROFILES, useRecommendedProfile } from "../lib/profiles";
 import { formatBytes, useApp, type SettingsTab } from "../lib/store";
 import { naturalVoiceFor, naturalVoices, naturalVoiceSpeaks, pronounce } from "../lib/pronounce";
 import { loadVoices, sayWord, voicesFor } from "../lib/tts";
-import { panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
+import { fontSizeKey, readerFontSize, panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
 import { FontPicker, LayoutPicker, PaperPicker, lineHeightOptions, widthOptions } from "./reader/Display";
 import type { GpuInfo, LangCode, ModelRow } from "../lib/types";
 import { BackupSection } from "./BackupSection";
@@ -670,7 +670,7 @@ function LangsPane() {
 function LookPreview() {
   const settings = useApp((s) => s.settings);
   const lang = useApp((s) => s.lang)();
-  const look = readerLook(settings);
+  const look = readerLook(settings, lang);
   const { lang: sampleLang, sample } = useMemo(() => sampleFor(lang), [lang]);
   const parts = useMemo(() => splitWords(sample.text), [sample]);
   let n = -1;
@@ -698,6 +698,7 @@ function ReadingPane() {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const lang = useApp((s) => s.lang)();
+  const size = readerFontSize(settings, lang);
   return (
     <>
       <LookPreview />
@@ -731,7 +732,7 @@ function ReadingPane() {
           <div className="set-row">
             <div className="grow">
               <strong>{t("Taille du texte", "Text size")}</strong>
-              <span className="num">{settings.font_size} px</span>
+              <span>{langInfo(lang).name} · {size} px</span>
             </div>
             <input
               className="range"
@@ -739,8 +740,8 @@ function ReadingPane() {
               type="range"
               min={SIZE_MIN}
               max={SIZE_MAX}
-              value={settings.font_size}
-              onChange={(e) => setSetting("font_size", e.target.value)}
+              value={size}
+              onChange={(e) => setSetting(fontSizeKey(lang), e.target.value)}
               aria-label={t("Taille du texte", "Text size")}
             />
           </div>

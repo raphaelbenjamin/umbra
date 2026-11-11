@@ -172,9 +172,16 @@ export interface Look {
   style: CSSProperties;
 }
 
-export function readerLook(s: Record<string, string>): Look {
+export const fontSizeKey = (lang: string) => `font_size_${lang}`;
+
+export function readerFontSize(s: Record<string, string>, lang: string): number {
+  const size = Number(s[fontSizeKey(lang)]) || Number(s.font_size) || Number(LOOK_DEFAULTS.font_size);
+  return Math.min(SIZE_MAX, Math.max(SIZE_MIN, size));
+}
+
+export function readerLook(s: Record<string, string>, lang: string): Look {
   const font = readFont(s.read_font);
-  const size = Math.min(SIZE_MAX, Math.max(SIZE_MIN, Number(s.font_size) || 23));
+  const size = readerFontSize(s, lang);
   const lineHeight = Number(s.line_height) || 1.75;
   const width = WIDTHS[s.read_width] ?? WIDTHS.normal;
   const p = paper(s.read_paper);

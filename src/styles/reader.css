@@ -410,7 +410,7 @@ span.player-voice .icon-btn {
 
 /* illumination : la page se termine, les mots nouveaux deviennent connus */
 .page.illuminate .w.s0 {
-  animation: illum 0.9s ease forwards;
+  animation: illum 0.45s ease forwards;
   animation-delay: var(--d, 0s);
 }
 @keyframes illum {

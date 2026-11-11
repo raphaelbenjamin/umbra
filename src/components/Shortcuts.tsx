@@ -24,6 +24,7 @@ function groups(arrowSeek: boolean): { title: string; rows: Row[] }[] {
         { keys: [[shift, "←"], [shift, "→"]], label: t("Étendre la sélection", "Extend the selection") },
         { keys: [["1", "2", "3"]], label: t("Mot en apprentissage, niveau 1 à 3", "Word being learned, level 1 to 3") },
         { keys: [["K"], ["4"]], label: t("Mot connu", "Known word") },
+        { keys: [["H"]], label: t("Basculer le flou", "Toggle blur") },
         { keys: [["X"]], label: t("Ignorer le mot", "Ignore the word") },
         { keys: [["0"]], label: t("Remettre le mot à nouveau", "Make the word new again") },
         { keys: [[t("Espace", "Space")]], label: t("Lire ou mettre en pause", "Play or pause") },

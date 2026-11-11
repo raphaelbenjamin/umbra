@@ -24,7 +24,7 @@ import { DisplayMenu } from "./Display";
 import { PlaylistStrip, UpNext, toggleLoop, usePlaylist } from "./PlaylistBar";
 import { AsideTabs, ReaderChat, type AsideTab } from "./ReaderChat";
 import { VideoStage } from "./VideoStage";
-import { knownRuns, type ReaderPart } from "./knownRuns";
+import { blurLiteral, knownRuns, type ReaderPart } from "./knownRuns";
 import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
 
@@ -121,7 +121,7 @@ export function Reader() {
   // « Ajouter à une playlist… » du menu Leçon : la leçon et celles de sa langue
   const [adding, setAdding] = useState<{ lesson: LessonSummary; all: LessonSummary[] } | null>(null);
 
-  const look = readerLook(settings);
+  const look = readerLook(settings, data?.lesson.lang ?? settings.lang);
   const paged = look.layout === "pages";
   // la page tourne avec la lecture ; sinon elle reste où l'on lit pendant que le son continue
   const follow = settings.auto_turn !== "0";
@@ -851,7 +851,7 @@ export function Reader() {
     try {
       if (marks && keys.length) {
         setIllum(true);
-        await sleep(1050);
+        await sleep(525);
         added = await api().termsMarkKnown(lesson.lang, keys, words);
         setTerms((prev) => {
           const next = { ...prev };
@@ -952,6 +952,11 @@ export function Reader() {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey) return;
       if (useApp.getState().importOpen || useMenu.getState().shortcuts || simplify || complete || lookOpen || adding) return;
+      if (e.key.toLowerCase() === "h" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        if (!e.repeat) void setSetting("blur_known_words", settings.blur_known_words === "1" ? "0" : "1");
+        return;
+      }
       if (settings.arrow_seek === "1" && lesson?.media_path && !e.shiftKey && !e.altKey &&
           (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
@@ -1062,7 +1067,7 @@ export function Reader() {
     bump();
     go("library");
   };
-  useLessonMenu(lesson ? { media: !!lesson.media_path, video: !!lesson.video_path, float: floating, loop: pl && !isBook(pl) ? pl.looping : null } : null, {
+  useLessonMenu(lesson ? { lang: lesson.lang, media: !!lesson.media_path, video: !!lesson.video_path, float: floating, loop: pl && !isBook(pl) ? pl.looping : null } : null, {
     toggle: () => playerRef.current?.toggle(),
     skip: (secs) => playerRef.current?.skip(secs),
     prev: () => goPage(page - 1),
@@ -1243,14 +1248,15 @@ export function Reader() {
     if (!t.w) {
       const parts = visible.split(/\n+/);
       if (parts.length > 1) {
-        if (parts[0]) current.push({ node: parts[0] });
+        if (parts[0]) current.push({ node: parts[0], known: blurKnown && blurLiteral(parts[0]) });
         if (current.length) paragraphs.push(<p key={`p${i}`}>{knownRuns(current, blurKnown)}</p>);
         current = [];
         const tail = parts[parts.length - 1];
-        if (tail.trim()) current.push({ node: tail });
+        if (tail.trim()) current.push({ node: tail, known: blurKnown && blurLiteral(tail) });
       } else {
         current.push({
-          space: !inSel && /^\s+$/.test(visible),
+          known: blurKnown && !inSel && blurLiteral(visible),
+          space: blurKnown && !inSel && /^\s+$/.test(visible),
           node: inPhrase || inSel ? (
             <span key={i} className={`${inPhrase ? `ph p${ph!.status}` : ""} ${inSel ? "sel-gap" : ""}`}>
               {visible}
@@ -1271,8 +1277,8 @@ export function Reader() {
     if (i === resumeAt) cls += " resume";
     if (glowKeys.has(t.k)) cls += " known-glow";
     current.push({
-      known: st === 4 && !selected,
-      node: <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.75}s` } as React.CSSProperties) : undefined}>
+      known: blurKnown && !selected && (st === 4 || blurLiteral(visible)),
+      node: <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
         {visible}
       </span>,
     });
@@ -1363,7 +1369,7 @@ export function Reader() {
           className="sweep"
           initial={{ y: -200, opacity: 0 }}
           animate={{ y: (pageRef.current?.offsetHeight ?? 600) + 40, opacity: [0, 1, 1, 0] }}
-          transition={{ duration: 1.05, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.525, ease: [0.4, 0, 0.2, 1] }}
         />
       )}
       {paragraphs}
@@ -1803,6 +1809,14 @@ export function Reader() {
                     </button>
                   )}
                 </div>
+                <button className="btn danger sm" onClick={() => void removeLesson()}>
+                  <Icon name="trash" size={15} />
+                  {lesson.kind === "book"
+                    ? t("Supprimer le chapitre", "Delete chapter")
+                    : lesson.media_path || lesson.video_path
+                      ? t("Supprimer l’épisode", "Delete episode")
+                      : t("Supprimer la leçon", "Delete lesson")}
+                </button>
               </motion.div>
             </motion.div>
           )}

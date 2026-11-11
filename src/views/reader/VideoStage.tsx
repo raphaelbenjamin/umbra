@@ -8,7 +8,7 @@ import { useApp } from "../../lib/store";
 import { displayText, sentenceBounds } from "../../lib/tokenize";
 import type { Lesson, Term, Token } from "../../lib/types";
 import { t } from "../../lib/i18n";
-import { knownRuns, type ReaderPart } from "./knownRuns";
+import { blurLiteral, knownRuns, type ReaderPart } from "./knownRuns";
 
 export type StageSize = "compact" | "large";
 
@@ -75,6 +75,7 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
   const [fetching, setFetching] = useState<number | null>(null);
   const [subTr, setSubTr] = useState("");
   const showTr = settings.video_translate === "1";
+  const blurKnown = settings.blur_known_words === "1";
   const online = onlineState(settings);
   const translationSource = online.words
     ? `${online.provider.id}:${online.model}:${online.ready}`
@@ -393,17 +394,17 @@ export function VideoStage({ lesson, tokens, terms, cursor, playing, onHost, onW
                     {knownRuns(tokens.slice(shown.chunk[0], shown.chunk[1]).map((t, j): ReaderPart => {
                       const i = shown.chunk[0] + j;
                       const text = displayText(t.t, lesson.lang);
-                      if (!t.w) return { node: text, space: /^\s+$/.test(text) };
+                      if (!t.w) return { node: text, known: blurKnown && blurLiteral(text), space: blurKnown && /^\s+$/.test(text) };
                       const st = terms[t.k]?.status ?? 0;
                       return {
-                        known: st === 4,
+                        known: blurKnown && (st === 4 || blurLiteral(text)),
                         node: (
                           <span key={i} data-i={i} className={`sw s${st}`} onClick={() => onWord(i)}>
                             {text}
                           </span>
                         ),
                       };
-                    }), settings.blur_known_words === "1")}
+                    }), blurKnown)}
                   </p>
                 </div>
                 {showTr && subTr && <p className="sub-tr">{subTr}</p>}
