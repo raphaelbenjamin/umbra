@@ -168,6 +168,11 @@ export interface DictResult {
   pending?: boolean;
 }
 
+export interface ChineseAnnotation {
+  pinyin: string;
+  gloss: string;
+}
+
 /** Dictionnaire d'une langue, dans la langue de l'interface. */
 export interface DictStatus {
   /** un dictionnaire existe pour cette langue */

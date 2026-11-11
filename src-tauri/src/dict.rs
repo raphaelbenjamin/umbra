@@ -77,6 +77,12 @@ pub struct DictEntry {
     pub glosses: Vec<String>,
 }
 
+#[derive(Serialize)]
+pub struct ChineseAnnotation {
+    pinyin: String,
+    gloss: String,
+}
+
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct DictResult {
     pub entries: Vec<DictEntry>,
@@ -317,6 +323,23 @@ impl Dicts {
 
     pub fn lookup_in(&self, native: &str, lang: &str, surface: &str) -> Result<DictResult> {
         self.lookup_ctx(native, lang, surface, "")
+    }
+
+    pub fn chinese_annotations(&self, native: &str, words: Vec<String>) -> Result<HashMap<String, ChineseAnnotation>> {
+        self.with_dict(native, "zh", |dict| {
+            let mut annotations = HashMap::new();
+            for word in words {
+                if word.trim().is_empty() || word.len() > 128 || annotations.contains_key(&word) {
+                    continue;
+                }
+                let result = dict.find_with_variants(native, "zh", &word)?;
+                if let Some(entry) = result.entries.into_iter().next() {
+                    let gloss = entry.glosses.into_iter().next().unwrap_or_default();
+                    annotations.insert(word, ChineseAnnotation { pinyin: entry.ipa, gloss });
+                }
+            }
+            Ok(annotations)
+        })
     }
 
     /// Recherche d'un mot. `after`, la suite de la phrase, sert aux langues dont les mots
@@ -1309,6 +1332,10 @@ mod tests {
         let r = d.lookup_in("en", "zh", "學校").unwrap();
         assert_eq!(r.entries[0].glosses[0], "school");
         assert!(r.entries[0].pos.contains("所"), "{r:?}");
+        let annotations = d.chinese_annotations("en", vec!["學校".into(), "學校".into(), "  ".into()]).unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations["學校"].pinyin, "xuéxiào");
+        assert_eq!(annotations["學校"].gloss, "school");
         // lecture la plus courante d'abord
         let r = d.lookup_in("en", "zh", "了").unwrap();
         assert_eq!(r.entries[0].ipa, "le", "{r:?}");

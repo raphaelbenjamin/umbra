@@ -235,6 +235,12 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
           </section>
 
           <section className="look-rows">
+            {lang === "zh" && (
+              <div className="look-row">
+                <span>{t("Mode débutant", "Beginner mode")}</span>
+                <Switch on={settings.chinese_beginner === "1"} onChange={(v) => set("chinese_beginner")(v ? "1" : "0")} label={t("Mode débutant chinois", "Chinese beginner mode")} />
+              </div>
+            )}
             <div className="look-row">
               <span>{t("Interligne", "Line spacing")}</span>
               <Segmented id="pop-lh" value={settings.line_height} onChange={set("line_height")} options={lineHeightOptions()} />

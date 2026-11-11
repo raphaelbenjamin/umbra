@@ -20,6 +20,7 @@ import { chooseCover } from "../../lib/covers";
 import { confirmAsk } from "../../lib/dialogs";
 import { useLessonMenu, useMenu } from "../../lib/menu";
 import { AddToPlaylist } from "../../components/AddToPlaylist";
+import { ChineseWord, useChineseAnnotations } from "./ChineseStudy";
 import { DisplayMenu } from "./Display";
 import { PlaylistStrip, UpNext, toggleLoop, usePlaylist } from "./PlaylistBar";
 import { AsideTabs, ReaderChat, type AsideTab } from "./ReaderChat";
@@ -245,6 +246,8 @@ export function Reader() {
   const pages = fittedOk ? fitted.pages : basePages;
   const pr = pages[page] ?? { start: 0, end: 0, words: 0 };
   const lang = lesson?.lang ?? "en";
+  const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
+  const annotations = useChineseAnnotations(chineseStudy, tokens, pr.start, pr.end);
   const pl = usePlaylist(lesson);
   pageNow.current = page;
 
@@ -368,7 +371,7 @@ export function Reader() {
     const fit = () => {
       // la première page porte le titre de la leçon
       const head = ghostRef.current?.offsetHeight ?? 0;
-      const next = fitPages(box, tokens, { height, first: Math.max(line * 2, height - head), line });
+      const next = fitPages(box, tokens, { height, first: Math.max(line * 2, height - head), line, chineseStudy });
       setFitted((prev) => (prev && prev.tokens === tokens && samePages(prev.pages, next) ? prev : { tokens, pages: next }));
     };
     // très longue leçon (chapitre de livre) déjà composée : le texte change de taille tout de suite,
@@ -379,7 +382,7 @@ export function Reader() {
     }
     fit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick]);
+  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick, chineseStudy]);
 
   // fenêtre, vidéo ou barre latérale qui changent la place du texte ; police arrivée après coup
   useEffect(() => {
@@ -1130,7 +1133,7 @@ export function Reader() {
     if (!el) return;
     const c = container.getBoundingClientRect();
     const r = el.getBoundingClientRect();
-    const fm = readingMarks(el);
+    const fm = chineseStudy ? null : readingMarks(el);
     const padX = 3;
     let target = { x: r.left - c.left - padX, y: r.top - c.top - 1.5, width: r.width + padX * 2, height: r.height + 3 };
     if (fm) {
@@ -1161,7 +1164,7 @@ export function Reader() {
       setLanternOut(0);
     } else setLanternOut(sc ? lanternSide() : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, page, pr.start, pr.end, relayout]);
+  }, [cursor, page, pr.start, pr.end, relayout, chineseStudy]);
 
   /** Mode défilement : la lanterne est-elle au-dessus (-1), en vue (0) ou au-dessous (1) ? */
   function lanternSide() {
@@ -1270,7 +1273,7 @@ export function Reader() {
     }
     const st = statusOf(t.k);
     const selected = range && i >= range.a && i <= range.b;
-    let cls = `w s${st}`;
+    let cls = `w s${st}${chineseStudy ? " zh-study-word" : ""}`;
     if (selected) cls += range!.a === range!.b ? " sel" : ` sel-range${i === range!.a ? " sel-a" : ""}${i === range!.b ? " sel-b" : ""}`;
     if (ph) cls += ` ph p${ph.status}`;
     if (i === cursor) cls += " cur";
@@ -1278,8 +1281,8 @@ export function Reader() {
     if (glowKeys.has(t.k)) cls += " known-glow";
     current.push({
       known: blurKnown && !selected && (st === 4 || blurLiteral(visible)),
-      node: <span key={i} className={cls} data-i={i} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
-        {visible}
+      node: <span key={i} className={cls} data-i={i} title={chineseStudy ? [annotations[t.t]?.pinyin, annotations[t.t]?.gloss].filter(Boolean).join(" · ") || undefined : undefined} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
+        {chineseStudy ? <ChineseWord text={visible} annotation={annotations[t.t]} /> : visible}
       </span>,
     });
   }
@@ -1356,7 +1359,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass}${illum ? " illuminate" : ""}`}
+      className={`page ${markClass}${chineseStudy ? " zh-study" : ""}${illum ? " illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}
@@ -1589,7 +1592,7 @@ export function Reader() {
                 <div className="leaf-ghost" ref={ghostRef} aria-hidden="true" inert>
                   {header}
                 </div>
-                <div className={`page leaf-measure ${markClass}`} ref={measureRef} lang={lang} dir={li.rtl ? "rtl" : undefined} aria-hidden="true" />
+                <div className={`page leaf-measure ${markClass}${chineseStudy ? " zh-study" : ""}`} ref={measureRef} lang={lang} dir={li.rtl ? "rtl" : undefined} aria-hidden="true" />
                 <AnimatePresence mode="wait" initial={false} custom={turn * flip}>
                   <motion.div key={page} className="leaf-page" {...turnProps}>
                     {page === 0 && header}

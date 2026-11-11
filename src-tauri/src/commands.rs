@@ -389,6 +389,18 @@ pub async fn dict_lookup(app: tauri::AppHandle, state: State<'_, AppState>, lang
     state.dicts.lookup_ctx(i18n::native(), &lang, &word, after.as_deref().unwrap_or("")).map_err(err)
 }
 
+#[tauri::command]
+pub async fn chinese_annotations(app: tauri::AppHandle, state: State<'_, AppState>, words: Vec<String>) -> R<Option<HashMap<String, crate::dict::ChineseAnnotation>>> {
+    if words.len() > 256 {
+        return Err("Too many Chinese words in one request".into());
+    }
+    if state.dicts.missing("zh") {
+        fetch_dict(&app, "zh");
+        return Ok(None);
+    }
+    state.dicts.chinese_annotations(i18n::native(), words).map(Some).map_err(err)
+}
+
 // ---------- IA (sur ce Mac ou en ligne) ----------
 
 fn active_model(state: &AppState, kind: &str) -> R<&'static models::ModelInfo> {

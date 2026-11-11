@@ -704,6 +704,15 @@ function ReadingPane() {
       <LookPreview />
       <Section title={t("La page", "The page")}>
         <div className="set-card">
+          {lang === "zh" && (
+            <div className="set-row">
+              <div className="grow">
+                <strong>{t("Mode débutant chinois", "Chinese beginner mode")}</strong>
+                <span>{t("Grands caractères espacés par mot, avec pinyin et traduction.", "Large characters grouped by word, with pinyin and a short meaning.")}</span>
+              </div>
+              <Switch on={settings.chinese_beginner === "1"} onChange={(v) => setSetting("chinese_beginner", v ? "1" : "0")} label={t("Mode débutant chinois", "Chinese beginner mode")} />
+            </div>
+          )}
           <div className="set-row set-stack">
             <div className="grow">
               <strong>{t("Mise en page", "Layout")}</strong>

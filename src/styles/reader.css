@@ -2091,3 +2091,38 @@ span.player-voice .icon-btn {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* Chinese beginner view: annotation rows share the width of their word. */
+.page.zh-study {
+  line-height: 1.3;
+}
+.page .zh-study-word {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  min-inline-size: 1.4em;
+  max-inline-size: 100%;
+  margin: 0.09em 0.15em 0.17em;
+  padding: 0.55em 0.06em 0.59em;
+  text-align: center;
+  font-size: 1.56em;
+  line-height: 1.04;
+  border-radius: 0.16em;
+}
+.zh-study-hanzi {
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.zh-study-pinyin,
+.zh-study-gloss {
+  position: absolute;
+  inset-inline: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 550 0.36em/1.15 var(--font-ui);
+  color: var(--muted);
+}
+.zh-study-pinyin { top: 0.19em; }
+.zh-study-gloss { bottom: 0.2em; }

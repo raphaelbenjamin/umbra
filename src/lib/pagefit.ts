@@ -25,20 +25,23 @@ export interface FitOptions {
   first: number;
   /** hauteur d'une ligne, en pixels */
   line: number;
+  chineseStudy?: boolean;
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c]);
 
 /** Même découpage en paragraphes que le rendu du lecteur (Reader.tsx). */
-function compose(tokens: Token[], a: number, b: number, lang: string): string {
+function compose(tokens: Token[], a: number, b: number, lang: string, chineseStudy: boolean): string {
   let html = "";
   let p = "";
   for (let i = a; i < b; i++) {
     const tk = tokens[i];
     const visible = displayText(tk.t, lang);
     if (tk.w) {
-      p += `<span class="w" data-k="${i}">${esc(visible)}</span>`;
+      p += chineseStudy
+        ? `<span class="w zh-study-word" data-k="${i}"><span class="zh-study-hanzi">${esc(visible)}</span></span>`
+        : `<span class="w" data-k="${i}">${esc(visible)}</span>`;
       continue;
     }
     const parts = visible.split(/\n+/);
@@ -72,7 +75,7 @@ export function fitPages(box: HTMLElement, tokens: Token[], opts: FitOptions): P
     // le morceau composé doit dépasser la page : sinon on l'agrandit
     for (;;) {
       const stop = Math.min(n, start + chunk);
-      end = fitOne(box, tokens, start, stop, height, opts.line);
+      end = fitOne(box, tokens, start, stop, height, opts.line, !!opts.chineseStudy);
       if (end >= 0) break;
       chunk *= 2;
     }
@@ -98,15 +101,15 @@ export function fitPages(box: HTMLElement, tokens: Token[], opts: FitOptions): P
  * Fin (exclusive) de la page qui commence à `start`, composée sur [start, stop).
  * -1 : tout le morceau tient mais la leçon continue (morceau trop court).
  */
-function fitOne(box: HTMLElement, tokens: Token[], start: number, stop: number, height: number, line: number): number {
-  box.innerHTML = compose(tokens, start, stop, box.lang);
+function fitOne(box: HTMLElement, tokens: Token[], start: number, stop: number, height: number, line: number, chineseStudy: boolean): number {
+  box.innerHTML = compose(tokens, start, stop, box.lang, chineseStudy);
   const spans = box.querySelectorAll<HTMLElement>("[data-k]");
   if (!spans.length) return stop;
   const top = box.getBoundingClientRect().top;
   // bas de la ligne d'un mot : le milieu de son texte est celui de la ligne
   const bottom = (el: HTMLElement) => {
     const r = el.getBoundingClientRect();
-    return (r.top + r.bottom) / 2 - top + line / 2;
+    return (chineseStudy ? r.bottom : (r.top + r.bottom) / 2 + line / 2) - top;
   };
   const fits = (k: number) => bottom(spans[k]) <= height + 0.5;
 

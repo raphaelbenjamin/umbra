@@ -826,6 +826,16 @@ export function createMockApi(): Api {
       if (!d) return { entries: [] };
       return { entries: [{ word: normalize(word), pos: t(d[0], d[3]), ipa: d[1], glosses: [t(d[2], d[4])] }] };
     },
+    async chineseAnnotations(words) {
+      const sample: Record<string, { pinyin: string; gloss: string }> = {
+        今天: { pinyin: "jīntiān", gloss: t("aujourd’hui", "today") },
+        的: { pinyin: "de", gloss: t("de", "of") },
+        天气: { pinyin: "tiānqì", gloss: t("météo", "weather") },
+        真: { pinyin: "zhēn", gloss: t("vraiment", "really") },
+        好: { pinyin: "hǎo", gloss: t("bon", "good") },
+      };
+      return Object.fromEntries(words.filter(word => Object.hasOwn(sample, word)).map(word => [word, sample[word]]));
+    },
     async dictStatus(lang) {
       const st = dictState(lang);
       if (st.exists && !st.ready) {

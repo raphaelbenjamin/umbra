@@ -133,6 +133,7 @@ pub fn run() {
             commands::activity_add,
             commands::export_vocab,
             commands::dict_lookup,
+            commands::chinese_annotations,
             commands::dict_status,
             commands::ai_word,
             commands::ai_sentence,
