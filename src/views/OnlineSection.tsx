@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Icon, type IconName } from "../components/Icon";
-import { Orb, Sheet, Switch } from "../components/ui";
+import { Icon } from "../components/Icon";
+import { Orb, Sheet } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { openSource } from "../lib/discover";
 import { t } from "../lib/i18n";
@@ -16,54 +16,6 @@ import type { OnlineCheck } from "../lib/types";
 
 const TILE = { type: "spring", stiffness: 520, damping: 40 } as const;
 const enter = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 6 }, transition: { type: "spring" as const, stiffness: 320, damping: 30 } };
-
-/** Sur ce Mac (par défaut) ou en ligne : deux tuiles comme celles de la puissance. */
-export function EnginePicker() {
-  const on = useApp((s) => s.settings.online_on === "1");
-  const setSetting = useApp((s) => s.setSetting);
-  const pick = (online: boolean) => {
-    if (online === on) return;
-    void setSetting("online_on", online ? "1" : "");
-    // retour sur ce Mac : le modèle se charge d'avance
-    if (!online) void api().aiWarmup().catch(() => {});
-  };
-  const opts: { online: boolean; icon: IconName; name: string; desc: string; tag: string }[] = [
-    {
-      online: false,
-      icon: "laptop",
-      name: t("Sur ce Mac", "On this Mac"),
-      desc: t(
-        "Hors ligne, gratuit et privé : rien ne quitte votre Mac. Qwen3.5, à la puissance choisie plus bas.",
-        "Offline, free and private: nothing leaves your Mac. Qwen3.5, at the power chosen below.",
-      ),
-      tag: t("Par défaut", "Default"),
-    },
-    {
-      online: true,
-      icon: "cloud",
-      name: t("En ligne", "Online"),
-      desc: t(
-        "Des modèles bien plus grands, plus fins, rapides même sur un petit Mac. Avec votre propre clé, chez le fournisseur de votre choix.",
-        "Much bigger, finer models, fast even on a small Mac. With your own key, at the provider of your choice.",
-      ),
-      tag: t("Facultatif", "Optional"),
-    },
-  ];
-  return (
-    <div className="profile-grid engine-grid" role="radiogroup" aria-label={t("Où travaille l'IA", "Where the AI works")}>
-      {opts.map((o) => (
-        <button key={o.icon} role="radio" aria-checked={o.online === on} className={`profile engine ${o.online === on ? "on" : ""}`} onClick={() => pick(o.online)}>
-          <span className="engine-icon">
-            <Icon name={o.icon} size={18} />
-          </span>
-          <strong>{o.name}</strong>
-          <span>{o.desc}</span>
-          <span className="size">{o.tag}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /** Liste des modèles gardée à la dernière vérification (réglage `online_models_<id>`). */
 function savedModels(raw: string | undefined): string[] {
@@ -262,12 +214,11 @@ function OnlineKey({ provider: p }: { provider: OnlineProvider }) {
 }
 
 /** Sign in with ChatGPT : connexion dans le navigateur, forfait, modèle, rythme des demandes. */
-function ChatGptAccount() {
+function ChatGptAccount({ explain, words, chat }: { explain: boolean; words: boolean; chat: boolean }) {
   const { status, set } = useChatGpt();
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const model = settings.online_model_chatgpt ?? "";
-  const chatModel = settings.online_model_chatgpt_chat ?? "";
   const models = savedModels(settings.online_models_chatgpt);
   const [busy, setBusy] = useState<"in" | "out" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -275,18 +226,14 @@ function ChatGptAccount() {
   const [welcome, setWelcome] = useState(false);
   const ready = !!status?.signed_in && status.plan && !status.expired;
 
-  const check = async (wanted = model, role: "translation" | "chat" = "translation") => {
+  const check = async () => {
     setBusy("check");
     setError(null);
     setDone(null);
     try {
-      const r = await api().onlineCheck("chatgpt", "", undefined, wanted || undefined);
+      const r = await api().onlineCheck("chatgpt", "", undefined, model || undefined);
       void setSetting("online_models_chatgpt", JSON.stringify(r.models));
-      if (role === "chat" && r.model !== wanted) {
-        setError(t("Ce modèle n’est plus disponible pour ce compte.", "This model is no longer available to this account."));
-        return;
-      }
-      await setSetting(role === "chat" ? "online_model_chatgpt_chat" : "online_model_chatgpt", r.model);
+      await setSetting("online_model_chatgpt", r.model);
       setDone(r);
     } catch (e) {
       setError(errorText(e));
@@ -334,8 +281,11 @@ function ChatGptAccount() {
     }
   };
 
-  const options = model && !models.includes(model) ? [model, ...models] : models;
-  const chatOptions = chatModel && !models.includes(chatModel) ? [chatModel, ...models] : models;
+  const modelFields = [
+    { enabled: explain, key: "online_model_chatgpt_explain", label: t("Modèle pour Expliquer", "Explain model") },
+    { enabled: words, key: "online_model_chatgpt", label: t("Modèle de traduction", "Translation model") },
+    { enabled: chat, key: "online_model_chatgpt_chat", label: t("Modèle pour Chat et Simplifier", "Chat and Simplify model") },
+  ];
   const manage = (e: React.MouseEvent) => {
     e.preventDefault();
     void openSource(status?.manage_url || "https://chatgpt.com/#settings/Usage");
@@ -367,7 +317,7 @@ function ChatGptAccount() {
           <span className="grow">
             <strong>{status.email || t("Compte ChatGPT", "ChatGPT account")}</strong>
             {/* deux lignes (`.set-row .grow`) : le compte, puis ce qu'il permet */}
-            <span className="muted">{status.plan ? t("Votre forfait sert à Lumen", "Your plan powers Lumen") : t("Forfait non accordé", "Plan not granted")}</span>
+            <span className="muted">{status.plan ? t("Forfait connecté", "Plan connected") : t("Forfait non accordé", "Plan not granted")}</span>
           </span>
           <button className="btn sm ghost" disabled={!!busy} onClick={() => void signOut()}>
             {t("Se déconnecter", "Sign out")}
@@ -385,7 +335,7 @@ function ChatGptAccount() {
         {busy === "check" && (
           <motion.div key="check" className="key-note" {...enter}>
             <Orb size={16} />
-            <span>{t("Lumen pose une petite question à ChatGPT…", "Lumen is asking ChatGPT a little question…")}</span>
+            <span>{t("Umbra pose une petite question à ChatGPT…", "Umbra is asking ChatGPT a little question…")}</span>
           </motion.div>
         )}
         {error && (
@@ -402,42 +352,41 @@ function ChatGptAccount() {
             <span>{t(`Prêt. ${done.model} a répondu en ${latency(done.ms)}.`, `Ready. ${done.model} answered in ${latency(done.ms)}.`)}</span>
           </motion.div>
         )}
-        {ready && status?.paused_minutes != null && (
+        {ready && words && status?.paused_minutes != null && (
           <motion.div key="pause" className="key-note error" {...enter}>
             <Icon name="clock" size={15} />
             <span>
               {t(
-                `Limite de votre forfait atteinte : Lumen traduit avec l'IA de ce Mac pendant encore ${status.paused_minutes} min.`,
-                `Your plan's limit is reached: Lumen translates with this Mac's AI for ${status.paused_minutes} more min.`,
+                `Traduction ChatGPT en pause pendant encore ${status.paused_minutes} min.`,
+                `ChatGPT translation is paused for ${status.paused_minutes} more min.`,
               )}
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {ready && options.length > 0 && (
-        <>
-          <label className="online-model">
-            <span>{t("Traduction rapide", "Quick translation")}</span>
-            <select className="select" value={model} onChange={(e) => void check(e.target.value)} disabled={!!busy}>
+      {ready && modelFields.filter((field) => field.enabled).map(({ key, label }) => {
+        const value = settings[key] ?? "";
+        const options = [...new Set([...models, value, model].filter(Boolean))];
+        return (
+          <label className="online-model" key={key}>
+            <span>{label}</span>
+            <select className="select" value={value} disabled={!!busy} onChange={(e) => void setSetting(key, e.target.value)}>
+              {key !== "online_model_chatgpt" && (
+                <option value="">{model ? t(`Par défaut (${model})`, `Default (${model})`) : t("Modèle par défaut", "Default model")}</option>
+              )}
+              {!model && key === "online_model_chatgpt" && <option value="" disabled>{t("Choisir un modèle", "Choose a model")}</option>}
               {options.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </label>
-          <label className="online-model">
-            <span>{t("Chat et Simplifier", "Chat and Simplify")}</span>
-            <select className="select" value={chatModel} disabled={!!busy} onChange={(e) => {
-              if (e.target.value) void check(e.target.value, "chat");
-              else {
-                setError(null);
-                setDone(null);
-                void setSetting("online_model_chatgpt_chat", "");
-              }
-            }}>
-              <option value="">{t("Même modèle que la traduction", "Same as translation")}</option>
-              {chatOptions.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </label>
-        </>
+        );
+      })}
+      {ready && modelFields.some((field) => field.enabled) && (
+        <div className="key-row">
+          <button className="btn sm ghost" disabled={!!busy} onClick={() => void check()}>
+            {t("Actualiser les modèles", "Refresh models")}
+          </button>
+        </div>
       )}
 
       <span className="import-hint">
@@ -451,12 +400,7 @@ function ChatGptAccount() {
             <a className="link" href={status.manage_url} onClick={manage}>
               {t("Gérer l'utilisation", "Manage usage")} <Icon name="external" size={12} stroke={2} />
             </a>
-            {t(" : ce que Lumen consomme, et la limite que vous lui laissez. ", ": what Lumen uses, and the limit you allow it. ")}
           </>
-        )}
-        {t(
-          "Choisissez un modèle rapide pour les mots et les phrases. Une traduction déjà en cache s’affiche immédiatement. Jusqu’à 30 nouvelles traductions par minute.",
-          "Choose a fast model for words and sentences. Cached translations appear immediately. Up to 30 new translations per minute.",
         )}
       </span>
 
@@ -485,8 +429,8 @@ function ChatGptAccount() {
         >
           <p>
             {t(
-              "Le sens des mots, la traduction des phrases et le chat de Lumen puisent désormais dans votre forfait ChatGPT, comme Codex. Vous pouvez suivre et limiter ce que Lumen utilise dans ChatGPT, Réglages › Utilisation.",
-              "Word meanings, sentence translation and Lumen's chat now draw on your ChatGPT plan, like Codex. You can follow and limit what Lumen uses in ChatGPT, Settings › Usage.",
+              "Les fonctions configurées pour ChatGPT utilisent votre forfait. Vous pouvez suivre l’utilisation depuis ChatGPT.",
+              "Features set to ChatGPT use your plan. You can track usage in ChatGPT.",
             )}{" "}
             <a className="link" href={status?.manage_url} onClick={manage}>
               {t("Gérer l'utilisation", "Manage usage")}
@@ -499,111 +443,123 @@ function ChatGptAccount() {
   );
 }
 
-/** L'IA en ligne : fournisseur, clé et modèle, ce qu'elle prend en charge, ce qui part en ligne. */
 export function OnlineSection() {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const st = useOnline();
   const p = st.provider;
+  const chatgptProvider = st.on && p.id === "chatgpt";
+  const showAccount = st.explain || chatgptProvider || !!settings.online_key_chatgpt;
   const saved = p.id === "custom" ? !!settings.online_url?.trim() : !!settings[p.keySetting]?.trim();
+  const local = t("Modèle local", "Local model");
+  const provider = t(`Fournisseur · ${p.name}`, `Provider · ${p.name}`);
+  const roles = [
+    {
+      key: "online_translation_engine",
+      title: t("Traduction instantanée", "Instant AI translation"),
+      description: t("Sens des mots et traduction des phrases pendant la lecture.", "Word meanings and sentence translations as you read."),
+      value: st.words ? "provider" : "local",
+      remote: "provider",
+      label: provider,
+    },
+    {
+      key: "online_explain_engine",
+      title: t("Expliquer", "Explain"),
+      description: t("Explication, analyse et exemples à la demande dans le panneau de lecture.", "On-demand tutor breakdowns and examples in the reader."),
+      value: st.explain ? "chatgpt" : "local",
+      remote: "chatgpt",
+      label: "ChatGPT",
+    },
+    {
+      key: "online_chat_engine",
+      title: t("Chat et Simplifier", "Chat and Simplify"),
+      description: t("Conversations et réécriture des leçons.", "Conversations and lesson rewrites."),
+      value: st.chat ? "provider" : "local",
+      remote: "provider",
+      label: provider,
+    },
+  ];
 
   return (
     <>
       <section className="set-section">
-        <h3>{t("Fournisseur", "Provider")}</h3>
-        <p>{t("Là où partent vos demandes. Chacun a sa clé, gardée sur ce Mac.", "Where your requests go. Each one has its own key, kept on this Mac.")}</p>
-        <div className="places online-places" role="radiogroup" aria-label={t("Fournisseur", "Provider")}>
-          {onlineProviders().map((x) => {
-            const on = x.id === p.id;
-            const has = x.id === "custom" ? !!settings.online_url?.trim() : !!settings[x.keySetting]?.trim();
-            return (
-              <button key={x.id} role="radio" aria-checked={on} className={`place ${on ? "on" : ""}`} onClick={() => void setSetting("online_provider", x.id)} title={x.name}>
-                {on && <motion.span layoutId="online-provider" className="look-ring" transition={TILE} />}
-                <span className={`place-glyph ${x.mark ? "mono" : ""}`}>{x.mark || <Icon name="link" size={18} />}</span>
-                <strong>{x.name}</strong>
-                <span className="place-note">
-                  {has ? (x.id === "custom" ? t("Adresse enregistrée", "Address saved") : x.id === "chatgpt" ? t("Connecté", "Connected") : t("Clé enregistrée", "Key saved")) : x.note}
-                </span>
-              </button>
-            );
-          })}
+        <h3>{t("Modèle par fonction", "AI by feature")}</h3>
+        <div className="set-card">
+          {roles.map(({ key, title, description, value, remote, label }) => (
+            <label className="set-row ai-route" key={key}>
+              <span className="grow">
+                <strong>{title}</strong>
+                <span>{description}</span>
+              </span>
+              <select className="select" value={value} onChange={(e) => void setSetting(key, e.target.value)}>
+                <option value="local">{local}</option>
+                <option value={remote}>{label}</option>
+              </select>
+            </label>
+          ))}
         </div>
       </section>
 
-      <section className="set-section">
-        <div className="set-card">
-          <div className="set-row">
-            <div className="grow">
-              <strong>{p.name}</strong>
-              <span>{p.about}</span>
+      {showAccount && (
+        <section className="set-section">
+          <h3>{t("Compte ChatGPT", "ChatGPT account")}</h3>
+          {st.explain && (
+            <p>{t(
+              "Quand vous cliquez sur Expliquer, ChatGPT reçoit la sélection et sa phrase de contexte.",
+              "When you click Explain, ChatGPT receives the selection and its surrounding sentence.",
+            )}</p>
+          )}
+          <div className="set-card">
+            <div className="set-row">
+              <ChatGptAccount explain={st.explain} words={chatgptProvider && st.words} chat={chatgptProvider && st.chat} />
             </div>
-            {saved && p.id !== "gemini" && p.id !== "chatgpt" && (
-              <button
-                className="btn sm ghost"
-                onClick={() => {
-                  void setSetting(p.keySetting, "");
-                  if (p.id === "custom") void setSetting("online_url", "");
-                }}
-              >
-                {p.id === "custom" ? t("Oublier ce serveur", "Forget this server") : t("Retirer la clé", "Remove the key")}
-              </button>
-            )}
           </div>
-          <div className="set-row">
-            {/* une clé par fournisseur : le champ repart de la sienne ; ChatGPT, lui, se connecte */}
-            {p.id === "chatgpt" ? <ChatGptAccount /> : <OnlineKey key={p.id} provider={p} />}
-          </div>
-          <div className="set-row">
-            <div className="grow">
-              <strong>{t("Sens des mots et traduction des phrases", "Word meanings and sentence translation")}</strong>
-              <span>
-                {st.words
-                  ? t("En ligne dans les leçons et les sous-titres. Le modèle de ce Mac sert de secours s’il est installé.", "Online in lessons and subtitles. Umbra falls back to the model on this Mac if it’s installed.")
-                  : t("Sur ce Mac. Le dictionnaire fonctionne hors ligne et les traductions en contexte utilisent le modèle local.", "On this Mac. The dictionary works offline, and contextual translations use the local model.")}
-              </span>
-            </div>
-            <Switch on={st.words} onChange={(v) => void setSetting("online_words", v ? "1" : "0")} label={t("Traduction en ligne", "Online translation")} />
-          </div>
-          <div className="set-row">
-            <div className="grow">
-              <strong>{t("Chat et Simplifier", "Chat and Simplify")}</strong>
-              <span>
-                {st.chat
-                  ? t("Utilise le modèle en ligne choisi et nécessite une connexion.", "Uses your selected online model and requires a connection.")
-                  : t("Utilise le modèle installé sur ce Mac.", "Uses the model installed on this Mac.")}
-              </span>
-            </div>
-            <Switch on={st.chat} onChange={(v) => void setSetting("online_chat", v ? "1" : "0")} label={t("Chat en ligne", "Online chat")} />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="set-section">
-        <div className="set-card">
-          <div className="set-row">
-            <div className="grow">
-              <strong>{t("Ce qui part en ligne", "What goes online")}</strong>
-              <span>
-                {t(
-                  "Le mot touché et sa phrase, le texte à simplifier, vos questions au chat avec la leçon jointe. Votre profil, votre vocabulaire et votre progression restent sur ce Mac. Chaque traduction est gardée : un mot déjà traduit ne repart pas. La transcription et la voix restent toujours sur ce Mac.",
-                  "The tapped word and its sentence, the text to simplify, your chat questions with the attached lesson. Your profile, vocabulary and progress stay on this Mac. Every translation is kept: a word already translated isn't sent again. Transcription and the voice always stay on this Mac.",
-                )}
-              </span>
-            </div>
+      {st.on && (
+        <section className="set-section">
+          <h3>{t("Fournisseur en ligne", "Online provider")}</h3>
+          <p>{t("Utilisé par la traduction ou le chat lorsque vous choisissez Fournisseur.", "Used for translation or chat when you select Provider.")}</p>
+          <div className="places online-places" role="radiogroup" aria-label={t("Fournisseur en ligne", "Online provider")}>
+            {onlineProviders().map((x) => {
+              const on = x.id === p.id;
+              const has = x.id === "custom" ? !!settings.online_url?.trim() : !!settings[x.keySetting]?.trim();
+              return (
+                <button key={x.id} role="radio" aria-checked={on} className={`place ${on ? "on" : ""}`} onClick={() => void setSetting("online_provider", x.id)} title={x.name}>
+                  {on && <motion.span layoutId="online-provider" className="look-ring" transition={TILE} />}
+                  <span className={`place-glyph ${x.mark ? "mono" : ""}`}>{x.mark || <Icon name="link" size={18} />}</span>
+                  <strong>{x.name}</strong>
+                  <span className="place-note">
+                    {has ? (x.id === "custom" ? t("Adresse enregistrée", "Address saved") : x.id === "chatgpt" ? t("Connecté", "Connected") : t("Clé enregistrée", "Key saved")) : x.note}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <div className="set-row">
-            <div className="grow">
-              <strong>{t("Et mon abonnement ChatGPT, Claude ou Gemini ?", "What about my ChatGPT, Claude or Gemini subscription?")}</strong>
-              <span>
-                {t(
-                  "ChatGPT Plus ou Pro : choisissez la tuile ChatGPT et connectez-vous, OpenAI permet aux applications open source comme Lumen d'utiliser votre forfait. Claude Pro et Google AI Pro, en revanche, ne servent que dans les applications de leur éditeur : Anthropic et Google suspendent les comptes qui les utilisent ailleurs. Il faut alors une clé, payée à l'usage, ou une clé gratuite : Gemini ou NVIDIA.",
-                  "ChatGPT Plus or Pro: pick the ChatGPT tile and sign in, OpenAI lets open-source apps like Lumen use your plan. Claude Pro and Google AI Pro, however, only work in their maker's own apps: Anthropic and Google suspend accounts that use them elsewhere. Then you need a key, paid as you go, or a free key: Gemini or NVIDIA.",
+          {!chatgptProvider && (
+            <div className="set-card">
+              <div className="set-row">
+                <div className="grow">
+                  <strong>{p.name}</strong>
+                  <span>{p.about}</span>
+                </div>
+                {saved && p.id !== "gemini" && (
+                  <button className="btn sm ghost" onClick={() => {
+                    void setSetting(p.keySetting, "");
+                    if (p.id === "custom") void setSetting("online_url", "");
+                  }}>
+                    {p.id === "custom" ? t("Oublier ce serveur", "Forget this server") : t("Retirer la clé", "Remove the key")}
+                  </button>
                 )}
-              </span>
+              </div>
+              <div className="set-row">
+                <OnlineKey key={p.id} provider={p} />
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
+          )}
+        </section>
+      )}
     </>
   );
 }

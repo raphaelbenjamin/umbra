@@ -182,20 +182,25 @@ export interface OnlineState {
   words: boolean;
   /** chat et Simplifier en ligne */
   chat: boolean;
+  /** Le bouton Expliquer utilise le compte ChatGPT. */
+  explain: boolean;
   model: string;
 }
 
 /** Ce qui part en ligne, d'après les réglages (miroir de `online::config_from`). */
 export function onlineState(s: Record<string, string>): OnlineState {
-  const on = s.online_on === "1";
+  const legacyOnline = s.online_on === "1";
+  const words = s.online_translation_engine ? s.online_translation_engine === "provider" : legacyOnline && s.online_words !== "0";
+  const chat = s.online_chat_engine ? s.online_chat_engine === "provider" : legacyOnline && s.online_chat !== "0";
   const provider = onlineProvider(s.online_provider);
   const ready = provider.id === "custom" ? !!s.online_url?.trim() : !!s[provider.keySetting]?.trim();
   return {
-    on,
+    on: words || chat,
     provider,
     ready,
-    words: on && s.online_words !== "0",
-    chat: on && s.online_chat !== "0",
+    words,
+    chat,
+    explain: s.online_explain_engine === "chatgpt",
     model: s[`online_model_${provider.id}`] ?? "",
   };
 }

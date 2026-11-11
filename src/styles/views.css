@@ -3489,27 +3489,9 @@
 
 /* ---------- IA en ligne (OnlineSection.tsx) ---------- */
 
-.profile-grid.engine-grid {
-  grid-template-columns: repeat(2, 1fr);
-}
-.engine-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: var(--chip);
-  color: var(--muted);
-  transition: background-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
-}
-.profile.on .engine-icon {
-  background: var(--light-veil);
-  color: var(--light-strong);
-  box-shadow: 0 0 14px var(--light-veil);
-}
-/* le bloc se déplie sous le choix : rien ne dépasse pendant l'animation */
-.online-block {
-  overflow: hidden;
+.set-row.ai-route .select {
+  width: 12rem;
+  min-width: 0;
 }
 .online-places {
   margin-top: 2px;
@@ -3552,9 +3534,16 @@
   max-width: 360px;
   padding: 7px 10px;
 }
-@container settings (max-width: 640px) {
-  .profile-grid.engine-grid {
-    grid-template-columns: 1fr;
+@container settings (max-width: 480px) {
+  .set-row.ai-route,
+  .chatgpt-account .online-model {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .set-row.ai-route .select,
+  .chatgpt-account .online-model .select {
+    width: 100%;
   }
 }
 

@@ -103,6 +103,7 @@ pub enum Role {
     Words,
     /// chat et Simplifier
     Chat,
+    Explain,
 }
 
 /// Un fournisseur prêt à répondre.
@@ -146,17 +147,7 @@ fn host_of(url: &str) -> String {
 /// reste sur ce Mac ; une erreur si elle est choisie mais incomplète.
 pub fn config_from(get: impl Fn(&str) -> Option<String>, role: Role) -> Option<Result<Config, String>> {
     let set = |k: &str| get(k).map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
-    if set("online_on").as_deref() != Some("1") {
-        return None;
-    }
-    let flag = match role {
-        Role::Words => "online_words",
-        Role::Chat => "online_chat",
-    };
-    if set(flag).as_deref() == Some("0") {
-        return None;
-    }
-    let p = set("online_provider").and_then(|id| find(&id)).unwrap_or(&PROVIDERS[0]);
+    let p = provider_for(&set, role)?;
     let custom = p.dialect == Dialect::Other;
     // ChatGPT : pas de clé, la connexion au compte
     if p.dialect == Dialect::ChatGpt && !crate::chatgpt::signed_in() {
@@ -189,10 +180,33 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, role: Role) -> Option<R
     Some(Ok(Config { provider: p, name, base, key, model }))
 }
 
+fn provider_for(setting: impl Fn(&str) -> Option<String>, role: Role) -> Option<&'static Provider> {
+    if role == Role::Explain {
+        return setting("online_explain_engine").filter(|engine| engine == "chatgpt").and_then(|id| find(&id));
+    }
+    let (engine, legacy_flag) = match role {
+        Role::Words => ("online_translation_engine", "online_words"),
+        Role::Chat => ("online_chat_engine", "online_chat"),
+        Role::Explain => unreachable!(),
+    };
+    let online = match setting(engine).as_deref() {
+        Some(value) => value == "provider",
+        None => setting("online_on").as_deref() == Some("1") && setting(legacy_flag).as_deref() != Some("0"),
+    };
+    online.then(|| setting("online_provider").and_then(|id| find(&id)).unwrap_or(&PROVIDERS[0]))
+}
+
 fn model_for(p: &Provider, role: Role, setting: impl Fn(&str) -> Option<String>) -> String {
-    if p.dialect == Dialect::ChatGpt && role == Role::Chat {
-        if let Some(model) = setting("online_model_chatgpt_chat") {
-            return model;
+    if p.dialect == Dialect::ChatGpt {
+        if role == Role::Explain {
+            if let Some(model) = setting("online_model_chatgpt_explain") {
+                return model;
+            }
+        }
+        if role == Role::Chat {
+            if let Some(model) = setting("online_model_chatgpt_chat") {
+                return model;
+            }
         }
     }
     setting(&format!("online_model_{}", p.id)).unwrap_or_else(|| p.fallback.to_string())
@@ -913,6 +927,24 @@ mod tests {
     }
 
     #[test]
+    fn explain_can_use_chatgpt_while_translation_stays_local() {
+        let settings = |key: &str| match key {
+            "online_on" | "online_words" => Some("1".into()),
+            "online_provider" => Some("deepseek".into()),
+            "online_translation_engine" => Some("local".into()),
+            "online_explain_engine" => Some("chatgpt".into()),
+            _ => None,
+        };
+        assert!(provider_for(settings, Role::Words).is_none());
+        assert_eq!(provider_for(settings, Role::Chat).unwrap().id, "deepseek");
+        assert_eq!(provider_for(settings, Role::Explain).unwrap().id, "chatgpt");
+        let explain_only = |key: &str| (key == "online_explain_engine").then(|| "chatgpt".into());
+        assert!(provider_for(explain_only, Role::Words).is_none());
+        assert!(provider_for(explain_only, Role::Chat).is_none());
+        assert_eq!(provider_for(explain_only, Role::Explain).unwrap().id, "chatgpt");
+    }
+
+    #[test]
     fn chatgpt_model_selection_preserves_the_existing_translation_model() {
         let chatgpt = find("chatgpt").unwrap();
         let old = |key: &str| (key == "online_model_chatgpt").then(|| "quick".into());
@@ -922,10 +954,12 @@ mod tests {
         let split = |key: &str| match key {
             "online_model_chatgpt" => Some("quick".into()),
             "online_model_chatgpt_chat" => Some("detailed".into()),
+            "online_model_chatgpt_explain" => Some("tutor".into()),
             _ => None,
         };
         assert_eq!(model_for(chatgpt, Role::Words, split), "quick");
         assert_eq!(model_for(chatgpt, Role::Chat, split), "detailed");
+        assert_eq!(model_for(chatgpt, Role::Explain, split), "tutor");
     }
 
     #[test]

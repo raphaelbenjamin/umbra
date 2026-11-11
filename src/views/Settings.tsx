@@ -27,7 +27,7 @@ import type { GpuInfo, LangCode, ModelRow } from "../lib/types";
 import { BackupSection } from "./BackupSection";
 import { StorageSection } from "./StorageSection";
 import { LingqSection } from "./LingqSection";
-import { EnginePicker, OnlineSection } from "./OnlineSection";
+import { OnlineSection } from "./OnlineSection";
 import { useOnline } from "../lib/online";
 import { PodcastSection } from "./PodcastSection";
 import { ProfileSection } from "./ProfileSection";
@@ -145,9 +145,9 @@ const groups = (): { title: string | null; tabs: Tab[] }[] => [
         label: t("IA", "AI"),
         lead: t(
           "Sur ce Mac, les modèles sont téléchargés une seule fois puis fonctionnent hors ligne. Si vous le souhaitez, une IA en ligne peut prendre le relais pour la traduction et le chat, avec votre clé.",
-          "On this Mac, the models are downloaded once, then work offline. If you wish, an online AI can take over translation and the chat, with your key.",
+          "Choose a model for instant translation, Explain, and Chat and Simplify.",
         ),
-        keys: "ia locale modele modeles qwen whisper asr transcription traduction chat profil leger equilibre maximum telecharger en ligne api cle fournisseur deepseek gemini nvidia nemotron gratuit mistral openai chatgpt claude anthropic openrouter ollama lm studio serveur abonnement carte graphique gpu vulkan processeur nvidia geforce amd radeon intel local ai model models translation profile light balanced download online key provider free server subscription graphics card processor",
+        keys: "ia locale modele modeles qwen whisper asr transcription traduction chat expliquer explain tutor profil leger equilibre maximum telecharger en ligne api cle fournisseur deepseek gemini nvidia nemotron gratuit mistral openai chatgpt claude anthropic openrouter ollama lm studio serveur abonnement carte graphique gpu vulkan processeur nvidia geforce amd radeon intel local ai model models translation profile light balanced download online key provider free server subscription graphics card processor",
       },
       {
         id: "videos",
@@ -235,10 +235,11 @@ function useBadges(): Partial<Record<SettingsTab, "busy" | "warn" | "light">> {
   const backupError = useBackup((s) => !!s.status?.enabled && !!s.status.error && !s.status.running);
   const lingq = useLingq((s) => s.phase === "importing");
   const online = useOnline();
+  const chatgptReady = useApp((s) => !!s.settings.online_key_chatgpt);
   // rien pour traduire ni converser : ni modèle sur ce Mac, ni IA en ligne prête pour les deux
   const noLlm = models.length > 0 && !models.some((m) => m.kind === "llm" && m.installed) && !(online.ready && online.words && online.chat);
   return {
-    ai: downloading ? "busy" : noLlm || (online.on && !online.ready) ? "warn" : undefined,
+    ai: downloading ? "busy" : noLlm || (online.on && !online.ready) || (online.explain && !chatgptReady) ? "warn" : undefined,
     backup: backupError ? "warn" : undefined,
     lingq: lingq ? "busy" : undefined,
   };
@@ -265,7 +266,6 @@ function TabIcon({ tab, size = 16 }: { tab: Tab; size?: number }) {
 
 export function Settings() {
   const tab = useApp((s) => s.settingsTab);
-  const online = useApp((s) => s.settings.online_on === "1");
   const openSettings = useApp((s) => s.openSettings);
   // iPhone : la liste des catégories, puis la page choisie (« ‹ Réglages » y ramène)
   const compact = useCompact();
@@ -368,9 +368,7 @@ export function Settings() {
             {!found.length && <p className="set-nav-empty">{t("Aucun réglage ne correspond.", "No setting matches.")}</p>}
           </div>
           <p className="set-nav-foot">
-            {online
-              ? t("Sans compte. L'IA en ligne passe par votre clé ; tout le reste fonctionne sur votre Mac.", "No account. The online AI goes through your key; everything else works on your Mac.")
-              : t("Tout fonctionne sur votre Mac, sans compte.", "Everything works on your Mac, with no account.")}
+            {t("Les modèles locaux fonctionnent hors ligne.", "Local models work offline.")}
           </p>
         </nav>
 
@@ -1122,7 +1120,7 @@ function ModelLine({ m }: { m: ModelRow }) {
 
 function AiPane() {
   const settings = useApp((s) => s.settings);
-  const online = settings.online_on === "1";
+  const online = useOnline();
   const setSetting = useApp((s) => s.setSetting);
   const models = useApp((s) => s.models);
   const download = useApp((s) => s.download);
@@ -1143,34 +1141,12 @@ function AiPane() {
 
   return (
     <>
-      <Section
-        title={t("Où travaille l'IA", "Where the AI works")}
-        note={t(
-          "Le sens des mots, la traduction des phrases, Simplifier et le chat. La transcription et la voix restent toujours sur ce Mac.",
-          "Word meanings, sentence translation, Simplify and the chat. Transcription and the voice always stay on this Mac.",
-        )}
-      >
-        <EnginePicker />
-      </Section>
-      <AnimatePresence initial={false}>
-        {online && (
-          <motion.div
-            key="online"
-            className="online-block"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.32, ease: EASE }}
-          >
-            <OnlineSection />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <OnlineSection />
       <Section
         title={t("Puissance", "Power")}
         note={
           t("Plus le modèle est grand, plus il saisit les nuances, mais plus il pèse et demande de mémoire.", "The bigger the model, the more nuance it catches, but the more space and memory it needs.") +
-          (online ? " " + t("Avec l'IA en ligne, il sert hors connexion et pour ce qui reste sur ce Mac.", "With the online AI, it's used offline and for whatever stays on this Mac.") : "")
+          ((online.on || online.explain) ? " " + t("Avec l'IA en ligne, il sert hors connexion et pour ce qui reste sur ce Mac.", "With the online AI, it's used offline and for whatever stays on this Mac.") : "")
         }
       >
         <div className="profile-grid">
@@ -1192,7 +1168,7 @@ function AiPane() {
         </div>
       </Section>
       {isWindows && <GpuSection />}
-      <Section title={t("Traduction et chat", "Translation and chat")} note={t("Le sens de chaque mot dans sa phrase, les réécritures et le chat.", "The meaning of each word in its sentence, rewriting and the chat.")}>
+      <Section title={t("Modèles locaux", "Local models")} note={t("Téléchargez un modèle pour les fonctions configurées sur Modèle local.", "Download a model for features set to Local model.")}>
         <div className="set-card">{lines("llm")}</div>
       </Section>
       <Section title={t("Transcription audio et vidéo", "Audio and video transcription")} note={t("Whisper écoute vos fichiers et vos vidéos, et situe chaque mot dans le temps pour la lanterne.", "Whisper listens to your files and videos, and places each word in time for the lantern.")}>

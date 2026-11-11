@@ -1,4 +1,4 @@
-import { ChineseExplain } from "./ChineseExplain";
+import { ReaderExplain } from "./ReaderExplain";
 import { displayText } from "../../lib/tokenize";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -292,14 +292,20 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
 
   const status = term?.status ?? 0;
   const entries = dict?.entries ?? [];
+  const pinyin = lang === "zh" ? entries.find((entry) => entry.ipa.trim())?.ipa : undefined;
 
   return (
     <div className="wp-pane" aria-label={t("Détail du mot", "Word details")}>
       <div key={key} className="wp-scroll wp-lookup">
         <div>
           <div className="wp-word">
-            <h2 className={sel.surface.length > 36 ? "long" : ""} dir="auto">
+            <h2 className={sel.surface.length > 36 ? "long" : ""} lang={lang} dir="auto">
               {displayText(sel.surface, lang)}
+              {pinyin && (
+                <span className="wp-pinyin" lang="zh-Latn">
+                  <span aria-hidden="true">·</span> {pinyin}
+                </span>
+              )}
             </h2>
             <div style={{ display: "flex", gap: 2 }}>
               <button className="icon-btn" onClick={() => void pronounce(sel.surface, lang, settings[`voice_${lang}`])} aria-label={t("Prononcer", "Pronounce")}>
@@ -363,9 +369,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           )}
         </div>
 
-        {lang === "zh" && (
-          <ChineseExplain key={JSON.stringify([sel.surface, sel.sentence])} selection={sel.surface} sentence={sel.sentence} />
-        )}
+        <ReaderExplain key={JSON.stringify([lang, sel.surface, sel.sentence])} lang={lang} selection={sel.surface} sentence={sel.sentence} />
 
         {sel.isPhrase &&
           !term &&

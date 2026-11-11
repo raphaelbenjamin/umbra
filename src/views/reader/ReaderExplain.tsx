@@ -1,26 +1,23 @@
 import { useState } from "react";
 import { Icon } from "../../components/Icon";
-import { api, errorText, isNoModel } from "../../lib/api";
+import { api, errorText } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useApp } from "../../lib/store";
-import type { ChineseExplanation } from "../../lib/types";
+import type { Explanation, LangCode } from "../../lib/types";
 
-export function ChineseExplain({ selection, sentence }: { selection: string; sentence: string }) {
-  const [answer, setAnswer] = useState<ChineseExplanation | null>(null);
+export function ReaderExplain({ lang, selection, sentence }: { lang: LangCode; selection: string; sentence: string }) {
+  const [answer, setAnswer] = useState<Explanation | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [needsModel, setNeedsModel] = useState(false);
   const openSettings = useApp(s => s.openSettings);
 
   const explain = async () => {
     setBusy(true);
     setError("");
-    setNeedsModel(false);
     try {
-      setAnswer(await api().explainChinese(selection, sentence));
+      setAnswer(await api().explainSelection(lang, selection, sentence));
     } catch (e) {
       setError(errorText(e));
-      setNeedsModel(isNoModel(e));
     } finally {
       setBusy(false);
     }
@@ -37,11 +34,9 @@ export function ChineseExplain({ selection, sentence }: { selection: string; sen
       {error && (
         <div className="wp-note" role="status">
           {error}
-          {needsModel && (
-            <button className="btn sm soft" onClick={() => openSettings("ai")}>
-              {t("Réglages de l’IA", "AI settings")}
-            </button>
-          )}
+          <button className="btn sm soft" onClick={() => openSettings("ai")}>
+            {t("Réglages de l’IA", "AI settings")}
+          </button>
         </div>
       )}
       {answer && (
@@ -51,9 +46,9 @@ export function ChineseExplain({ selection, sentence }: { selection: string; sen
             <ul className="wp-explanation-parts">
               {answer.parts.map((part, i) => (
                 <li key={i}>
-                  <strong lang="zh">{part.hanzi}</strong>
-                  <span className="muted">{part.pinyin}</span>
-                  <span>{part.english}</span>
+                  <strong lang={lang} dir="auto">{part.text}</strong>
+                  {part.reading && <span className="muted">{part.reading}</span>}
+                  <span>{part.translation}</span>
                 </li>
               ))}
             </ul>
@@ -61,9 +56,9 @@ export function ChineseExplain({ selection, sentence }: { selection: string; sen
           <div className="wp-explanation-examples">
             {answer.examples.map((example, i) => (
               <div className="wp-explanation-example" key={i}>
-                <strong lang="zh">{example.hanzi}</strong>
-                <span className="muted">{example.pinyin}</span>
-                <span lang="en">{example.english}</span>
+                <strong lang={lang} dir="auto">{example.text}</strong>
+                {example.reading && <span className="muted">{example.reading}</span>}
+                <span>{example.translation}</span>
               </div>
             ))}
           </div>

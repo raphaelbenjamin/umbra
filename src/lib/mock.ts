@@ -7,6 +7,7 @@ import pkg from "../../package.json";
 import { LANGS, STARTERS, bundledDict } from "./langs";
 import { RUN_ON_WORDS, longestRun, normalize, tokenize } from "./tokenize";
 import { roughEstimate } from "./level";
+import { onlineState } from "./online";
 import type {
   ChatGptStatus,
   BackupCounts,
@@ -405,7 +406,7 @@ export function createMockApi(): Api {
   /** IA en ligne choisie pour ce rôle (miroir de `online::config_from`) : erreur si la clé manque. */
   const online = (role: "words" | "chat"): boolean => {
     const s = db.settings;
-    if (s.online_on !== "1" || s[role === "words" ? "online_words" : "online_chat"] === "0") return false;
+    if (!onlineState(s)[role]) return false;
     const id = s.online_provider || "deepseek";
     const names: Record<string, string> = { deepseek: "DeepSeek", gemini: "Gemini", nvidia: "NVIDIA", mistral: "Mistral", openai: "OpenAI", anthropic: "Claude", openrouter: "OpenRouter" };
     if (id === "custom") {
@@ -862,17 +863,17 @@ export function createMockApi(): Api {
       await sleep(200);
       return fakeStream(t(`[Traduction simulée] ${sentence}`, `[Simulated translation] ${sentence}`), onPiece);
     },
-    async explainChinese(selection) {
-      if (selection !== "丈夫") throw new Error("Tutor responses require the Umbra desktop app.");
+    async explainSelection(lang, selection) {
+      if (lang !== "zh" || selection !== "丈夫") throw new Error("Tutor responses require the Umbra desktop app.");
       return {
         meaning: "丈夫 (zhàngfu) means husband.",
         parts: [
-          { hanzi: "丈", pinyin: "zhàng", english: "traditional unit of length" },
-          { hanzi: "夫", pinyin: "fū", english: "man" },
+          { text: "丈", reading: "zhàng", translation: "traditional unit of length" },
+          { text: "夫", reading: "fū", translation: "man" },
         ],
         examples: [
-          { hanzi: "她的丈夫是老师。", pinyin: "Tā de zhàngfu shì lǎoshī.", english: "Her husband is a teacher." },
-          { hanzi: "我和丈夫去买菜。", pinyin: "Wǒ hé zhàngfu qù mǎi cài.", english: "My husband and I are going to buy groceries." },
+          { text: "她的丈夫是老师。", reading: "Tā de zhàngfu shì lǎoshī.", translation: "Her husband is a teacher." },
+          { text: "我和丈夫去买菜。", reading: "Wǒ hé zhàngfu qù mǎi cài.", translation: "My husband and I are going to buy groceries." },
         ],
       };
     },
