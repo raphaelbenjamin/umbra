@@ -866,6 +866,7 @@ export function createMockApi(): Api {
       await sleep(200);
       return fakeStream(t(`[Traduction simulée] ${sentence}`, `[Simulated translation] ${sentence}`), onPiece);
     },
+    async cachedExplanation() { return null; },
     async explainSelection(lang, selection) {
       if (lang !== "zh" || selection !== "丈夫") throw new Error("Tutor responses require the Umbra desktop app.");
       return {

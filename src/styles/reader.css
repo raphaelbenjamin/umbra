@@ -133,6 +133,11 @@
 .reader-top .title-mini.show {
   opacity: 1;
 }
+@media (max-width: 720px) {
+  .reader-prepare-explanations > span {
+    display: none;
+  }
+}
 .reader-scroll {
   flex: 1;
   min-height: 0;

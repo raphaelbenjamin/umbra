@@ -28,6 +28,7 @@ import { VideoStage } from "./VideoStage";
 import { blurLiteral, knownRuns, type ReaderPart } from "./knownRuns";
 import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
+import { explanationKey, selectionContext, usePageExplanations } from "./pageExplanations";
 
 interface Range {
   a: number;
@@ -273,6 +274,9 @@ export function Reader() {
   const pages = fittedOk ? fitted.pages : basePages;
   const pr = pages[page] ?? { start: 0, end: 0, words: 0 };
   const lang = lesson?.lang ?? "en";
+  const explanations = usePageExplanations(JSON.stringify([lessonId, page, pr.start, pr.end,
+    settings.online_explain_engine, settings.online_model_chatgpt_explain, settings.online_model_chatgpt,
+    settings.llm_model, settings.ui_lang]));
   const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
   const showPinyin = chineseStudy && settings.chinese_pinyin !== "0";
   const showGloss = chineseStudy && settings.chinese_gloss !== "0";
@@ -548,10 +552,7 @@ export function Reader() {
   const selection: Selection | null = useMemo(() => {
     if (!range || !lesson) return null;
     const { a, b } = range;
-    const [sa, sb] = sentenceBounds(tokens, a);
-    const sbEnd = Math.max(sb, sentenceBounds(tokens, b)[1]);
-    const sentStart = tokens[sa]?.s ?? 0;
-    const sentEnd = tokens[sbEnd - 1]?.e ?? 0;
+    const { sentenceStart: sentStart, sentenceEnd: sentEnd, sentence } = selectionContext(lesson.text, tokens, a, b);
     const selStart = tokens[a].s;
     const selEnd = tokens[b].e;
     const clean = (s: string) => s.replace(/\s+/g, " ");
@@ -563,7 +564,7 @@ export function Reader() {
     return {
       surface: clean(lesson.text.slice(selStart, selEnd)),
       key: words.join(" "),
-      sentence: clean(lesson.text.slice(sentStart, sentEnd)).trim(),
+      sentence,
       before: clean(lesson.text.slice(sentStart, selStart)).trimStart(),
       after: clean(lesson.text.slice(selEnd, sentEnd)).trimEnd(),
       isPhrase,
@@ -1420,12 +1421,24 @@ export function Reader() {
       lang={lang}
       sel={selection}
       term={selection ? terms[selection.key] : undefined}
+      preparedExplanation={selection && lang === "zh" ? explanations.answers[explanationKey(selection.surface, selection.sentence)] : undefined}
       onStatus={(k, s) => setStatus(k, s)}
       onTranslation={onTranslation}
       onSelectPhrase={(a, b) => select(a, b)}
       onClose={() => setRange(null)}
     />
   );
+  const prep = explanations.progress;
+  let prepareLabel = t("Préparer les explications", "Preload explanations");
+  if (prep?.stopping) {
+    prepareLabel = t("Arrêt…", "Stopping…");
+  } else if (prep?.running) {
+    prepareLabel = t(`Arrêter (${prep.done}/${prep.total})`, `Stop (${prep.done}/${prep.total})`);
+  } else if (prep && prep.done === prep.total) {
+    prepareLabel = t("Explications prêtes", "Explanations ready");
+  } else if (prep?.done) {
+    prepareLabel = t(`Reprendre (${prep.done}/${prep.total})`, `Resume (${prep.done}/${prep.total})`);
+  }
 
   // page qui ne tourne pas avec la lecture : où en est la lanterne ?
   const cursorPage = cursor >= 0 ? pageOfToken(pages, cursor) : -1;
@@ -1567,6 +1580,24 @@ export function Reader() {
           <button className="btn sm soft no-drag" onClick={() => setSimplify(true)} title={t("Réécrire ce texte à un niveau plus simple", "Rewrite this text at a simpler level")}>
             <Icon name="sparkle" size={14} /> {t("Simplifier", "Simplify")}
           </button>
+          {lang === "zh" && !cinema && (
+            <button
+              className="btn sm soft no-drag reader-prepare-explanations"
+              aria-label={prepareLabel}
+              disabled={prep?.stopping || (!prep?.running &&
+                !tokens.slice(pr.start, pr.end).some((token) => token.w && (terms[token.k]?.status ?? 0) < 4))}
+              onClick={() => prep?.running
+                ? explanations.stop()
+                : void explanations.prepare(lesson.text, tokens, pr.start, pr.end, terms)}
+              title={prep?.running
+                ? t("Arrêter après l’explication en cours", "Stop after the current explanation")
+                : t("Préparer les explications des mots nouveaux et en cours d’apprentissage de cette page avec votre tuteur IA",
+                    "Prepare explanations for new and learning words on this page using your AI tutor")}
+            >
+              <Icon name="bulb" size={14} />
+              <span aria-live="polite">{prepareLabel}</span>
+            </button>
+          )}
           {floating && (
             <button
               className={`icon-btn no-drag chat-float-btn ${aside === "chat" ? "on" : ""}`}

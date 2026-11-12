@@ -1,21 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../../components/Icon";
 import { api, errorText } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useApp } from "../../lib/store";
 import type { Explanation, LangCode } from "../../lib/types";
+import { requestExplanation } from "./pageExplanations";
 
-export function ReaderExplain({ lang, selection, sentence }: { lang: LangCode; selection: string; sentence: string }) {
-  const [answer, setAnswer] = useState<Explanation | null>(null);
+export function ReaderExplain({ lang, selection, sentence, prepared }: {
+  lang: LangCode; selection: string; sentence: string; prepared?: Explanation;
+}) {
+  const [loaded, setAnswer] = useState<Explanation | null>(null);
+  const answer = prepared ?? loaded;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const openSettings = useApp(s => s.openSettings);
+
+  useEffect(() => {
+    if (lang !== "zh" || prepared) return;
+    let active = true;
+    void api().cachedExplanation(lang, selection, sentence).then((cached) => {
+      if (active && cached) setAnswer(cached);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [lang, selection, sentence, prepared]);
 
   const explain = async () => {
     setBusy(true);
     setError("");
     try {
-      setAnswer(await api().explainSelection(lang, selection, sentence));
+      setAnswer(await requestExplanation(lang, selection, sentence));
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -31,7 +44,7 @@ export function ReaderExplain({ lang, selection, sentence }: { lang: LangCode; s
           {busy ? t("Explication…", "Explaining…") : t("Expliquer", "Explain")}
         </button>
       )}
-      {error && (
+      {error && !answer && (
         <div className="wp-note" role="status">
           {error}
           <button className="btn sm soft" onClick={() => openSettings("ai")}>

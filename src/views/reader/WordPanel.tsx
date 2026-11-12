@@ -8,7 +8,7 @@ import { useOnline } from "../../lib/online";
 import { t } from "../../lib/i18n";
 import { preparePronunciation, pronounce } from "../../lib/pronounce";
 import { useApp } from "../../lib/store";
-import type { DictEntry, DictResult, LangCode, Status, Term } from "../../lib/types";
+import type { DictEntry, DictResult, Explanation, LangCode, Status, Term } from "../../lib/types";
 import { loadReaderDictionary } from "./dictionaryLookup";
 
 export interface Selection {
@@ -47,6 +47,7 @@ const statusOpts = (): { s: Status; label: string; sw: string }[] => [
 ];
 
 interface Props {
+  preparedExplanation?: Explanation;
   lang: LangCode;
   sel: Selection | null;
   term: Term | undefined;
@@ -125,7 +126,7 @@ function DictionaryDefinitions({ dict, lang, surface, onGloss }: {
   );
 }
 
-export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
+export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const openGuide = useApp((s) => s.openGuide);
@@ -414,7 +415,7 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           )}
         </div>
 
-        <ReaderExplain key={JSON.stringify([lang, sel.surface, sel.sentence])} lang={lang} selection={sel.surface} sentence={sel.sentence} />
+        <ReaderExplain key={JSON.stringify([lang, sel.surface, sel.sentence])} lang={lang} selection={sel.surface} sentence={sel.sentence} prepared={preparedExplanation} />
 
         {sel.isPhrase &&
           !term &&
