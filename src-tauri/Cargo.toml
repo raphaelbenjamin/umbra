@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "umbra"
-version = "2.0.17"
+version = "2.0.18"
 description = "Umbra: learn languages by reading and listening"
 authors = ["Ulysse Rives"]
 license = "GPL-3.0-or-later"

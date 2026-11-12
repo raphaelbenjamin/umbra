@@ -706,9 +706,35 @@ span.player-voice .icon-btn {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.page-ai-action.page-ai-simplify {
-  margin-top: 3px;
-  border-top: 1px solid var(--border);
+.page-ai-translations {
+  display: grid;
+  gap: 6px;
+}
+.page-ai-translations:not(:last-child) {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.page-ai-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 10px 0;
+  font-size: 13px;
+}
+.page-ai-count input {
+  width: 76px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--chip);
+  color: var(--text);
+  font: inherit;
+}
+.page-ai-translations p {
+  margin: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .page-ai-busy {
   position: absolute;

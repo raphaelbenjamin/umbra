@@ -2,7 +2,7 @@
 // d'elles-mêmes à l'écoute (comme sur LingQ).
 
 import { api, errorText } from "./api";
-import { count, t } from "./i18n";
+import { count, locale, t } from "./i18n";
 import { useApp } from "./store";
 import type { LessonSummary, Playlist } from "./types";
 
@@ -41,6 +41,25 @@ export interface BookView {
 }
 
 export const isBook = (p: Playlist) => p.kind === "book";
+
+/** Orders numbered parts like "HSK · 2/20" before "HSK · 10/20". */
+export function planBook(lessons: LessonSummary[]) {
+  const compare = new Intl.Collator(locale(), { numeric: true, sensitivity: "base" }).compare;
+  const parts = lessons.map((lesson) => {
+    const suffix = lesson.title.match(/^(.*?)\s*(\d+)\s*\/\s*(\d+)\s*$/u);
+    return {
+      lesson,
+      title: suffix?.[1].replace(/[\s·:–—_-]+$/u, "").trim() ?? "",
+      number: Number(suffix?.[2]),
+      total: Number(suffix?.[3]),
+    };
+  });
+  const first = parts[0];
+  const numbered = first && parts.every((p) => p.total === first.total && p.number >= 1 && p.number <= p.total);
+  const title = numbered && parts.every((p) => p.title === first.title) ? first.title : "";
+  parts.sort((a, b) => (numbered ? a.number - b.number : 0) || compare(a.lesson.title, b.lesson.title) || a.lesson.id - b.lesson.id);
+  return { title, chapters: parts.map((p) => p.lesson) };
+}
 
 /** Le livre d'une playlist « book » ; null s'il n'a plus de chapitre. */
 export function bookView(p: Playlist, all: LessonSummary[] | Map<number, LessonSummary>): BookView | null {

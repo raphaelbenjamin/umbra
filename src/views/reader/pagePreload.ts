@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, errorText } from "../../lib/api";
 import { onlineState } from "../../lib/online";
 import { useApp } from "../../lib/store";
@@ -52,27 +52,30 @@ export function requestWordPreload(lang: LangCode, word: string, sentence: strin
   return request;
 }
 
-export function usePagePreload<T>(pageKey: string, load: (lang: LangCode, selection: string, sentence: string) => Promise<T>) {
+export function usePagePreload<T>(scopeKey: string, load: (lang: LangCode, selection: string, sentence: string) => Promise<T>) {
   const active = useRef<AbortController | null>(null);
+  const cached = useRef(new Set<string>());
   const [progress, setProgress] = useState<{ done: number; total: number; running: boolean; stopping?: boolean } | null>(null);
   const [answers, setAnswers] = useState<Record<string, T>>({});
   const toast = useApp((s) => s.toast);
 
   useLayoutEffect(() => {
+    cached.current.clear();
     setProgress(null);
     setAnswers({});
     return () => {
       active.current?.abort();
       active.current = null;
     };
-  }, [pageKey]);
+  }, [scopeKey]);
 
   function stop() {
+    if (!active.current) return;
     active.current?.abort();
     setProgress((previous) => previous && { ...previous, stopping: true });
   }
 
-  async function prepare(lang: LangCode, text: string, tokens: Token[], start: number, end: number, terms: Record<string, Term>) {
+  const prepare = useCallback(async (lang: LangCode, text: string, tokens: Token[], start: number, end: number, terms: Record<string, Term>) => {
     if (active.current) return;
     const targets = new Map<string, { selection: string; sentence: string }>();
     for (let index = start; index < end; index++) {
@@ -80,9 +83,13 @@ export function usePagePreload<T>(pageKey: string, load: (lang: LangCode, select
       if (!token?.w || (terms[token.k]?.status ?? 0) >= 4) continue;
       const selection = text.slice(token.s, token.e).replace(/\s+/g, " ");
       const { sentence } = selectionContext(text, tokens, index, index);
-      targets.set(pageWordKey(selection, sentence), { selection, sentence });
+      const key = pageWordKey(selection, sentence);
+      if (!cached.current.has(key)) targets.set(key, { selection, sentence });
     }
-    if (!targets.size) return;
+    if (!targets.size) {
+      setProgress(null);
+      return true;
+    }
     const batch = new AbortController();
     active.current = batch;
     let done = 0;
@@ -93,18 +100,73 @@ export function usePagePreload<T>(pageKey: string, load: (lang: LangCode, select
         const answer = await load(lang, selection, sentence);
         if (batch.signal.aborted) break;
         done++;
+        cached.current.add(key);
         setAnswers((previous) => ({ ...previous, [key]: answer }));
         setProgress({ done, total: targets.size, running: true });
       }
+      return true;
     } catch (error) {
       if (!batch.signal.aborted) toast(errorText(error), "error");
+      return batch.signal.aborted;
     } finally {
       if (active.current === batch) {
         active.current = null;
         setProgress({ done, total: targets.size, running: false });
       }
     }
-  }
+  }, [load, toast]);
 
   return { answers, progress, prepare, stop };
+}
+
+export function useTranslationLookahead({ scope, lang, text, tokens, terms, pages, page, blocked }: {
+  scope: string;
+  lang: LangCode;
+  text: string | undefined;
+  tokens: Token[];
+  terms: Record<string, Term>;
+  pages: { start: number; end: number }[];
+  page: number;
+  blocked: boolean;
+}) {
+  const job = usePagePreload(scope, requestWordPreload);
+  const [plan, setPlan] = useState<{ scope: string; count: number } | null>(null);
+  const ahead = plan?.scope === scope ? plan.count : null;
+  const attempted = useRef<string | null>(null);
+  const generation = useRef(0);
+
+  useLayoutEffect(() => {
+    setPlan(null);
+    attempted.current = null;
+    return () => { generation.current++; };
+  }, [scope]);
+
+  const start = pages[page]?.start;
+  const end = pages[Math.min(page + (ahead ?? 0), pages.length - 1)]?.end;
+  useEffect(() => {
+    if (ahead === null || blocked || job.progress?.running || text === undefined ||
+        start === undefined || end === undefined || start >= end) return;
+    const window = `${start}:${end}`;
+    if (attempted.current === window) return;
+    attempted.current = window;
+    const current = generation.current;
+    void job.prepare(lang, text, tokens, start, end, terms).then((ok) => {
+      if (ok === false && generation.current === current) setPlan(null);
+    });
+  }, [ahead, blocked, job.progress?.running, job.prepare, lang, text, tokens, terms, start, end]);
+
+  return {
+    answers: job.answers,
+    progress: job.progress,
+    enabled: ahead !== null,
+    start: (count: number) => {
+      attempted.current = null;
+      setPlan({ scope, count });
+    },
+    stop: () => {
+      generation.current++;
+      setPlan(null);
+      job.stop();
+    },
+  };
 }

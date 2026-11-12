@@ -153,6 +153,7 @@ pub fn run() {
             commands::playlist_update,
             commands::playlist_delete,
             commands::book_create,
+            commands::book_group,
             commands::term_set,
             commands::terms_mark_known,
             commands::terms_list,

@@ -650,6 +650,21 @@ export function createMockApi(): Api {
       commit();
       return { playlist, lessons };
     },
+    async bookGroup(lang, name, lessons) {
+      if (!name.trim() || lessons.length < 2) {
+        throw t("Donnez un titre au livre et sélectionnez au moins deux leçons.", "Enter a book title and select at least two lessons.");
+      }
+      const chapters = fill(lang, lessons);
+      if (chapters.length !== lessons.length ||
+          playlists().some((p) => p.kind === "book" && p.lessons.some((id) => chapters.includes(id)))) {
+        throw t("Sélectionnez des leçons distinctes, dans la même langue et sans livre.", "Select separate lessons in the same language that aren’t already in a book.");
+      }
+      const id = Math.max(0, ...playlists().map((p) => p.id)) + 1;
+      const title = name.trim().replace(/\s+/g, " ").slice(0, 120);
+      playlists().push({ id, lang, name: title, lessons: chapters, current: null, created_at: Date.now() / 1000, kind: "book", looping: false });
+      commit();
+      return id;
+    },
     async lessonSetCover(id, data, _ext, also) {
       if (!db.lessons.some((x) => x.id === id)) throw t("Leçon introuvable", "Lesson not found");
       // dans le navigateur, l'image est gardée telle quelle (adresse data:)

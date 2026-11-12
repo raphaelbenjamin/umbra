@@ -112,6 +112,7 @@ export interface Api {
   playlistDelete(id: number): Promise<void>;
   /** crée un livre : ses chapitres et sa playlist d'un seul geste, la couverture (JPEG réduit) partagée */
   bookCreate(book: NewBook, cover: Uint8Array | null): Promise<CreatedBook>;
+  bookGroup(lang: LangCode, name: string, lessons: number[]): Promise<number>;
   termSet(update: TermUpdate): Promise<void>;
   termsMarkKnown(lang: LangCode, keys: string[], wordsRead: number): Promise<number>;
   termsList(query: TermQuery): Promise<{ items: Term[]; total: number }>;
@@ -266,6 +267,7 @@ async function createTauriApi(): Promise<Api> {
     playlistUpdate: (id, patch) => invoke("playlist_update", { id, patch }),
     playlistDelete: (id) => invoke("playlist_delete", { id }),
     bookCreate: (book, cover) => invoke("book_create", { book, cover: cover ? Array.from(cover) : null }),
+    bookGroup: (lang, name, lessons) => invoke("book_group", { lang, name, lessons }),
     termSet: (update) => invoke("term_set", { update }),
     termsMarkKnown: (lang, keys, wordsRead) => invoke("terms_mark_known", { lang, keys, wordsRead }),
     termsList: (query) => invoke("terms_list", { query }),

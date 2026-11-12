@@ -977,6 +977,20 @@
 .lib-selbar .btn.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
+.lib-book-selbar {
+  flex-wrap: wrap;
+}
+.book-group-chapters {
+  max-height: min(260px, 35vh);
+  overflow: auto;
+  margin: 12px 0 0;
+  padding-inline-start: 26px;
+  color: var(--muted);
+}
+.book-group-chapters li {
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
 
 /* ==========================================================================
    Playlists

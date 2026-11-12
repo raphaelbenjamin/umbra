@@ -9,7 +9,7 @@ import { api, errorText } from "../lib/api";
 import { confirmAsk } from "../lib/dialogs";
 import { count, isEn, t } from "../lib/i18n";
 import { STARTERS, inLang, starterCollection } from "../lib/langs";
-import { bookView, isBook, markRead, pagesOf, progressOf, readBook, type BookView } from "../lib/playlists";
+import { bookView, isBook, markRead, pagesOf, planBook, progressOf, readBook, type BookView } from "../lib/playlists";
 import { formatDuration, formatNumber, useApp } from "../lib/store";
 import { isWindows } from "../lib/platform";
 import type { LessonSummary, Playlist } from "../lib/types";
@@ -460,6 +460,9 @@ export function Library() {
   // ---------- sélection de plusieurs éléments (pour les supprimer ou les marquer lus d'un coup) ----------
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [bookPlan, setBookPlan] = useState<ReturnType<typeof planBook> | null>(null);
+  const [bookTitle, setBookTitle] = useState("");
+  const [grouping, setGrouping] = useState(false);
   // dernier élément touché : Maj + clic coche tout l'intervalle jusqu'à lui
   const pickFrom = useRef<string | null>(null);
   const startSelect = (first?: string) => {
@@ -503,11 +506,35 @@ export function Library() {
   const pickedEntries = shown.filter((e) => picked.has(e.key));
   const pickedLessons = pickedEntries.reduce((n, e) => n + lessonsIn(e), 0);
   const pickedRead = pickedEntries.length > 0 && pickedEntries.every(completedOf);
+  const bookCandidates = pickedEntries.flatMap((e) => e.l ? [e.l] : []);
+  const canGroup = bookCandidates.length >= 2 && bookCandidates.length === pickedEntries.length;
+  const startGroup = () => {
+    if (!canGroup) return;
+    const plan = planBook(bookCandidates);
+    setBookTitle(plan.title);
+    setBookPlan(plan);
+  };
+  const saveGroup = async () => {
+    if (!bookPlan || !bookTitle.trim() || grouping) return;
+    setGrouping(true);
+    try {
+      await api().bookGroup(lang, bookTitle, bookPlan.chapters.map((l) => l.id));
+      setBookPlan(null);
+      stopSelect();
+      if (filter === "text") setFilter("book");
+      bump();
+      toast(t("Livre créé", "Book created"));
+    } catch (e) {
+      toast(errorText(e), "error");
+    } finally {
+      setGrouping(false);
+    }
+  };
   const removePicked = async () => {
     if (await removeEntries(shown.filter((e) => picked.has(e.key)))) stopSelect();
   };
   useEffect(() => {
-    if (!selecting) return;
+    if (!selecting || bookPlan) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       const typing = e.target instanceof HTMLElement && !!e.target.closest("input, textarea, select, [contenteditable]");
@@ -737,7 +764,7 @@ export function Library() {
         <AnimatePresence>
           {selecting && (
             <motion.div
-              className="lib-selbar"
+              className="lib-selbar lib-book-selbar"
               role="toolbar"
               aria-label={t("Leçons sélectionnées", "Selected lessons")}
               initial={{ opacity: 0, y: 22, scale: 0.96 }}
@@ -753,6 +780,11 @@ export function Library() {
               <button className="btn sm ghost" onClick={pickAll} disabled={!shown.length}>
                 {allPicked ? t("Tout désélectionner", "Deselect all") : t("Tout sélectionner", "Select all")}
               </button>
+              {canGroup && (
+                <button className="btn sm ghost" onClick={startGroup}>
+                  <Icon name="book" size={15} /> {t("Créer un livre", "Group as book")}
+                </button>
+              )}
               <button className="btn sm ghost" onClick={() => void markEntries(pickedEntries, !pickedRead)} disabled={!picked.size}>
                 <Icon name={pickedRead ? "unread" : "read"} size={15} /> {pickedRead ? t("Marquer comme non lu", "Mark as unread") : t("Marquer comme lu", "Mark as read")}
               </button>
@@ -766,6 +798,30 @@ export function Library() {
           )}
         </AnimatePresence>
       </div>
+      <Sheet
+        open={!!bookPlan}
+        onClose={() => { if (!grouping) setBookPlan(null); }}
+        title={t("Créer un livre", "Group as book")}
+        width={520}
+        footer={
+          <>
+            <button className="btn ghost" disabled={grouping} onClick={() => setBookPlan(null)}>
+              {t("Annuler", "Cancel")}
+            </button>
+            <button className="btn primary" disabled={grouping || !bookTitle.trim()} onClick={() => void saveGroup()}>
+              {grouping ? t("Création…", "Creating…") : t("Créer le livre", "Create book")}
+            </button>
+          </>
+        }
+      >
+        <input className="input" autoFocus maxLength={120} disabled={grouping}
+          value={bookTitle} onChange={(e) => setBookTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) void saveGroup(); }}
+          aria-label={t("Titre du livre", "Book title")} placeholder={t("Titre du livre", "Book title")} />
+        <ol className="book-group-chapters" aria-label={t("Ordre des chapitres", "Chapter order")}>
+          {bookPlan?.chapters.map((chapter) => <li key={chapter.id}>{chapter.title}</li>)}
+        </ol>
+      </Sheet>
       <Sheet
         open={!!renaming}
         onClose={() => setRenaming(null)}

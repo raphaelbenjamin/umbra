@@ -842,6 +842,36 @@ fn book_kind() -> String {
     "book".into()
 }
 
+fn insert_book(tx: &rusqlite::Transaction, lang: &str, name: &str, lessons: &[i64]) -> Result<i64> {
+    tx.execute("INSERT INTO playlists(lang,name,created_at,kind) VALUES(?1,?2,?3,'book')", params![lang, name, now()])?;
+    let id = tx.last_insert_rowid();
+    playlist_fill(tx, id, lessons)?;
+    Ok(id)
+}
+
+/// Groups existing lessons without rewriting their content, metadata, or progress.
+pub fn book_group(c: &mut Connection, lang: &str, name: &str, lessons: &[i64]) -> Result<i64> {
+    if name.trim().is_empty() || lessons.len() < 2 {
+        anyhow::bail!(crate::i18n::t("Donnez un titre au livre et sélectionnez au moins deux leçons.", "Enter a book title and select at least two lessons."));
+    }
+    let tx = c.transaction()?;
+    let id = insert_book(&tx, lang, &playlist_name(name), lessons)?;
+    let eligible: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM playlist_items AS chapter
+         WHERE chapter.playlist_id=?1 AND NOT EXISTS (
+           SELECT 1 FROM playlist_items AS other JOIN playlists AS p ON p.id=other.playlist_id
+           WHERE other.lesson_id=chapter.lesson_id AND p.kind='book' AND p.id<>?1
+         )",
+        [id],
+        |r| r.get(0),
+    )?;
+    if eligible != lessons.len() as i64 {
+        anyhow::bail!(crate::i18n::t("Sélectionnez des leçons distinctes, dans la même langue et sans livre.", "Select separate lessons in the same language that aren’t already in a book."));
+    }
+    tx.commit()?;
+    Ok(id)
+}
+
 /// Crée les chapitres d'un livre et leur playlist (`kind` = « book ») d'un seul geste :
 /// jamais de livre à moitié créé. Les chapitres partagent la couverture du livre.
 /// Renvoie la playlist et les leçons, dans l'ordre du livre.
@@ -872,9 +902,7 @@ pub fn book_create(c: &mut Connection, b: &NewBook, cover: Option<&str>) -> Resu
     if ids.is_empty() {
         anyhow::bail!(crate::i18n::t("Aucun chapitre lisible dans ce livre.", "No readable chapter in this book."));
     }
-    tx.execute("INSERT INTO playlists(lang,name,created_at,kind) VALUES(?1,?2,?3,'book')", params![b.lang, title, now()])?;
-    let id = tx.last_insert_rowid();
-    playlist_fill(&tx, id, &ids)?;
+    let id = insert_book(&tx, &b.lang, &title, &ids)?;
     tx.commit()?;
     Ok((id, ids))
 }
@@ -1921,6 +1949,39 @@ mod tests {
         assert_eq!(playlists_list(&c, "it").unwrap().len(), 2);
         drop(c);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn grouping_keeps_existing_lessons_and_rejects_overlap() {
+        let mut c = open(Path::new(":memory:")).unwrap();
+        let make = |title: &str| {
+            lesson_create(&c, &NewLesson {
+                lang: "en".into(), title: title.into(), collection: "Original collection".into(),
+                kind: "text".into(), source: String::new(), text: "Hello there.".into(),
+                media_path: None, timings: None, video_path: None,
+            }).unwrap()
+        };
+        let second = make("Book · 2/20");
+        let first = make("Book · 1/20");
+        let third = make("Book · 3/20");
+        c.execute("UPDATE lessons SET page=3 WHERE id=?1", [first]).unwrap();
+        let regular = playlist_create(&mut c, "en", "My reading list", &[first, second]).unwrap();
+        let book = book_group(&mut c, "en", "Book", &[first, second]).unwrap();
+        assert!(book_group(&mut c, "en", "Overlap", &[second, third]).is_err());
+        assert!(book_group(&mut c, "en", "Duplicate", &[third, third]).is_err());
+
+        let playlists = playlists_list(&c, "en").unwrap();
+        assert_eq!(playlists.len(), 2);
+        let grouped = playlists.iter().find(|p| p.id == book).unwrap();
+        assert_eq!(grouped.kind, "book");
+        assert_eq!(grouped.lessons, [first, second]);
+        assert_eq!(playlists.iter().find(|p| p.id == regular).unwrap().lessons, [first, second]);
+
+        playlist_delete(&c, book).unwrap();
+        let chapters = lessons_list(&c, "en").unwrap();
+        assert_eq!(chapters.len(), 3);
+        let original = chapters.iter().find(|l| l.id == first).unwrap();
+        assert_eq!((original.title.as_str(), original.collection.as_str(), original.page), ("Book · 1/20", "Original collection", 3));
     }
 
     #[test]

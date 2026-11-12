@@ -28,8 +28,8 @@ import { VideoStage } from "./VideoStage";
 import { blurLiteral, knownRuns, type ReaderPart } from "./knownRuns";
 import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
-import { pageWordKey, requestExplanation, requestWordPreload, selectionContext, translationSettingsKey, usePagePreload } from "./pagePreload";
-import { PageAiMenu } from "./PageAiMenu";
+import { pageWordKey, requestExplanation, selectionContext, translationSettingsKey, usePagePreload, useTranslationLookahead } from "./pagePreload";
+import { PagePreloadMenu } from "./PagePreloadMenu";
 
 interface Range {
   a: number;
@@ -279,7 +279,11 @@ export function Reader() {
   const explanations = usePagePreload(JSON.stringify([pageKey,
     settings.online_explain_engine, settings.online_model_chatgpt_explain, settings.online_model_chatgpt,
     settings.llm_model, settings.ui_lang]), requestExplanation);
-  const translations = usePagePreload(JSON.stringify([pageKey, translationSettingsKey(settings)]), requestWordPreload);
+  const translations = useTranslationLookahead({
+    scope: JSON.stringify([lessonId, lang, translationSettingsKey(settings)]),
+    lang, text: lesson?.id === lessonId ? lesson?.text : undefined, tokens, terms, pages, page,
+    blocked: !!explanations.progress?.running,
+  });
   const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
   const showPinyin = chineseStudy && settings.chinese_pinyin !== "0";
   const showGloss = chineseStudy && settings.chinese_gloss !== "0";
@@ -1588,12 +1592,20 @@ export function Reader() {
           >
             <Icon name="copy" size={17} />
           </button>
-          <PageAiMenu key={lesson.id} eligible={canPreload} onSimplify={() => setSimplify(true)}
+          <PagePreloadMenu key={lesson.id} eligible={canPreload} savedCount={settings.translation_preload_ahead ?? "5"}
             translations={{ progress: translations.progress, stop: translations.stop,
-              start: () => void translations.prepare(lang, lesson.text, tokens, pr.start, pr.end, terms) }}
+              enabled: translations.enabled, start: (count) => {
+                translations.start(count);
+                void setSetting("translation_preload_ahead", String(count)).catch((error) => toast(errorText(error), "error"));
+              } }}
             explanations={lang === "zh" ? { progress: explanations.progress, stop: explanations.stop,
               start: () => void explanations.prepare(lang, lesson.text, tokens, pr.start, pr.end, terms) } : undefined}
           />
+          <button type="button" className="icon-btn no-drag" onClick={() => setSimplify(true)}
+            aria-label={t("Simplifier le texte", "Simplify text")} title={t("Simplifier le texte", "Simplify text")}
+          >
+            <Icon name="sparkle" size={17} />
+          </button>
           {floating && (
             <button
               className={`icon-btn no-drag chat-float-btn ${aside === "chat" ? "on" : ""}`}

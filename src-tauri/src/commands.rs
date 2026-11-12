@@ -316,6 +316,11 @@ pub async fn playlist_create(state: State<'_, AppState>, lang: String, name: Str
 }
 
 #[tauri::command]
+pub async fn book_group(state: State<'_, AppState>, lang: String, name: String, lessons: Vec<i64>) -> R<i64> {
+    db::book_group(&mut state.db.lock(), &lang, &name, &lessons).map_err(err)
+}
+
+#[tauri::command]
 pub async fn playlist_update(state: State<'_, AppState>, id: i64, patch: PlaylistPatch) -> R<()> {
     db::playlist_update(&mut state.db.lock(), id, &patch).map_err(err)
 }
