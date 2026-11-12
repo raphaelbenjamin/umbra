@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { api, errorText } from "../../lib/api";
+import { onlineState } from "../../lib/online";
 import { useApp } from "../../lib/store";
 import { sentenceBounds } from "../../lib/tokenize";
-import type { Explanation, LangCode, Term, Token } from "../../lib/types";
+import type { Explanation, LangCode, Term, Token, WordAnswer } from "../../lib/types";
 
-export function explanationKey(selection: string, sentence: string) {
+export function pageWordKey(selection: string, sentence: string) {
   return JSON.stringify([selection.trim(), sentence]);
 }
 
@@ -19,7 +20,7 @@ const pending = new Map<string, Promise<Explanation>>();
 
 export function requestExplanation(lang: LangCode, selection: string, sentence: string) {
   const settings = useApp.getState().settings;
-  const key = JSON.stringify([lang, explanationKey(selection, sentence), settings.online_explain_engine,
+  const key = JSON.stringify([lang, pageWordKey(selection, sentence), settings.online_explain_engine,
     settings.online_model_chatgpt_explain, settings.online_model_chatgpt, settings.llm_model, settings.ui_lang]);
   const current = pending.get(key);
   if (current) return current;
@@ -28,10 +29,33 @@ export function requestExplanation(lang: LangCode, selection: string, sentence: 
   return request;
 }
 
-export function usePageExplanations(pageKey: string) {
+export function translationSettingsKey(settings: Record<string, string>) {
+  const online = onlineState(settings);
+  return JSON.stringify([settings.ui_lang, settings.llm_model, online.words, online.provider.id, online.model, online.ready]);
+}
+
+const pendingTranslations = new Map<string, Promise<WordAnswer>>();
+function translationKey(lang: LangCode, word: string, sentence: string) {
+  return JSON.stringify([lang, pageWordKey(word, sentence), translationSettingsKey(useApp.getState().settings)]);
+}
+
+export function pendingTranslation(lang: LangCode, word: string, sentence: string) {
+  return pendingTranslations.get(translationKey(lang, word, sentence));
+}
+
+export function requestWordPreload(lang: LangCode, word: string, sentence: string) {
+  const key = translationKey(lang, word, sentence);
+  const current = pendingTranslations.get(key);
+  if (current) return current;
+  const request = api().aiWord(lang, word, sentence, () => {}, true).finally(() => pendingTranslations.delete(key));
+  pendingTranslations.set(key, request);
+  return request;
+}
+
+export function usePagePreload<T>(pageKey: string, load: (lang: LangCode, selection: string, sentence: string) => Promise<T>) {
   const active = useRef<AbortController | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number; running: boolean; stopping?: boolean } | null>(null);
-  const [answers, setAnswers] = useState<Record<string, Explanation>>({});
+  const [answers, setAnswers] = useState<Record<string, T>>({});
   const toast = useApp((s) => s.toast);
 
   useLayoutEffect(() => {
@@ -48,7 +72,7 @@ export function usePageExplanations(pageKey: string) {
     setProgress((previous) => previous && { ...previous, stopping: true });
   }
 
-  async function prepare(text: string, tokens: Token[], start: number, end: number, terms: Record<string, Term>) {
+  async function prepare(lang: LangCode, text: string, tokens: Token[], start: number, end: number, terms: Record<string, Term>) {
     if (active.current) return;
     const targets = new Map<string, { selection: string; sentence: string }>();
     for (let index = start; index < end; index++) {
@@ -56,7 +80,7 @@ export function usePageExplanations(pageKey: string) {
       if (!token?.w || (terms[token.k]?.status ?? 0) >= 4) continue;
       const selection = text.slice(token.s, token.e).replace(/\s+/g, " ");
       const { sentence } = selectionContext(text, tokens, index, index);
-      targets.set(explanationKey(selection, sentence), { selection, sentence });
+      targets.set(pageWordKey(selection, sentence), { selection, sentence });
     }
     if (!targets.size) return;
     const batch = new AbortController();
@@ -66,7 +90,7 @@ export function usePageExplanations(pageKey: string) {
     try {
       for (const [key, { selection, sentence }] of targets) {
         if (batch.signal.aborted) break;
-        const answer = await requestExplanation("zh", selection, sentence);
+        const answer = await load(lang, selection, sentence);
         if (batch.signal.aborted) break;
         done++;
         setAnswers((previous) => ({ ...previous, [key]: answer }));

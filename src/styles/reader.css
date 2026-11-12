@@ -133,11 +133,6 @@
 .reader-top .title-mini.show {
   opacity: 1;
 }
-@media (max-width: 720px) {
-  .reader-prepare-explanations > span {
-    display: none;
-  }
-}
 .reader-scroll {
   flex: 1;
   min-height: 0;
@@ -678,6 +673,52 @@ span.player-voice .icon-btn {
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+.look-pop.page-ai-pop {
+  width: min(320px, calc(100vw - 48px));
+  padding: 6px;
+  gap: 2px;
+  border-radius: 13px;
+}
+.page-ai-action {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  font-size: 13px;
+}
+.page-ai-action:not(:disabled):hover {
+  background: var(--chip);
+}
+.page-ai-action:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.page-ai-action small {
+  margin-inline-start: auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.page-ai-action.page-ai-simplify {
+  margin-top: 3px;
+  border-top: 1px solid var(--border);
+}
+.page-ai-busy {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
 }
 .look-head {
   display: flex;

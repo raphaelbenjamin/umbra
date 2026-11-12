@@ -481,13 +481,15 @@ async fn generate(st: &AppState, brain: &Brain, messages: &[(&str, String)], max
 
 /// Traduction : l'IA en ligne, et si elle est injoignable (pas de connexion),
 /// le modèle de ce Mac s'il est installé. Renvoie la réponse et qui l'a donnée.
-async fn translate(st: &AppState, brain: Brain, messages: &[(&str, String)], max_tokens: usize, epoch: u64, on_event: &Channel<AiEvent>) -> R<(String, Brain)> {
-    match generate(st, &brain, messages, max_tokens, Priority::Interactive(epoch), Some(on_event)).await {
+async fn translate(st: &AppState, brain: Brain, messages: &[(&str, String)], max_tokens: usize, epoch: Option<u64>, on_event: &Channel<AiEvent>) -> R<(String, Brain)> {
+    let priority = || epoch.map_or(Priority::Background, Priority::Interactive);
+    let events = epoch.map(|_| on_event);
+    match generate(st, &brain, messages, max_tokens, priority(), events).await {
         Ok(out) => Ok((out, brain)),
         Err(e) if online::is_unreachable(&e) => match active_model(st, "llm") {
             Ok(m) => {
                 let local = Brain::Local(m);
-                let out = generate(st, &local, messages, max_tokens, Priority::Interactive(epoch), Some(on_event)).await.map_err(err)?;
+                let out = generate(st, &local, messages, max_tokens, priority(), events).await.map_err(err)?;
                 Ok((out, local))
             }
             Err(_) => Err(e.to_string()),
@@ -510,6 +512,7 @@ pub async fn ai_word(
     word: String,
     sentence: String,
     on_event: Channel<AiEvent>,
+    preload: Option<bool>,
 ) -> R<WordAnswer> {
     let brain = brain(&state, online::Role::Words)?;
     // traductions en français (clé d'origine) ou en anglais (clé à part)
@@ -521,7 +524,7 @@ pub async fn ai_word(
         let (t, n) = v.split_once('\u{1f}').unwrap_or((&v, ""));
         return Ok(WordAnswer { translation: t.to_string(), note: n.to_string(), cached: true });
     }
-    let epoch = state.ai.next_epoch();
+    let epoch = (!preload.unwrap_or(false)).then(|| state.ai.next_epoch());
     // indice du dictionnaire : forme de base et premiers sens
     let mut hint = String::new();
     if !word.contains(' ') && state.dicts.available(&lang) {
@@ -563,7 +566,7 @@ pub async fn ai_sentence(
     }
     let epoch = state.ai.next_epoch();
     let messages = ai::sentence_messages(native, &lang, &sentence);
-    let (out, by) = translate(state.inner(), brain, &messages, 260, epoch, &on_event).await?;
+    let (out, by) = translate(state.inner(), brain, &messages, 260, Some(epoch), &on_event).await?;
     let out = out.trim().trim_matches(['«', '»', '"']).trim().to_string();
     if !out.is_empty() && !echo(&out) {
         db::cache_put(&state.db.lock(), &key_of(&by), &out);

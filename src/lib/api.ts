@@ -126,7 +126,7 @@ export interface Api {
   dictStatus(lang: LangCode): Promise<DictStatus>;
   /** un dictionnaire vient d'arriver (ou son téléchargement a échoué) */
   dictListen(onChange: (lang: string) => void): Promise<() => void>;
-  aiWord(lang: LangCode, word: string, sentence: string, onPiece: (t: string) => void): Promise<WordAnswer>;
+  aiWord(lang: LangCode, word: string, sentence: string, onPiece: (t: string) => void, preload?: boolean): Promise<WordAnswer>;
   aiSentence(lang: LangCode, sentence: string, onPiece: (t: string) => void): Promise<string>;
   aiSimplify(lang: LangCode, text: string, level: string, onPiece: (t: string) => void): Promise<string>;
   explainSelection(lang: LangCode, selection: string, sentence: string): Promise<Explanation>;
@@ -279,8 +279,8 @@ async function createTauriApi(): Promise<Api> {
       const { listen } = await import("@tauri-apps/api/event");
       return listen<string>("dict", (e) => onChange(e.payload));
     },
-    aiWord: (lang, word, sentence, onPiece) =>
-      invoke("ai_word", { lang, word, sentence, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
+    aiWord: (lang, word, sentence, onPiece, preload) =>
+      invoke("ai_word", { lang, word, sentence, preload: preload ?? false, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
     aiSentence: (lang, sentence, onPiece) =>
       invoke("ai_sentence", { lang, sentence, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
     aiSimplify: (lang, text, level, onPiece) =>

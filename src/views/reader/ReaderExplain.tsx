@@ -4,7 +4,7 @@ import { api, errorText } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { useApp } from "../../lib/store";
 import type { Explanation, LangCode } from "../../lib/types";
-import { requestExplanation } from "./pageExplanations";
+import { requestExplanation } from "./pagePreload";
 
 export function ReaderExplain({ lang, selection, sentence, prepared }: {
   lang: LangCode; selection: string; sentence: string; prepared?: Explanation;

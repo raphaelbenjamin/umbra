@@ -28,7 +28,8 @@ import { VideoStage } from "./VideoStage";
 import { blurLiteral, knownRuns, type ReaderPart } from "./knownRuns";
 import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
-import { explanationKey, selectionContext, usePageExplanations } from "./pageExplanations";
+import { pageWordKey, requestExplanation, requestWordPreload, selectionContext, translationSettingsKey, usePagePreload } from "./pagePreload";
+import { PageAiMenu } from "./PageAiMenu";
 
 interface Range {
   a: number;
@@ -274,9 +275,11 @@ export function Reader() {
   const pages = fittedOk ? fitted.pages : basePages;
   const pr = pages[page] ?? { start: 0, end: 0, words: 0 };
   const lang = lesson?.lang ?? "en";
-  const explanations = usePageExplanations(JSON.stringify([lessonId, page, pr.start, pr.end,
+  const pageKey = JSON.stringify([lessonId, page, pr.start, pr.end]);
+  const explanations = usePagePreload(JSON.stringify([pageKey,
     settings.online_explain_engine, settings.online_model_chatgpt_explain, settings.online_model_chatgpt,
-    settings.llm_model, settings.ui_lang]));
+    settings.llm_model, settings.ui_lang]), requestExplanation);
+  const translations = usePagePreload(JSON.stringify([pageKey, translationSettingsKey(settings)]), requestWordPreload);
   const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
   const showPinyin = chineseStudy && settings.chinese_pinyin !== "0";
   const showGloss = chineseStudy && settings.chinese_gloss !== "0";
@@ -988,7 +991,7 @@ export function Reader() {
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey) return;
+      if (t.closest("input, textarea, select, [contenteditable], [data-page-ai]") || e.metaKey || e.ctrlKey) return;
       if (useApp.getState().importOpen || useMenu.getState().shortcuts || simplify || complete || lookOpen || adding) return;
       if (e.key.toLowerCase() === "h" && !e.altKey && !e.shiftKey) {
         e.preventDefault();
@@ -1416,29 +1419,31 @@ export function Reader() {
       {paragraphs}
     </div>
   );
+  const selectedWord = selection ? pageWordKey(selection.surface, selection.sentence) : null;
   const wordPanel = (
     <WordPanel
       lang={lang}
       sel={selection}
       term={selection ? terms[selection.key] : undefined}
-      preparedExplanation={selection && lang === "zh" ? explanations.answers[explanationKey(selection.surface, selection.sentence)] : undefined}
+      preparedExplanation={selectedWord && lang === "zh" ? explanations.answers[selectedWord] : undefined}
+      preparedTranslation={selectedWord ? translations.answers[selectedWord] : undefined}
       onStatus={(k, s) => setStatus(k, s)}
       onTranslation={onTranslation}
       onSelectPhrase={(a, b) => select(a, b)}
       onClose={() => setRange(null)}
     />
   );
-  const prep = explanations.progress;
-  let prepareLabel = t("Préparer les explications", "Preload explanations");
-  if (prep?.stopping) {
-    prepareLabel = t("Arrêt…", "Stopping…");
-  } else if (prep?.running) {
-    prepareLabel = t(`Arrêter (${prep.done}/${prep.total})`, `Stop (${prep.done}/${prep.total})`);
-  } else if (prep && prep.done === prep.total) {
-    prepareLabel = t("Explications prêtes", "Explanations ready");
-  } else if (prep?.done) {
-    prepareLabel = t(`Reprendre (${prep.done}/${prep.total})`, `Resume (${prep.done}/${prep.total})`);
-  }
+  const canPreload = tokens.slice(pr.start, pr.end).some((token) => token.w && (terms[token.k]?.status ?? 0) < 4);
+  const copyPage = async () => {
+    if (pr.start >= pr.end) return;
+    const text = lesson.text.slice(tokens[pr.start].s, tokens[pr.end - 1].e).trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(t("Texte de la page copié", "Page text copied"), "light");
+    } catch {
+      toast(t("La copie n’a pas abouti.", "Couldn’t copy the page."), "error");
+    }
+  };
 
   // page qui ne tourne pas avec la lecture : où en est la lanterne ?
   const cursorPage = cursor >= 0 ? pageOfToken(pages, cursor) : -1;
@@ -1577,27 +1582,18 @@ export function Reader() {
               <DisplayMenu open={lookOpen} onClose={closeLook} lang={lang} />
             </div>
           )}
-          <button className="btn sm soft no-drag" onClick={() => setSimplify(true)} title={t("Réécrire ce texte à un niveau plus simple", "Rewrite this text at a simpler level")}>
-            <Icon name="sparkle" size={14} /> {t("Simplifier", "Simplify")}
+          <button type="button" className="icon-btn no-drag" onClick={() => void copyPage()}
+            disabled={pr.start >= pr.end} aria-label={t("Copier le texte de la page", "Copy page text")}
+            title={t("Copier le texte de la page", "Copy page text")}
+          >
+            <Icon name="copy" size={17} />
           </button>
-          {lang === "zh" && !cinema && (
-            <button
-              className="btn sm soft no-drag reader-prepare-explanations"
-              aria-label={prepareLabel}
-              disabled={prep?.stopping || (!prep?.running &&
-                !tokens.slice(pr.start, pr.end).some((token) => token.w && (terms[token.k]?.status ?? 0) < 4))}
-              onClick={() => prep?.running
-                ? explanations.stop()
-                : void explanations.prepare(lesson.text, tokens, pr.start, pr.end, terms)}
-              title={prep?.running
-                ? t("Arrêter après l’explication en cours", "Stop after the current explanation")
-                : t("Préparer les explications des mots nouveaux et en cours d’apprentissage de cette page avec votre tuteur IA",
-                    "Prepare explanations for new and learning words on this page using your AI tutor")}
-            >
-              <Icon name="bulb" size={14} />
-              <span aria-live="polite">{prepareLabel}</span>
-            </button>
-          )}
+          <PageAiMenu key={lesson.id} eligible={canPreload} onSimplify={() => setSimplify(true)}
+            translations={{ progress: translations.progress, stop: translations.stop,
+              start: () => void translations.prepare(lang, lesson.text, tokens, pr.start, pr.end, terms) }}
+            explanations={lang === "zh" ? { progress: explanations.progress, stop: explanations.stop,
+              start: () => void explanations.prepare(lang, lesson.text, tokens, pr.start, pr.end, terms) } : undefined}
+          />
           {floating && (
             <button
               className={`icon-btn no-drag chat-float-btn ${aside === "chat" ? "on" : ""}`}

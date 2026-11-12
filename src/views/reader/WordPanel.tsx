@@ -8,7 +8,8 @@ import { useOnline } from "../../lib/online";
 import { t } from "../../lib/i18n";
 import { preparePronunciation, pronounce } from "../../lib/pronounce";
 import { useApp } from "../../lib/store";
-import type { DictEntry, DictResult, Explanation, LangCode, Status, Term } from "../../lib/types";
+import type { DictEntry, DictResult, Explanation, LangCode, Status, Term, WordAnswer } from "../../lib/types";
+import { pendingTranslation } from "./pagePreload";
 import { loadReaderDictionary } from "./dictionaryLookup";
 
 export interface Selection {
@@ -48,6 +49,7 @@ const statusOpts = (): { s: Status; label: string; sw: string }[] => [
 
 interface Props {
   preparedExplanation?: Explanation;
+  preparedTranslation?: WordAnswer;
   lang: LangCode;
   sel: Selection | null;
   term: Term | undefined;
@@ -126,7 +128,7 @@ function DictionaryDefinitions({ dict, lang, surface, onGloss }: {
   );
 }
 
-export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
+export function WordPanel({ lang, sel, term, preparedExplanation, preparedTranslation, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const openGuide = useApp((s) => s.openGuide);
@@ -164,6 +166,20 @@ export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTr
   useLayoutEffect(() => {
     if (!sel) return;
     const id = ++reqId.current;
+    const showWord = (answer: WordAnswer) => {
+      setAi(answer.translation);
+      setAiNote(answer.note);
+      setAiState("done");
+      if (answer.translation && !termRef.current?.translation && (!sel.isPhrase || termRef.current)) {
+        onTranslation(sel.key, answer.translation, answer.note, sel.sentence, true);
+      }
+    };
+    if (preparedTranslation?.translation) {
+      setAiError("");
+      setSlow(false);
+      showWord(preparedTranslation);
+      return;
+    }
     setAi("");
     setAiNote("");
     setAiError("");
@@ -191,7 +207,7 @@ export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTr
           }
           return;
         }
-        const res = await api().aiWord(lang, sel.surface, sel.sentence, (piece) => {
+        const translateWord = () => api().aiWord(lang, sel.surface, sel.sentence, (piece) => {
           if (id !== reqId.current) return;
           raw += piece;
           // « Sens : … » (français) ou « Meaning: … » (anglais)
@@ -199,14 +215,10 @@ export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTr
           setAi(line.replace(/^\s*(sens|meaning)\s*[:：]\s*/i, ""));
           setAiState("stream");
         });
+        const pending = pendingTranslation(lang, sel.surface, sel.sentence);
+        const res = await (pending ?? translateWord());
         if (id !== reqId.current) return;
-        setAi(res.translation);
-        setAiNote(res.note);
-        setAiState("done");
-        // une sélection de plusieurs mots ne devient une expression que sur demande
-        if (res.translation && !termRef.current?.translation && (!sel.isPhrase || termRef.current)) {
-          onTranslation(sel.key, res.translation, res.note, sel.sentence, true);
-        }
+        showWord(res);
       } catch (e) {
         if (id !== reqId.current) return;
         if (isNoModel(e)) setAiState("nomodel");
@@ -223,7 +235,7 @@ export function WordPanel({ lang, sel, term, preparedExplanation, onStatus, onTr
       window.clearTimeout(slowTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, surface, sentence, lang, llmReady, onlineKey]);
+  }, [key, surface, sentence, lang, llmReady, onlineKey, preparedTranslation]);
 
   // la prononciation se prépare dès le toucher : le haut-parleur répond aussitôt
   useEffect(() => {
