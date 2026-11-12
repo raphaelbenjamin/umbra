@@ -486,12 +486,18 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
     [timing, seekTo, setCursor],
   );
 
-  const playMedia = () => {
+  const playMedia = (userInitiated = false) => {
     const m = master();
     if (!m) return;
     pausedMediaAt.current = null;
-    // refus possible (lecture sans geste de l'utilisateur) : le lecteur reste simplement en pause
-    void m.play().catch(() => {});
+    void m.play().catch((error: unknown) => {
+      if (!userInitiated || master() !== m || (error instanceof DOMException && error.name === "AbortError")) return;
+      const code = m.error?.code;
+      const message = code === 3 || code === 4
+        ? t("Le fichier audio est illisible ou introuvable.", "The audio file is unreadable or missing.")
+        : t("Impossible de démarrer la lecture audio.", "Couldn't start audio playback.");
+      useApp.getState().toast(message, "error");
+    });
     if (dual && !idleRef.current) void videoRef.current?.play().catch(() => {});
   };
   const pauseMedia = () => {
@@ -525,7 +531,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
         } else if (timing && r && !resumesAway(cur) && (cur < r.start || cur >= r.end)) {
           seekToToken(r.start);
         }
-        playMedia();
+        playMedia(true);
       } else pauseMedia();
       return;
     }

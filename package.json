@@ -1,7 +1,7 @@
 {
   "name": "umbra",
   "private": true,
-  "version": "2.0.14",
+  "version": "2.0.15",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:reader-dictionary": "node --test scripts/reader-dictionary.test.mjs",
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.mjs",
     "tauri": "tauri",

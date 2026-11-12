@@ -436,19 +436,18 @@ impl Dict {
         };
         let noun = self.entries(stem, false)?.into_iter().find(|e| e.pos == "Noun");
         let Some(noun) = noun else { return Ok(exact) };
-        if exact.entries.iter().any(|e| e.word == noun.word && e.pos == noun.pos) {
-            return Ok(exact);
-        }
         let after = after.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '־' | '-'));
         let next_word = crate::text::word_keys(after, "he").into_iter().next();
         let year_context = stem == "שנה" && matches!(
             next_word.as_deref(), Some("שעברה" | "הבאה" | "האחרונה" | "הראשונה" | "הזאת")
         );
-        if (after.starts_with(|c: char| c.is_numeric()) || year_context) && self.entries(&key, false)?.is_empty() {
+        let followed_by_number = after.starts_with(|c: char| c.is_numeric());
+        if year_context || (followed_by_number && (stem == "שנה" || self.entries(&key, false)?.is_empty())) {
             exact.lemma = Some(noun.word.clone());
             exact.form_note = Some(format!("ב־ + {}", noun.word));
+            exact.entries.retain(|e| e.word != noun.word || e.pos != noun.pos);
             exact.entries.insert(0, noun);
-        } else {
+        } else if !exact.entries.iter().any(|e| e.word == noun.word && e.pos == noun.pos) {
             exact.entries.insert(exact.entries.len().min(1), noun);
         }
         Ok(exact)
@@ -1424,20 +1423,47 @@ mod tests {
                 ('多少','多少','','duōshǎo','amount',0), ('多少','多少','','duōshao','how much?',1);
         ").unwrap();
         let dict = Dict { conn, v2: true };
-        for (word, reading, part, gloss) in [
-            ("本书", "běn shū", 0, "this; classifier for books after a number or demonstrative"),
-            ("一台", "yī tái", 1, "classifier for machines and devices"),
-            ("八块钱", "bā kuài qián", 1, "yuan (colloquial currency unit)"),
+        for (word, reading, parts, part, gloss) in [
+            ("本书", "běn shū", &["本", "书"][..], 0, "this; classifier for books after a number or demonstrative"),
+            ("一台", "yī tái", &["一", "台"][..], 1, "classifier for machines and devices"),
+            ("八块钱", "bā kuài qián", &["八", "块", "钱"][..], 1, "yuan (colloquial currency unit)"),
         ] {
             let result = dict.lookup_zh("en", word).unwrap();
             assert!(result.breakdown);
             assert_eq!(result.pinyin.as_deref(), Some(reading));
+            assert_eq!(result.entries.iter().map(|entry| entry.word.as_str()).collect::<Vec<_>>(), parts);
             assert_eq!(result.entries[part].glosses[0], gloss);
         }
         let amount = dict.lookup_zh("en", "多少").unwrap();
         assert_eq!(amount.pinyin.as_deref(), Some("duōshao"));
+        assert_eq!(amount.entries[0].glosses[0], "how much?");
         assert_eq!(amount.entries[1].ipa, "duōshǎo");
+        assert_eq!(amount.entries[1].glosses[0], "amount");
         assert!(dict.lookup_zh("en", "八龘").unwrap().pinyin.is_none());
+    }
+
+    #[test]
+    fn hebrew_year_context_ranks_the_noun_above_an_exact_rare_reading() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("
+            CREATE TABLE entries (k TEXT, word TEXT, pos TEXT, ipa TEXT, gloss TEXT, rank INTEGER);
+            CREATE TABLE forms (k TEXT, lemma TEXT, note INTEGER);
+            CREATE TABLE notes (id INTEGER, text TEXT);
+            INSERT INTO entries VALUES
+                ('בשנה','בשנה','Verb','','be ashamed',0),
+                ('שנה','שנה','Noun','','year',0);
+        ").unwrap();
+        let dict = Dict { conn, v2: true };
+        let lookup = |word, after| dict.hebrew_context(word, after, dict.find("he", word).unwrap()).unwrap();
+        for (word, after) in [("בשנה", " שעברה"), ("בַּשָּׁנָה", " 2025"), ("בשנה", "־הבאה")] {
+            let result = lookup(word, after);
+            assert_eq!(result.entries[0].glosses[0], "year");
+            assert_eq!(result.entries[1].glosses[0], "be ashamed");
+            assert_eq!(result.form_note.as_deref(), Some("ב־ + שנה"));
+        }
+        let ambiguous = lookup("בשנה", "");
+        assert_eq!(ambiguous.entries[0].glosses[0], "be ashamed");
+        assert_eq!(ambiguous.entries[1].glosses[0], "year");
     }
 
     /// Format 2 : définitions en français et en anglais des 24 autres langues.

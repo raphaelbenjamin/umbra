@@ -362,8 +362,12 @@ pub async fn audio_or_keep(src: PathBuf, level: Level) -> PathBuf {
     let cancel = AtomicBool::new(false);
     match audio(&src, level, &cancel).await {
         Ok(Some(l)) => {
-            let _ = std::fs::remove_file(&src);
-            l.audio.unwrap_or(src)
+            if let Some(path) = l.audio.filter(|path| path != &src && crate::media::is_nonempty_media_file(path)) {
+                let _ = std::fs::remove_file(&src);
+                path
+            } else {
+                src
+            }
         }
         Ok(None) => src,
         Err(e) => {

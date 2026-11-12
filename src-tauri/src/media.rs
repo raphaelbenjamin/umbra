@@ -1155,6 +1155,10 @@ pub async fn yt_captions(
     )))
 }
 
+pub(crate) fn is_nonempty_media_file(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|meta| meta.is_file() && meta.len() > 0)
+}
+
 pub async fn yt_audio(
     data_dir: &Path,
     ytdlp: &Path,
@@ -1183,7 +1187,14 @@ pub async fn yt_audio(
     let out = run_with_fallback(data_dir, ytdlp, &args, browser, on_progress).await?;
     let title = out.iter().find_map(|l| l.strip_prefix("TITLE:")).unwrap_or(crate::i18n::t("Vidéo", "Video")).to_string();
     let file = out.iter().find_map(|l| l.strip_prefix("FILE:")).ok_or_else(|| anyhow!(crate::i18n::t("fichier audio introuvable", "audio file not found")))?;
-    Ok((PathBuf::from(file), title))
+    let file = PathBuf::from(file);
+    if !is_nonempty_media_file(&file) {
+        return Err(anyhow!(crate::i18n::t(
+            "Le fichier audio téléchargé est manquant ou vide.",
+            "The downloaded audio file is missing or empty."
+        )));
+    }
+    Ok((file, title))
 }
 
 /// Choix de l'image à télécharger (`-f` puis `-S` de yt-dlp) : la plus légère

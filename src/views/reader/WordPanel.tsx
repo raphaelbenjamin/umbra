@@ -8,7 +8,8 @@ import { useOnline } from "../../lib/online";
 import { t } from "../../lib/i18n";
 import { preparePronunciation, pronounce } from "../../lib/pronounce";
 import { useApp } from "../../lib/store";
-import type { DictResult, LangCode, Status, Term } from "../../lib/types";
+import type { DictEntry, DictResult, LangCode, Status, Term } from "../../lib/types";
+import { loadReaderDictionary } from "./dictionaryLookup";
 
 export interface Selection {
   /** texte affiché (mot ou expression) */
@@ -56,6 +57,74 @@ interface Props {
   onClose(): void;
 }
 
+function DictionaryDefinitions({ dict, lang, surface, onGloss }: {
+  dict: DictResult;
+  lang: LangCode;
+  surface: string;
+  onGloss: (gloss: string) => void;
+}) {
+  const [selectedPart, setSelectedPart] = useState(0);
+  const entries = dict.entries.filter((entry) => entry.glosses.some(Boolean));
+  const first = entries[0];
+  if (!first) return null;
+
+  const glosses = (entry: DictEntry) => entry.glosses.filter(Boolean);
+  const label = (entry: DictEntry) => (
+    <div className="wp-dict-label">
+      <bdi lang={lang}>{displayText(entry.word, lang)}</bdi>
+      {entry.ipa && (lang === "zh" || lang === "ja") && <bdi lang={lang === "zh" ? "zh-Latn" : lang}>{entry.ipa}</bdi>}
+      {entry.pos && lang !== "zh" && <span>{entry.pos}</span>}
+    </div>
+  );
+  const meaning = (gloss: string) => (
+    <button className="wp-dict-gloss" type="button" onClick={() => onGloss(gloss)} title={t("Utiliser comme ma traduction", "Use as my translation")}>
+      {gloss}
+    </button>
+  );
+  const preferred = glosses(first);
+  const alternatives = preferred.length > 1 || entries.length > 1;
+  const part = entries[selectedPart] ?? first;
+
+  return (
+    <section className="wp-block wp-dictionary">
+      <span className="eyebrow">{dict.breakdown ? t("Éléments de l’expression", "Phrase parts") : t("Dictionnaire", "Dictionary")}</span>
+      {dict.breakdown ? (
+        <>
+          <div className="wp-dict-parts" dir={lang === "he" ? "rtl" : "ltr"} role="group" aria-label={t("Éléments de l’expression", "Phrase parts")}>
+            {entries.map((entry, index) => (
+              <button key={index} type="button" aria-pressed={part === entry} onClick={() => setSelectedPart(index)} lang={lang}>
+                {displayText(entry.word, lang)}
+              </button>
+            ))}
+          </div>
+          <div className="wp-dict-entry" aria-live="polite">
+            {label(part)}
+            {glosses(part).map((gloss, index) => <div className="wp-dict-part-gloss" key={index}>{gloss}</div>)}
+          </div>
+        </>
+      ) : (
+        <>
+          {first.word !== surface.toLowerCase() && label(first)}
+          {dict.form_note && first.word === dict.lemma && <bdi className="wp-dict-label">{dict.form_note}</bdi>}
+          {meaning(preferred[0])}
+          {alternatives && (
+            <details className="wp-dict-more">
+              <summary>{t("Autres sens", "Other meanings")}</summary>
+              {preferred.slice(1).map((gloss, index) => <div key={index}>{meaning(gloss)}</div>)}
+              {entries.slice(1).map((entry, index) => (
+                <div className="wp-dict-entry" key={index}>
+                  {label(entry)}
+                  {glosses(entry).map((gloss, i) => <div key={i}>{meaning(gloss)}</div>)}
+                </div>
+              ))}
+            </details>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
@@ -79,26 +148,27 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
 
   const key = sel?.key ?? "";
   const sentence = sel?.sentence ?? "";
+  const surface = sel?.surface ?? "";
+  const after = sel?.after ?? "";
+  const canLookUp = !!sel && dictLookable(lang, sel);
 
-  // dictionnaire + IA à chaque nouvelle sélection
+  useLayoutEffect(() => {
+    setDict(null);
+    if (!canLookUp) return;
+    const client = api();
+    return loadReaderDictionary(lang, () => client.dictLookup(lang, surface, after), (change) => client.dictListen(change), setDict);
+  }, [canLookUp, lang, key, surface, after]);
+
+  // IA à chaque nouvelle sélection
   useLayoutEffect(() => {
     if (!sel) return;
     const id = ++reqId.current;
-    setDict(null);
     setAi("");
     setAiNote("");
     setAiError("");
     setAiState("loading");
     setSlow(false);
     const slowTimer = window.setTimeout(() => id === reqId.current && setSlow(true), 2500);
-
-    if (dictLookable(lang, sel)) {
-      // la suite de la phrase : le mot japonais ou vietnamien qui commence ici
-      api()
-        .dictLookup(lang, sel.surface, sel.after)
-        .then((d) => id === reqId.current && setDict(d))
-        .catch(() => {});
-    }
 
     const t = window.setTimeout(async () => {
       let raw = "";
@@ -152,33 +222,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
       window.clearTimeout(slowTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, sentence, lang, llmReady, onlineKey]);
-
-  // dictionnaire en téléchargement : le mot s'affiche dès qu'il arrive (une seule relecture)
-  const pending = !!dict?.pending;
-  useEffect(() => {
-    if (!pending || !sel) return;
-    const id = reqId.current;
-    let alive = true;
-    let unlisten: (() => void) | undefined;
-    void api()
-      .dictListen((l) => {
-        if (l !== lang || id !== reqId.current) return;
-        api()
-          .dictLookup(lang, sel.surface, sel.after)
-          .then((d) => id === reqId.current && setDict({ ...d, pending: false }))
-          .catch(() => {});
-      })
-      .then((u) => (alive ? (unlisten = u) : u()));
-    return () => {
-      alive = false;
-      unlisten?.();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, key, lang]);
+  }, [key, surface, sentence, lang, llmReady, onlineKey]);
 
   // la prononciation se prépare dès le toucher : le haut-parleur répond aussitôt
-  const surface = sel?.surface ?? "";
   useEffect(() => {
     if (!surface) return;
     const t = window.setTimeout(() => preparePronunciation(surface, lang), 220);
@@ -291,7 +337,6 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
   }
 
   const status = term?.status ?? 0;
-  const entries = dict?.entries ?? [];
   const pinyin = dict?.pinyin;
 
   return (
@@ -400,32 +445,9 @@ export function WordPanel({ lang, sel, term, onStatus, onTranslation, onSelectPh
           </div>
         )}
 
-        {entries.length > 0 && (
-          <div className="wp-block">
-            <span className="eyebrow">{dict?.breakdown ? t("Éléments du dictionnaire", "Dictionary breakdown") : t("Dictionnaire", "Dictionary")}</span>
-            <div className="wp-gloss">
-              {entries.slice(0, dict?.breakdown ? 8 : 2).map((e, i) => (
-                <div key={i}>
-                  {(entries.length > 1 || e.word !== sel.surface.toLowerCase()) && (
-                    <div className="pos">
-                      {displayText(e.word, lang)}
-                      {lang === "ja" && e.ipa && e.ipa !== e.word ? `【${e.ipa}】` : ""}
-                      {lang === "zh" && e.ipa ? ` ${e.ipa}` : ""}
-                      {e.pos && ` · ${e.pos}`}
-                    </div>
-                  )}
-                  {e.glosses.slice(0, 3).map((g, j) => dict?.breakdown ? (
-                    <div key={j} className="wp-part-gloss"><span className="n">{j + 1}</span><span>{g}</span></div>
-                  ) : (
-                    <button key={j} onClick={() => onTranslation(sel.key, g, term?.note ?? aiNote, sel.sentence)} title={t("Utiliser comme ma traduction", "Use as my translation")}>
-                      <span className="n">{j + 1}</span>
-                      <span>{g}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
+        {!!dict?.entries.length && (
+          <DictionaryDefinitions key={JSON.stringify([lang, key, surface, after])} dict={dict} lang={lang} surface={surface}
+            onGloss={(gloss) => onTranslation(sel.key, gloss, term?.note ?? aiNote, sel.sentence)} />
         )}
       </div>
       <div className="wp-foot">
