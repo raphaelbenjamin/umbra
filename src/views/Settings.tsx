@@ -22,7 +22,7 @@ import { naturalVoiceFor, naturalVoices, naturalVoiceSpeaks, pronounce } from ".
 import { loadVoices, sayWord, voicesFor } from "../lib/tts";
 import { fontSizeKey, readerFontSize, panelMode, panelOptions, readerLook, readFont, SIZE_MAX, SIZE_MIN } from "../lib/reading";
 import { ChineseStudyOptions } from "./reader/ChineseStudy";
-import { FontPicker, LayoutPicker, PaperPicker, lineHeightOptions, widthOptions } from "./reader/Display";
+import { ChunkModeOptions, FontPicker, LayoutPicker, PaperPicker, lineHeightOptions, widthOptions } from "./reader/Display";
 import type { GpuInfo, LangCode, ModelRow } from "../lib/types";
 import { BackupSection } from "./BackupSection";
 import { StorageSection } from "./StorageSection";
@@ -704,6 +704,7 @@ function ReadingPane() {
       <Section title={t("La page", "The page")}>
         <div className="set-card">
           {lang === "zh" && <ChineseStudyOptions />}
+          <ChunkModeOptions />
           <div className="set-row set-stack">
             <div className="grow">
               <strong>{t("Mise en page", "Layout")}</strong>

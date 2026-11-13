@@ -9,6 +9,37 @@ import { ChineseStudyOptions } from "./ChineseStudy";
 
 const RING = { type: "spring", stiffness: 520, damping: 40 } as const;
 
+export function ChunkModeOptions({ compact = false }: { compact?: boolean }) {
+  const enabled = useApp((s) => s.settings.chunk_mode === "1");
+  const english = useApp((s) => s.settings.chunk_english !== "0");
+  const blurEnglish = useApp((s) => s.settings.chunk_blur_english === "1");
+  const set = useApp((s) => s.setSetting);
+  const row = compact ? "look-row" : "set-row";
+  const modeLabel = t("Mode expressions", "Chunk mode");
+  const englishLabel = t("Anglais sous les expressions", "English under chunks");
+  const blurLabel = t("Révéler l’anglais au survol", "Reveal English on hover");
+  return (
+    <>
+      <div className={row}>
+        <span>{modeLabel}</span>
+        <Switch label={modeLabel} on={enabled} onChange={(v) => void set("chunk_mode", v ? "1" : "0")} />
+      </div>
+      {enabled && (
+        <div className={row}>
+          <span>{englishLabel}</span>
+          <Switch label={englishLabel} on={english} onChange={(v) => void set("chunk_english", v ? "1" : "0")} />
+        </div>
+      )}
+      {enabled && english && (
+        <div className={row}>
+          <span>{blurLabel}</span>
+          <Switch label={blurLabel} on={blurEnglish} onChange={(v) => void set("chunk_blur_english", v ? "1" : "0")} />
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Mise en page : pages sans défilement (comme LingQ) ou une longue page à faire défiler. */
 export function LayoutPicker({ value, onChange, id }: { value: ReaderLayout; onChange(v: ReaderLayout): void; id: string }) {
   const opts: { v: ReaderLayout; label: string; hint: string }[] = [
@@ -236,6 +267,7 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
           </section>
 
           <section className="look-rows">
+            <ChunkModeOptions compact />
             {lang === "zh" && <ChineseStudyOptions compact />}
             <div className="look-row">
               <span>{t("Interligne", "Line spacing")}</span>

@@ -31,6 +31,7 @@ import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
 import { pageWordKey, requestExplanation, selectionContext, translationSettingsKey, usePagePreload, useTranslationLookahead } from "./pagePreload";
 import { PagePreloadMenu } from "./PagePreloadMenu";
 import { useChunkBreakdown } from "./chunkBreakdown";
+import { ChunkCards } from "./ChunkCards";
 
 interface Range {
   a: number;
@@ -153,6 +154,9 @@ export function Reader() {
   const [adding, setAdding] = useState<{ lesson: LessonSummary; all: LessonSummary[] } | null>(null);
 
   const look = readerLook(settings, data?.lesson.lang ?? settings.lang);
+  const chunkMode = settings.chunk_mode === "1";
+  const chunkEnglish = settings.chunk_english !== "0";
+  const chunkBlurEnglish = chunkEnglish && settings.chunk_blur_english === "1";
   const paged = look.layout === "pages";
   // la page tourne avec la lecture ; sinon elle reste où l'on lit pendant que le son continue
   const follow = settings.auto_turn !== "0";
@@ -165,6 +169,10 @@ export function Reader() {
   const viewRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
+  const setLeafView = useCallback((node: HTMLDivElement | null) => {
+    viewRef.current = node;
+    if (chunkMode) scrollRef.current = node;
+  }, [chunkMode]);
   const playerRef = useRef<PlayerHandle>(null);
   const drag = useRef<{ start: number; moved: boolean } | null>(null);
   const session = useRef({ read: 0, known: 0, lingqs: 0 });
@@ -279,7 +287,7 @@ export function Reader() {
   const pageText = lesson?.id === lessonId && pr.end > pr.start
     ? lesson.text.slice(pageTextStart, tokens[pr.end - 1].e)
     : "";
-  const breakdown = useChunkBreakdown(pageText);
+  const breakdown = useChunkBreakdown(pageText, chunkMode);
   const lang = lesson?.lang ?? "en";
   const pageKey = JSON.stringify([lessonId, page, pr.start, pr.end]);
   const explanations = usePagePreload(JSON.stringify([pageKey,
@@ -290,10 +298,13 @@ export function Reader() {
     lang, text: lesson?.id === lessonId ? lesson?.text : undefined, tokens, terms, pages, page,
     blocked: !!explanations.progress?.running,
   });
-  const chineseStudy = lang === "zh" && settings.chinese_beginner === "1";
+  const chineseBeginner = lang === "zh" && settings.chinese_beginner === "1";
+  const chineseStudy = !chunkMode && chineseBeginner;
   const showPinyin = chineseStudy && settings.chinese_pinyin !== "0";
   const showGloss = chineseStudy && settings.chinese_gloss !== "0";
-  const studyClass = chineseStudy ? ` zh-study${showPinyin ? "" : " zh-no-pinyin"}${showGloss ? "" : " zh-no-gloss"}` : "";
+  const studyClass = chineseBeginner
+    ? ` zh-study${settings.chinese_pinyin === "0" ? " zh-no-pinyin" : ""}${settings.chinese_gloss === "0" ? " zh-no-gloss" : ""}`
+    : "";
   const annotations = useChineseAnnotations(showPinyin || showGloss, tokens, pr.start, pr.end);
   const pl = usePlaylist(lesson);
   pageNow.current = page;
@@ -418,7 +429,7 @@ export function Reader() {
     const fit = () => {
       // la première page porte le titre de la leçon
       const head = ghostRef.current?.offsetHeight ?? 0;
-      const next = fitPages(box, tokens, { height, first: Math.max(line * 2, height - head), line, chineseStudy });
+      const next = fitPages(box, tokens, { height, first: Math.max(line * 2, height - head), line, chineseStudy: chineseBeginner });
       setFitted((prev) => (prev && prev.tokens === tokens && samePages(prev.pages, next) ? prev : { tokens, pages: next }));
     };
     // très longue leçon (chapitre de livre) déjà composée : le texte change de taille tout de suite,
@@ -470,7 +481,7 @@ export function Reader() {
     const a = data.lesson.anchor;
     const range = pages[page];
     if (!range || a <= range.start || a >= range.end) return;
-    if (!paged) {
+    if (!paged || chunkMode) {
       const sc = scrollRef.current;
       const el = pageRef.current?.querySelector(`[data-i="${a}"]`);
       if (!sc || !el) return;
@@ -481,7 +492,7 @@ export function Reader() {
     }
     // avec un média, la lanterne montre déjà l'endroit
     if (!(data.lesson.media_path && data.lesson.position > 0.5)) setResumeAt(a);
-  }, [data, pages, page, paged, fittedOk]);
+  }, [data, pages, page, paged, fittedOk, chunkMode]);
   useEffect(() => {
     if (resumeAt < 0) return;
     const t = window.setTimeout(() => setResumeAt(-1), 2600);
@@ -795,6 +806,7 @@ export function Reader() {
   // mode pages : deux doigts qui glissent sur le trackpad (ou la molette) tournent la page, comme dans Livres
   const swipe = useRef({ x: 0, y: 0, lock: false, timer: 0 });
   const onSwipe = (e: React.WheelEvent) => {
+    if (chunkMode && Math.abs(e.deltaY) >= Math.abs(e.deltaX)) return;
     const s = swipe.current;
     // un seul tour de page par geste : on attend que l'élan du trackpad retombe
     window.clearTimeout(s.timer);
@@ -1212,7 +1224,7 @@ export function Reader() {
       setLanternOut(0);
     } else setLanternOut(sc ? lanternSide() : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, page, pr.start, pr.end, relayout, studyClass]);
+  }, [cursor, page, pr.start, pr.end, relayout, studyClass, chunkMode, chunkEnglish, breakdown.chunks]);
 
   /** Mode défilement : la lanterne est-elle au-dessus (-1), en vue (0) ou au-dessous (1) ? */
   function lanternSide() {
@@ -1290,34 +1302,24 @@ export function Reader() {
   const paragraphs: React.ReactNode[] = [];
   let current: ReaderPart[] = [];
   const total = Math.max(1, pr.end - pr.start);
-  for (let i = pr.start; i < pr.end; i++) {
+  const tokenPart = (i: number, source: string): ReaderPart => {
     const t = tokens[i];
     const ph = phraseCover.get(i);
     const inPhrase = ph && i > ph.a && i <= ph.b;
     const inSel = range && range.a !== range.b && i > range.a && i < range.b;
-    const visible = displayText(t.t, lang);
+    const visible = displayText(source, lang);
     if (!t.w) {
-      const parts = visible.split(/\n+/);
-      if (parts.length > 1) {
-        if (parts[0]) current.push({ node: parts[0], known: blurKnown && blurLiteral(parts[0]) });
-        if (current.length) paragraphs.push(<p key={`p${i}`}>{knownRuns(current, blurKnown)}</p>);
-        current = [];
-        const tail = parts[parts.length - 1];
-        if (tail.trim()) current.push({ node: tail, known: blurKnown && blurLiteral(tail) });
-      } else {
-        current.push({
-          known: blurKnown && !inSel && blurLiteral(visible),
-          space: blurKnown && !inSel && /^\s+$/.test(visible),
-          node: inPhrase || inSel ? (
-            <span key={i} className={`${inPhrase ? `ph p${ph!.status}` : ""} ${inSel ? "sel-gap" : ""}`}>
-              {visible}
-            </span>
-          ) : (
-            visible
-          ),
-        });
-      }
-      continue;
+      return {
+        known: blurKnown && !inSel && blurLiteral(visible),
+        space: blurKnown && !inSel && /^\s+$/.test(visible),
+        node: inPhrase || inSel ? (
+          <span key={i} className={`${inPhrase ? `ph p${ph!.status}` : ""} ${inSel ? "sel-gap" : ""}`}>
+            {visible}
+          </span>
+        ) : (
+          visible
+        ),
+      };
     }
     const st = statusOf(t.k);
     const selected = range && i >= range.a && i <= range.b;
@@ -1330,14 +1332,30 @@ export function Reader() {
     const annotation = annotations[t.t];
     const pinyin = showPinyin ? annotation?.pinyin : undefined;
     const gloss = showGloss && annotation?.gloss ? shortChineseGloss(annotation.gloss) : undefined;
-    current.push({
+    return {
       known: blurKnown && !selected && (st === 4 || blurLiteral(visible)),
       node: <span key={i} className={cls} data-i={i} title={[pinyin, gloss].filter(Boolean).join(" · ") || undefined} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
         {chineseStudy ? <ChineseWord text={visible} pinyin={pinyin} gloss={gloss} /> : visible}
       </span>,
-    });
+    };
+  };
+  const cards = chunkMode ? breakdown.chunks : undefined;
+  if (!cards) {
+    for (let i = pr.start; i < pr.end; i++) {
+      const token = tokens[i];
+      const lines = token.w ? [token.t] : token.t.split(/\n+/);
+      if (lines.length === 1) {
+        current.push(tokenPart(i, token.t));
+        continue;
+      }
+      if (lines[0]) current.push(tokenPart(i, lines[0]));
+      if (current.length) paragraphs.push(<p key={`p${i}`}>{knownRuns(current, blurKnown)}</p>);
+      current = [];
+      const tail = lines[lines.length - 1];
+      if (tail.trim()) current.push(tokenPart(i, tail));
+    }
+    if (current.length) paragraphs.push(<p key="last">{knownRuns(current, blurKnown)}</p>);
   }
-  if (current.length) paragraphs.push(<p key="last">{knownRuns(current, blurKnown)}</p>);
 
   let newOnPage = 0;
   const seen = new Set<string>();
@@ -1410,7 +1428,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass}${studyClass}${illum ? " illuminate" : ""}`}
+      className={`page ${markClass}${chineseStudy ? studyClass : ""}${illum ? " illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}
@@ -1426,7 +1444,20 @@ export function Reader() {
           transition={{ duration: 0.525, ease: [0.4, 0, 0.2, 1] }}
         />
       )}
-      {paragraphs}
+      {cards ? (
+        <ChunkCards chunks={cards} text={pageText} tokens={tokens} first={pr.start} last={pr.end}
+          offset={pageTextStart} english={chunkEnglish} blurEnglish={chunkBlurEnglish} blur={blurKnown} part={tokenPart} />
+      ) : (
+        <>
+          {chunkMode && pageText.trim() && (
+            <div className="reader-chunk-status" role="status">
+              <span>{breakdown.error || t("Préparation des expressions avec ChatGPT…", "Preparing chunks with ChatGPT…")}</span>
+              {breakdown.error && <button className="btn sm soft" onClick={() => void breakdown.prepare(true)}>{t("Réessayer", "Retry")}</button>}
+            </div>
+          )}
+          {paragraphs}
+        </>
+      )}
     </div>
   );
   const selectedWord = selection ? pageWordKey(selection.surface, selection.sentence) : null;
@@ -1678,7 +1709,9 @@ export function Reader() {
           <div className="reader-leaves" onWheel={onSwipe} onPointerDown={onVoidDown} {...touchProps}>
             {arrow("left")}
             <div className="leaf">
-              <div className="leaf-view" ref={viewRef}>
+              <div className={`leaf-view${chunkMode ? " chunk-scroll" : ""}`}
+                ref={setLeafView}
+                onScroll={chunkMode ? onReaderScroll : undefined}>
                 {/* composition des pages : copie invisible du titre et de la page, mêmes styles */}
                 <div className="leaf-ghost" ref={ghostRef} aria-hidden="true" inert>
                   {header}
