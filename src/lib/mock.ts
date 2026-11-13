@@ -896,6 +896,10 @@ export function createMockApi(): Api {
         ],
       };
     },
+    async chunkBreakdown(_text, cachedOnly) {
+      if (cachedOnly) return null;
+      throw new Error(t("Le découpage avec ChatGPT nécessite l’application Umbra.", "Chunk breakdown with ChatGPT requires the Umbra desktop app."));
+    },
     async aiSimplify(_lang, text, _level, onPiece) {
       online("chat");
       await sleep(400);

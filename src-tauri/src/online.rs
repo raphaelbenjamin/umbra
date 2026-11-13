@@ -104,6 +104,7 @@ pub enum Role {
     /// chat et Simplifier
     Chat,
     Explain,
+    Chunks,
 }
 
 /// Un fournisseur prêt à répondre.
@@ -181,13 +182,16 @@ pub fn config_from(get: impl Fn(&str) -> Option<String>, role: Role) -> Option<R
 }
 
 fn provider_for(setting: impl Fn(&str) -> Option<String>, role: Role) -> Option<&'static Provider> {
+    if role == Role::Chunks {
+        return find("chatgpt");
+    }
     if role == Role::Explain {
         return setting("online_explain_engine").filter(|engine| engine == "chatgpt").and_then(|id| find(&id));
     }
     let (engine, legacy_flag) = match role {
         Role::Words => ("online_translation_engine", "online_words"),
         Role::Chat => ("online_chat_engine", "online_chat"),
-        Role::Explain => unreachable!(),
+        Role::Explain | Role::Chunks => unreachable!(),
     };
     let online = match setting(engine).as_deref() {
         Some(value) => value == "provider",
@@ -203,7 +207,7 @@ fn model_for(p: &Provider, role: Role, setting: impl Fn(&str) -> Option<String>)
                 return model;
             }
         }
-        if role == Role::Chat {
+        if matches!(role, Role::Chat | Role::Chunks) {
             if let Some(model) = setting("online_model_chatgpt_chat") {
                 return model;
             }

@@ -30,6 +30,7 @@ import { WordFloat } from "./WordFloat";
 import { EXPR_MAX_WORDS, WordPanel, type Selection } from "./WordPanel";
 import { pageWordKey, requestExplanation, selectionContext, translationSettingsKey, usePagePreload, useTranslationLookahead } from "./pagePreload";
 import { PagePreloadMenu } from "./PagePreloadMenu";
+import { useChunkBreakdown } from "./chunkBreakdown";
 
 interface Range {
   a: number;
@@ -274,6 +275,11 @@ export function Reader() {
   const fittedOk = paged && fitted?.tokens === tokens;
   const pages = fittedOk ? fitted.pages : basePages;
   const pr = pages[page] ?? { start: 0, end: 0, words: 0 };
+  const pageTextStart = tokens[pr.start]?.s ?? 0;
+  const pageText = lesson?.id === lessonId && pr.end > pr.start
+    ? lesson.text.slice(pageTextStart, tokens[pr.end - 1].e)
+    : "";
+  const breakdown = useChunkBreakdown(pageText);
   const lang = lesson?.lang ?? "en";
   const pageKey = JSON.stringify([lessonId, page, pr.start, pr.end]);
   const explanations = usePagePreload(JSON.stringify([pageKey,
@@ -1424,6 +1430,8 @@ export function Reader() {
     </div>
   );
   const selectedWord = selection ? pageWordKey(selection.surface, selection.sentence) : null;
+  const chunkStart = selection ? tokens[selection.tokenIndex].s - pageTextStart : -1;
+  const passageChunk = breakdown.chunks?.find((chunk) => chunk.start <= chunkStart && chunkStart < chunk.end);
   const wordPanel = (
     <WordPanel
       lang={lang}
@@ -1431,6 +1439,7 @@ export function Reader() {
       term={selection ? terms[selection.key] : undefined}
       preparedExplanation={selectedWord && lang === "zh" ? explanations.answers[selectedWord] : undefined}
       preparedTranslation={selectedWord ? translations.answers[selectedWord] : undefined}
+      passageChunk={passageChunk}
       onStatus={(k, s) => setStatus(k, s)}
       onTranslation={onTranslation}
       onSelectPhrase={(a, b) => select(a, b)}
@@ -1439,10 +1448,9 @@ export function Reader() {
   );
   const canPreload = tokens.slice(pr.start, pr.end).some((token) => token.w && (terms[token.k]?.status ?? 0) < 4);
   const copyPage = async () => {
-    if (pr.start >= pr.end) return;
-    const text = lesson.text.slice(tokens[pr.start].s, tokens[pr.end - 1].e).trim();
+    if (!pageText) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(pageText.trim());
       toast(t("Texte de la page copié", "Page text copied"), "light");
     } catch {
       toast(t("La copie n’a pas abouti.", "Couldn’t copy the page."), "error");
@@ -1605,6 +1613,13 @@ export function Reader() {
             aria-label={t("Simplifier le texte", "Simplify text")} title={t("Simplifier le texte", "Simplify text")}
           >
             <Icon name="sparkle" size={17} />
+          </button>
+          <button type="button" className={`icon-btn no-drag ${breakdown.chunks ? "on" : ""}`}
+            onClick={() => void breakdown.prepare()} disabled={!pageText.trim() || breakdown.pending}
+            aria-label={breakdown.pending ? t("Découpage en cours", "Breaking down page") : t("Découpage en expressions", "Chunk breakdown")}
+            aria-busy={breakdown.pending} title={t("Découper cette page avec ChatGPT", "Break down this page with ChatGPT")}
+          >
+            <Icon name="chunks" size={17} className={breakdown.pending ? "chunk-pending" : undefined} />
           </button>
           {floating && (
             <button

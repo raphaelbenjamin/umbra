@@ -187,6 +187,13 @@ export interface Explanation {
   examples: ExplanationLine[];
 }
 
+export interface PassageChunk {
+  text: string;
+  translation: string;
+  start: number;
+  end: number;
+}
+
 /** Dictionnaire d'une langue, dans la langue de l'interface. */
 export interface DictStatus {
   /** un dictionnaire existe pour cette langue */

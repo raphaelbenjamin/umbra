@@ -8,7 +8,7 @@ import { useOnline } from "../../lib/online";
 import { t } from "../../lib/i18n";
 import { preparePronunciation, pronounce } from "../../lib/pronounce";
 import { useApp } from "../../lib/store";
-import type { DictEntry, DictResult, Explanation, LangCode, Status, Term, WordAnswer } from "../../lib/types";
+import type { DictEntry, DictResult, Explanation, LangCode, PassageChunk, Status, Term, WordAnswer } from "../../lib/types";
 import { pendingTranslation } from "./pagePreload";
 import { loadReaderDictionary } from "./dictionaryLookup";
 
@@ -50,6 +50,7 @@ const statusOpts = (): { s: Status; label: string; sw: string }[] => [
 interface Props {
   preparedExplanation?: Explanation;
   preparedTranslation?: WordAnswer;
+  passageChunk?: PassageChunk;
   lang: LangCode;
   sel: Selection | null;
   term: Term | undefined;
@@ -128,7 +129,7 @@ function DictionaryDefinitions({ dict, lang, surface, onGloss }: {
   );
 }
 
-export function WordPanel({ lang, sel, term, preparedExplanation, preparedTranslation, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
+export function WordPanel({ lang, sel, term, preparedExplanation, preparedTranslation, passageChunk, onStatus, onTranslation, onSelectPhrase, onClose }: Props) {
   const settings = useApp((s) => s.settings);
   const setSetting = useApp((s) => s.setSetting);
   const openGuide = useApp((s) => s.openGuide);
@@ -427,6 +428,12 @@ export function WordPanel({ lang, sel, term, preparedExplanation, preparedTransl
           )}
         </div>
 
+        {passageChunk && (
+          <div className="wp-chunk" aria-label={t("Traduction du groupe de mots", "Chunk translation")}>
+            <strong lang={lang} dir="auto">{displayText(passageChunk.text, lang)}</strong>
+            <span className="wp-chunk-translation" lang="en">→ {passageChunk.translation}</span>
+          </div>
+        )}
         <ReaderExplain key={JSON.stringify([lang, sel.surface, sel.sentence])} lang={lang} selection={sel.surface} sentence={sel.sentence} prepared={preparedExplanation} />
 
         {sel.isPhrase &&

@@ -1647,6 +1647,22 @@ span.player-voice .icon-btn {
   flex-direction: column;
   gap: 8px;
 }
+.wp-chunk {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-inline-start: 2px solid var(--accent);
+  border-radius: 6px;
+  background: var(--chip);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.wp-chunk-translation {
+  color: var(--muted);
+}
+.chunk-pending {
+  opacity: .55;
+}
 .wp-ai {
   font-size: 26px;
   font-weight: 520;

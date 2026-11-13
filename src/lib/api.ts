@@ -15,6 +15,7 @@ import type {
   DeviceInfo,
   ChineseAnnotation,
   Explanation,
+  PassageChunk,
   DictResult,
   DictStatus,
   DiscoverFeed,
@@ -130,6 +131,7 @@ export interface Api {
   aiWord(lang: LangCode, word: string, sentence: string, onPiece: (t: string) => void, preload?: boolean): Promise<WordAnswer>;
   aiSentence(lang: LangCode, sentence: string, onPiece: (t: string) => void): Promise<string>;
   aiSimplify(lang: LangCode, text: string, level: string, onPiece: (t: string) => void): Promise<string>;
+  chunkBreakdown(text: string, cachedOnly: boolean): Promise<PassageChunk[] | null>;
   explainSelection(lang: LangCode, selection: string, sentence: string): Promise<Explanation>;
   cachedExplanation(lang: LangCode, selection: string, sentence: string): Promise<Explanation | null>;
   aiWarmup(): Promise<boolean>;
@@ -287,6 +289,7 @@ async function createTauriApi(): Promise<Api> {
       invoke("ai_sentence", { lang, sentence, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
     aiSimplify: (lang, text, level, onPiece) =>
       invoke("ai_simplify", { lang, text, level, onEvent: ch<{ type: string; text: string }>((e) => onPiece(e.text)) }),
+    chunkBreakdown: (text, cachedOnly) => invoke("ai_chunk_breakdown", { text, cachedOnly }),
     explainSelection: (lang, selection, sentence) => invoke("explain_selection", { lang, selection, sentence }),
     cachedExplanation: (lang, selection, sentence) => invoke("explain_selection", { lang, selection, sentence, cachedOnly: true }),
     aiWarmup: () => invoke("ai_warmup"),

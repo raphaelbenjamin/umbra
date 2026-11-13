@@ -48,6 +48,7 @@ const P: Record<string, string> = {
   expand: "M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5",
   shrink: "M9 4v5H4 M15 4v5h5 M9 20v-5H4 M15 20v-5h5",
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z",
+  chunks: "M4 6h4 M12 6h8 M4 12h9 M17 12h3 M4 18h5 M13 18h7",
   rewind: "M11 7l-6 5 6 5z M19 7l-6 5 6 5z",
   ffwd: "M13 7l6 5-6 5z M5 7l6 5-6 5z",
   back5: "M4 12a8 8 0 1 0 2.4-5.7 M4 4v4h4",

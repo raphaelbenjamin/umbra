@@ -166,6 +166,7 @@ pub fn run() {
             commands::ai_word,
             commands::ai_sentence,
             commands::ai_simplify,
+            commands::ai_chunk_breakdown,
             commands::explain_selection,
             commands::ai_warmup,
             commands::gpu_info,
