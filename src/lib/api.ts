@@ -116,6 +116,7 @@ export interface Api {
   bookGroup(lang: LangCode, name: string, lessons: number[]): Promise<number>;
   termSet(update: TermUpdate): Promise<void>;
   termsMarkKnown(lang: LangCode, keys: string[], wordsRead: number): Promise<number>;
+  trainingGenerate(lang: LangCode, task: "difficulty" | "definition" | "example", words: { term: string; context: string }[]): Promise<{ index: number; value: string }[]>;
   termsList(query: TermQuery): Promise<{ items: Term[]; total: number }>;
   stats(lang: LangCode): Promise<Stats>;
   /** mots lus, écoute et temps actif dans une leçon ; renvoie la série si l'objectif du jour vient d'être atteint */
@@ -272,6 +273,7 @@ async function createTauriApi(): Promise<Api> {
     bookGroup: (lang, name, lessons) => invoke("book_group", { lang, name, lessons }),
     termSet: (update) => invoke("term_set", { update }),
     termsMarkKnown: (lang, keys, wordsRead) => invoke("terms_mark_known", { lang, keys, wordsRead }),
+    trainingGenerate: (lang, task, words) => invoke("training_generate", { lang, task, words }),
     termsList: (query) => invoke("terms_list", { query }),
     stats: (lang) => invoke("stats", { lang }),
     activityAdd: (lang, wordsRead, listenSecs, learnSecs = 0) => invoke("activity_add", { lang, wordsRead, listenSecs, learnSecs }),

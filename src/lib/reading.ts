@@ -25,7 +25,7 @@ export const READ_FONTS: ReadFont[] = [
   { id: "pingfang", label: "PingFang SC", stack: "var(--font-chinese)", kind: "sans" },
   { id: "newsreader", label: "Newsreader", stack: '"Newsreader Variable", "Literata Variable", Georgia, serif', kind: "serif" },
   { id: "newyork", label: "New York", stack: 'ui-serif, "New York", Georgia, serif', kind: "serif", mac: true },
-  { id: "georgia", label: "Georgia", stack: 'Georgia, "Times New Roman", serif', kind: "serif" },
+  { id: "inter", label: "Inter", stack: '"Inter Variable", var(--font-ui)', kind: "sans" },
   { id: "palatino", label: "Palatino", stack: 'Palatino, "Palatino Linotype", "Book Antiqua", serif', kind: "serif" },
   { id: "geist", label: "Geist", stack: '"Geist Variable", -apple-system, system-ui, sans-serif', kind: "sans" },
   {
@@ -159,7 +159,8 @@ export function playbackRates(media: boolean): string[] {
 }
 
 export function readFont(id: string | undefined): ReadFont {
-  return READ_FONTS.find((f) => f.id === id) ?? READ_FONTS[0];
+  const fontId = id === "georgia" ? "inter" : id;
+  return READ_FONTS.find((f) => f.id === fontId) ?? READ_FONTS[0];
 }
 
 export function paper(id: string | undefined): Paper {

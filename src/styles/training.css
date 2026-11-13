@@ -1,0 +1,60 @@
+.training-view {
+  width: min(100%, 1050px);
+  padding: 30px clamp(16px, 4vw, 48px) 60px;
+  margin-inline: auto;
+}
+.training-view > header { margin-block-end: 22px; }
+.training-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-block: 14px;
+}
+.training-view .segmented { max-width: 100%; flex-wrap: wrap; }
+.training-list { display: grid; gap: 18px; margin-block-start: 22px; }
+.training-list section {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elev);
+}
+.training-list h2 { font: 600 16px var(--font-ui); margin: 0 0 10px; }
+.training-list h2 small, .training-row span, .training-row small { color: var(--muted); }
+.training-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
+.training-row > div { display: grid; gap: 3px; overflow-wrap: anywhere; }
+.training-row strong, .training-row small { justify-self: start; }
+.training-check {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+}
+.training-check[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.training-flashcard {
+  display: grid;
+  place-content: center;
+  gap: 24px;
+  width: 100%;
+  min-height: 280px;
+  padding: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--bg-elev);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.training-flashcard strong { font-size: clamp(32px, 5vw, 60px); font-weight: 600; }
+.training-answer { display: grid; gap: 8px; font-size: 20px; color: var(--muted); visibility: hidden; }
+.training-flashcard:is(.revealed, :focus-visible) .training-answer { visibility: visible; }
+@media (hover: hover) {
+  .training-flashcard:hover .training-answer { visibility: visible; }
+}
+.training-shuffle { display: flex; gap: 8px; align-items: center; }
+@media (prefers-reduced-motion: reduce) {
+  .training-row { transition: none; }
+}

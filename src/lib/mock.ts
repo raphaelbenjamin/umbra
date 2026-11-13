@@ -721,6 +721,7 @@ export function createMockApi(): Api {
       commit();
       return added;
     },
+    async trainingGenerate() { throw new Error("Training generation requires the Umbra desktop app."); },
     async termsList(q) {
       let items = Object.entries(db.terms)
         .filter(([k]) => k.startsWith(q.lang + "|"))
@@ -735,7 +736,7 @@ export function createMockApi(): Api {
         items = items.filter((t) => t.term.includes(s) || t.translation.toLowerCase().includes(s));
       }
       items.sort((a, b) => (a.status <= 3 ? 0 : 1) - (b.status <= 3 ? 0 : 1) || b.updated_at - a.updated_at);
-      return { items: items.slice(q.offset, q.offset + q.limit), total: items.length };
+      return { items: items.slice(q.offset, q.limit < 0 ? undefined : q.offset + q.limit), total: items.length };
     },
     async stats(lang): Promise<Stats> {
       const terms = Object.entries(db.terms).filter(([k]) => k.startsWith(lang + "|")).map(([, t]) => t);

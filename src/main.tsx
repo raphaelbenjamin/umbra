@@ -1,4 +1,6 @@
 import "@fontsource-variable/geist";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource-variable/literata";
 import "@fontsource-variable/literata/wght-italic.css";
 import "@fontsource-variable/newsreader";

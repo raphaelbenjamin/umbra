@@ -49,7 +49,7 @@ const tabs = (): Tab[] => [
 ];
 
 /** Vues rangées sous « Plus » : l'onglet s'allume quand on y est. */
-const MORE: View[] = ["playlists", "chat", "vocab", "settings"];
+const MORE: View[] = ["playlists", "chat", "vocab", "training", "settings"];
 
 export function MobileNav() {
   const view = useApp((s) => s.view);
@@ -200,6 +200,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose(): void }) {
     { view: "playlists", label: "Playlists", icon: "playlist", run: () => openPlaylist(null) },
     { view: "chat", label: "Chat", icon: "chat", run: () => go("chat") },
     { view: "vocab", label: t("Vocabulaire", "Vocabulary"), icon: "cards", run: () => go("vocab") },
+    { view: "training", label: t("Entraînement", "Training"), icon: "cards", run: () => go("training") },
     { view: "settings", label: t("Réglages", "Settings"), icon: "settings", run: () => openSettings() },
   ];
 

@@ -26,6 +26,7 @@ import { Onboarding } from "./views/Onboarding";
 import { Playlists } from "./views/Playlists";
 import { Progress } from "./views/Progress";
 import { Settings } from "./views/Settings";
+import { Training } from "./views/Training";
 import { Vocabulary } from "./views/Vocabulary";
 import { Reader } from "./views/reader/Reader";
 
@@ -196,6 +197,7 @@ export function App() {
             {view === "reader" && <Reader />}
             {view === "chat" && <Chat />}
             {view === "vocab" && <Vocabulary />}
+            {view === "training" && <Training />}
             {view === "progress" && <Progress />}
             {view === "settings" && <Settings />}
           </motion.div>

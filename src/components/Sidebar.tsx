@@ -25,6 +25,7 @@ const nav = (): { view: View; label: string; icon: IconName }[] => [
   { view: "playlists", label: "Playlists", icon: "playlist" },
   { view: "reader", label: t("Lecture en cours", "Now reading"), icon: "book" },
   { view: "chat", label: "Chat", icon: "chat" },
+  { view: "training", label: t("Entraînement", "Training"), icon: "cards" },
   { view: "vocab", label: t("Vocabulaire", "Vocabulary"), icon: "cards" },
   { view: "progress", label: t("Progrès", "Progress"), icon: "chart" },
 ];
