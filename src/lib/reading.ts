@@ -145,6 +145,8 @@ export const LOOK_DEFAULTS: Record<string, string> = {
   chinese_pinyin: "1",
   chinese_gloss: "1",
   chunk_mode: "0",
+  chunk_size: "medium",
+  chunk_boundaries: "shaded",
   chunk_english: "1",
   chunk_blur_english: "0",
   // panneau du mot : "auto" flotte au-dessus du mot quand la fenêtre est étroite

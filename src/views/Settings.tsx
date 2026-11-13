@@ -700,11 +700,13 @@ function ReadingPane() {
   const size = readerFontSize(settings, lang);
   return (
     <>
+      <Section title={t("Mode expressions", "Chunk mode")}>
+        <div className="set-card"><ChunkModeOptions /></div>
+      </Section>
       <LookPreview />
-      <Section title={t("La page", "The page")}>
+      <Section title={t("Lecture normale", "Normal reading")}>
         <div className="set-card">
           {lang === "zh" && <ChineseStudyOptions />}
-          <ChunkModeOptions />
           <div className="set-row set-stack">
             <div className="grow">
               <strong>{t("Mise en page", "Layout")}</strong>

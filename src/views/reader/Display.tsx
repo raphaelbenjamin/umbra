@@ -16,8 +16,8 @@ export function ChunkModeOptions({ compact = false }: { compact?: boolean }) {
   const set = useApp((s) => s.setSetting);
   const row = compact ? "look-row" : "set-row";
   const modeLabel = t("Mode expressions", "Chunk mode");
-  const englishLabel = t("Anglais sous les expressions", "English under chunks");
-  const blurLabel = t("Révéler l’anglais au survol", "Reveal English on hover");
+  const size = useApp((s) => s.settings.chunk_size || "medium");
+  const boundaries = useApp((s) => s.settings.chunk_boundaries || "shaded");
   return (
     <>
       <div className={row}>
@@ -25,16 +25,42 @@ export function ChunkModeOptions({ compact = false }: { compact?: boolean }) {
         <Switch label={modeLabel} on={enabled} onChange={(v) => void set("chunk_mode", v ? "1" : "0")} />
       </div>
       {enabled && (
-        <div className={row}>
-          <span>{englishLabel}</span>
-          <Switch label={englishLabel} on={english} onChange={(v) => void set("chunk_english", v ? "1" : "0")} />
-        </div>
-      )}
-      {enabled && english && (
-        <div className={row}>
-          <span>{blurLabel}</span>
-          <Switch label={blurLabel} on={blurEnglish} onChange={(v) => void set("chunk_blur_english", v ? "1" : "0")} />
-        </div>
+        <>
+          <div className={`${row} chunk-setting`}>
+            <span>{t("Taille des expressions", "Chunk size")}</span>
+            <Segmented id={compact ? "pop-chunk-size" : "set-chunk-size"} value={size}
+              label={t("Taille des expressions", "Chunk size")} onChange={(v) => void set("chunk_size", v)}
+              options={[
+                { value: "small", label: t("Petite", "Small") },
+                { value: "medium", label: t("Moyenne", "Medium") },
+                { value: "large", label: t("Grande", "Large") },
+              ]} />
+          </div>
+          <div className={`${row} chunk-setting`}>
+            <span>{t("Visibilité de l’anglais", "English visibility")}</span>
+            <Segmented id={compact ? "pop-chunk-english" : "set-chunk-english"}
+              label={t("Visibilité de l’anglais", "English visibility")}
+              value={!english ? "hide" : blurEnglish ? "hover" : "show"}
+              onChange={(v) => {
+                void set("chunk_english", v === "hide" ? "0" : "1");
+                if (v !== "hide") void set("chunk_blur_english", v === "hover" ? "1" : "0");
+              }}
+              options={[
+                { value: "show", label: t("Afficher", "Show all") },
+                { value: "hover", label: t("Au survol", "On hover") },
+                { value: "hide", label: t("Masquer", "Hide all") },
+              ]} />
+          </div>
+          <div className={`${row} chunk-setting`}>
+            <span>{t("Bordures", "Chunk boundaries")}</span>
+            <Segmented id={compact ? "pop-chunk-boundaries" : "set-chunk-boundaries"} value={boundaries}
+              label={t("Bordures", "Chunk boundaries")} onChange={(v) => void set("chunk_boundaries", v)}
+              options={[
+                { value: "shaded", label: t("Ombrées", "Shaded") },
+                { value: "plain", label: t("Simples", "Plain") },
+              ]} />
+          </div>
+        </>
       )}
     </>
   );
@@ -190,7 +216,9 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
   const ref = useRef<HTMLDivElement>(null);
   const set = (k: string) => (v: string) => void setSetting(k, v);
   const size = readerFontSize(settings, lang);
-  const defaults = Object.entries(LOOK_DEFAULTS).filter(([key]) => lang === "zh" || !key.startsWith("chinese_"));
+  const defaults = Object.entries(LOOK_DEFAULTS).filter(([key]) => settings.chunk_mode === "1"
+    ? key.startsWith("chunk_") && key !== "chunk_mode"
+    : !key.startsWith("chunk_") && (lang === "zh" || !key.startsWith("chinese_")));
   const value = (key: string) => key === "font_size" ? String(size) : key === "read_font" ? readFont(settings.read_font).id : settings[key];
   const changed = defaults.some(([key, initial]) => (value(key) ?? initial) !== initial);
 
@@ -246,61 +274,65 @@ export function DisplayMenu({ open, onClose, lang }: { open: boolean; onClose():
             </AnimatePresence>
           </div>
 
-          <section>
-            <span className="eyebrow">{t("Mise en page", "Layout")}</span>
-            <LayoutPicker id="pop" value={settings.reader_layout === "scroll" ? "scroll" : "pages"} onChange={set("reader_layout")} />
-          </section>
-
-          <section>
-            <span className="eyebrow">{t("Police", "Font")}</span>
-            <FontPicker id="pop" lang={lang} value={readFont(settings.read_font).id} onChange={set("read_font")} />
-          </section>
-
-          <section>
-            <span className="eyebrow">{t("Taille", "Size")}</span>
-            <SizeControl value={size} onChange={(v) => void setSetting(fontSizeKey(lang), String(v))} />
-          </section>
-
-          <section>
-            <span className="eyebrow">{t("Couleur de la page", "Page color")}</span>
-            <PaperPicker id="pop" value={settings.read_paper || "auto"} onChange={set("read_paper")} font={readFont(settings.read_font).stack} />
-          </section>
-
           <section className="look-rows">
             <ChunkModeOptions compact />
-            {lang === "zh" && <ChineseStudyOptions compact />}
-            <div className="look-row">
-              <span>{t("Interligne", "Line spacing")}</span>
-              <Segmented id="pop-lh" value={settings.line_height} onChange={set("line_height")} options={lineHeightOptions()} />
-            </div>
-            <div className="look-row">
-              <span>{t("Largeur", "Width")}</span>
-              <Segmented id="pop-w" value={settings.read_width || "normal"} onChange={set("read_width")} options={widthOptions()} />
-            </div>
-            <div className="look-row">
-              <span>{t("Mots", "Words")}</span>
-              <Segmented
-                id="pop-ws"
-                value={settings.word_style}
-                onChange={set("word_style")}
-                options={[
-                  { value: "tint", label: t("Teinte", "Tint") },
-                  { value: "line", label: t("Soulignés", "Underlined") },
-                ]}
-              />
-            </div>
-            <div className="look-row">
-              <span>{t("Flouter les mots connus", "Blur known words")}</span>
-              <Switch on={settings.blur_known_words === "1"} onChange={(v) => set("blur_known_words")(v ? "1" : "0")} label={t("Flouter les mots connus", "Blur known words")} />
-            </div>
-            {/* sur iPhone, le mot s'ouvre toujours en carte : pas de choix (mobile.css) */}
-            <div className="look-row panel-choice">
-              <span title={t("À droite du texte, ou flottant au-dessus du mot touché. « Auto » le fait flotter quand la fenêtre est étroite.", "On the right of the text, or floating above the word you tap. “Auto” floats it when the window is narrow.")}>
-                {t("Panneau", "Panel")}
-              </span>
-              <Segmented id="pop-wp" value={panelMode(settings.word_panel)} onChange={set("word_panel")} options={panelOptions()} />
-            </div>
           </section>
+          {settings.chunk_mode !== "1" && <>
+            <section>
+              <span className="eyebrow">{t("Mise en page", "Layout")}</span>
+              <LayoutPicker id="pop" value={settings.reader_layout === "scroll" ? "scroll" : "pages"} onChange={set("reader_layout")} />
+            </section>
+
+            <section>
+              <span className="eyebrow">{t("Police", "Font")}</span>
+              <FontPicker id="pop" lang={lang} value={readFont(settings.read_font).id} onChange={set("read_font")} />
+            </section>
+
+            <section>
+              <span className="eyebrow">{t("Taille", "Size")}</span>
+              <SizeControl value={size} onChange={(v) => void setSetting(fontSizeKey(lang), String(v))} />
+            </section>
+
+            <section>
+              <span className="eyebrow">{t("Couleur de la page", "Page color")}</span>
+              <PaperPicker id="pop" value={settings.read_paper || "auto"} onChange={set("read_paper")} font={readFont(settings.read_font).stack} />
+            </section>
+
+            <section className="look-rows">
+              {lang === "zh" && <ChineseStudyOptions compact />}
+              <div className="look-row">
+                <span>{t("Interligne", "Line spacing")}</span>
+                <Segmented id="pop-lh" value={settings.line_height} onChange={set("line_height")} options={lineHeightOptions()} />
+              </div>
+              <div className="look-row">
+                <span>{t("Largeur", "Width")}</span>
+                <Segmented id="pop-w" value={settings.read_width || "normal"} onChange={set("read_width")} options={widthOptions()} />
+              </div>
+              <div className="look-row">
+                <span>{t("Mots", "Words")}</span>
+                <Segmented
+                  id="pop-ws"
+                  value={settings.word_style}
+                  onChange={set("word_style")}
+                  options={[
+                    { value: "tint", label: t("Teinte", "Tint") },
+                    { value: "line", label: t("Soulignés", "Underlined") },
+                  ]}
+                />
+              </div>
+              <div className="look-row">
+                <span>{t("Flouter les mots connus", "Blur known words")}</span>
+                <Switch on={settings.blur_known_words === "1"} onChange={(v) => set("blur_known_words")(v ? "1" : "0")} label={t("Flouter les mots connus", "Blur known words")} />
+              </div>
+              {/* sur iPhone, le mot s'ouvre toujours en carte : pas de choix (mobile.css) */}
+              <div className="look-row panel-choice">
+                <span title={t("À droite du texte, ou flottant au-dessus du mot touché. « Auto » le fait flotter quand la fenêtre est étroite.", "On the right of the text, or floating above the word you tap. “Auto” floats it when the window is narrow.")}>
+                  {t("Panneau", "Panel")}
+                </span>
+                <Segmented id="pop-wp" value={panelMode(settings.word_panel)} onChange={set("word_panel")} options={panelOptions()} />
+              </div>
+            </section>
+          </>}
         </motion.div>
       )}
     </AnimatePresence>

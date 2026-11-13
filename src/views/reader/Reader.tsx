@@ -155,6 +155,9 @@ export function Reader() {
 
   const look = readerLook(settings, data?.lesson.lang ?? settings.lang);
   const chunkMode = settings.chunk_mode === "1";
+  const [chunkTools, setChunkTools] = useState(false);
+  const [chunkAhead, setChunkAhead] = useState("0");
+  const chunkSize = settings.chunk_size === "small" ? 16 : settings.chunk_size === "large" ? 24 : 20;
   const chunkEnglish = settings.chunk_english !== "0";
   const chunkBlurEnglish = chunkEnglish && settings.chunk_blur_english === "1";
   const paged = look.layout === "pages";
@@ -287,7 +290,25 @@ export function Reader() {
   const pageText = lesson?.id === lessonId && pr.end > pr.start
     ? lesson.text.slice(pageTextStart, tokens[pr.end - 1].e)
     : "";
-  const breakdown = useChunkBreakdown(pageText, chunkMode);
+  const breakdown = useChunkBreakdown(pageText, chunkMode && (!paged || fittedOk), lessonId);
+  const preloadChunks = () => {
+    if (!lesson || !validChunkAhead) return;
+    const inputs = pages.slice(page, page + Number(chunkAhead) + 1)
+      .filter(({ start, end }) => start < end)
+      .map(({ start, end }) => lesson.text.slice(tokens[start].s, tokens[end - 1].e))
+      .filter((text) => text.trim());
+    if (inputs.length) {
+      void breakdown.prepare(inputs);
+      setChunkTools(false);
+    }
+  };
+  const validChunkAhead = /^\d+$/.test(chunkAhead) && Number.isSafeInteger(Number(chunkAhead));
+  const chunkProgress = breakdown.progress;
+  const chunkStatus = chunkProgress?.running
+    ? t(`Préparation · ${chunkProgress.done}/${chunkProgress.total}`, `Preparing · ${chunkProgress.done}/${chunkProgress.total}`)
+    : chunkProgress?.error || (chunkProgress?.done
+      ? t(`Pages prêtes · ${chunkProgress.done}/${chunkProgress.total}`, `Pages ready · ${chunkProgress.done}/${chunkProgress.total}`)
+      : breakdown.chunks ? t("Cette page est prête", "This page is ready") : "");
   const lang = lesson?.lang ?? "en";
   const pageKey = JSON.stringify([lessonId, page, pr.start, pr.end]);
   const explanations = usePagePreload(JSON.stringify([pageKey,
@@ -416,7 +437,7 @@ export function Reader() {
   const [fitTick, setFitTick] = useState(0);
   const lastFit = useRef({ w: 0, h: 0 });
   useLayoutEffect(() => {
-    if (!paged || !data) return;
+    if (!paged || !data || (chunkMode && fittedOk)) return;
     const view = viewRef.current;
     const box = measureRef.current;
     if (!view || !box) return;
@@ -440,7 +461,7 @@ export function Reader() {
     }
     fit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick, studyClass]);
+  }, [paged, data?.lesson.id, tokens, look.size, look.lineHeight, look.width, look.font.id, fitTick, studyClass, chunkMode]);
 
   // fenêtre, vidéo ou barre latérale qui changent la place du texte ; police arrivée après coup
   useEffect(() => {
@@ -1014,7 +1035,7 @@ export function Reader() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest("input, textarea, select, [contenteditable], [data-page-ai]") || e.metaKey || e.ctrlKey) return;
-      if (useApp.getState().importOpen || useMenu.getState().shortcuts || simplify || complete || lookOpen || adding) return;
+      if (useApp.getState().importOpen || useMenu.getState().shortcuts || simplify || chunkTools || complete || lookOpen || adding) return;
       if (e.key.toLowerCase() === "h" && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         if (!e.repeat) void setSetting("blur_known_words", settings.blur_known_words === "1" ? "0" : "1");
@@ -1428,7 +1449,7 @@ export function Reader() {
     <div
       ref={pageRef}
       data-tour="page"
-      className={`page ${markClass}${chineseStudy ? studyClass : ""}${illum ? " illuminate" : ""}`}
+      className={`page ${markClass}${chunkMode ? " chunk-page" : ""}${chineseStudy ? studyClass : ""}${illum ? " illuminate" : ""}`}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onContextMenu={onWordContextMenu}
@@ -1451,8 +1472,14 @@ export function Reader() {
         <>
           {chunkMode && pageText.trim() && (
             <div className="reader-chunk-status" role="status">
-              <span>{breakdown.error || t("Préparation des expressions avec ChatGPT…", "Preparing chunks with ChatGPT…")}</span>
-              {breakdown.error && <button className="btn sm soft" onClick={() => void breakdown.prepare(true)}>{t("Réessayer", "Retry")}</button>}
+              <span>{breakdown.error || (breakdown.stopped
+                ? t("Préparation arrêtée", "Preparation stopped")
+                : t("Préparation des expressions avec ChatGPT…", "Preparing chunks with ChatGPT…"))}</span>
+              {(breakdown.error || breakdown.stopped) && (
+                <button className="btn sm soft" disabled={breakdown.pending} onClick={() => void breakdown.prepare([pageText], true)}>
+                  {t("Réessayer", "Retry")}
+                </button>
+              )}
             </div>
           )}
           {paragraphs}
@@ -1560,7 +1587,8 @@ export function Reader() {
   };
 
   return (
-    <div ref={rootRef} className={`reader ${cinema ? "cinema" : ""} ${floating ? "wp-floating" : ""} ${look.className}`} style={look.style}>
+    <div ref={rootRef} className={`reader ${cinema ? "cinema" : ""} ${floating ? "wp-floating" : ""} ${look.className}${chunkMode ? " chunk-reader" : ""}${chunkMode && settings.chunk_boundaries === "plain" ? " chunk-plain" : ""}`}
+      style={{ ...look.style, "--chunk-size": `${chunkSize}px` } as React.CSSProperties}>
       <div className="reader-col" ref={colRef}>
         <div className="reader-top drag" data-tauri-drag-region>
           {!cinema && (
@@ -1645,12 +1673,13 @@ export function Reader() {
           >
             <Icon name="sparkle" size={17} />
           </button>
-          <button type="button" className={`icon-btn no-drag ${breakdown.chunks ? "on" : ""}`}
-            onClick={() => void breakdown.prepare()} disabled={!pageText.trim() || breakdown.pending}
-            aria-label={breakdown.pending ? t("Découpage en cours", "Breaking down page") : t("Découpage en expressions", "Chunk breakdown")}
-            aria-busy={breakdown.pending} title={t("Découper cette page avec ChatGPT", "Break down this page with ChatGPT")}
+          <button type="button" className={`icon-btn no-drag chunk-tool${breakdown.chunks || breakdown.pending ? " on" : ""}`}
+            onClick={() => setChunkTools(true)} disabled={!pageText.trim()}
+            aria-label={t("Découpage en expressions", "Chunk breakdown")}
+            title={chunkStatus || t("Découper avec ChatGPT", "Chunk breakdown with ChatGPT")}
           >
-            <Icon name="chunks" size={17} className={breakdown.pending ? "chunk-pending" : undefined} />
+            <Icon name="chunks" size={17} />
+            {breakdown.pending && <span className="chunk-tool-count">{chunkProgress?.done}/{chunkProgress?.total}</span>}
           </button>
           {floating && (
             <button
@@ -1978,6 +2007,19 @@ export function Reader() {
         )}
       </aside>
 
+      <Sheet open={chunkTools} onClose={() => setChunkTools(false)} title={t("Découpage en expressions", "Chunk breakdown")} width={420}
+        footer={breakdown.pending
+          ? <button className="btn soft" onClick={breakdown.stop}>{t("Arrêter", "Stop")}</button>
+          : <button className="btn primary" disabled={!validChunkAhead || !pageText.trim()} onClick={preloadChunks}>{t("Préparer", "Prepare")}</button>}>
+        <div className="chunk-preload">
+          <label htmlFor="chunk-pages-ahead">{t("Pages d’avance", "Pages ahead")}</label>
+          <input id="chunk-pages-ahead" className="input" type="number" min="0" step="1"
+            value={chunkAhead} onChange={(e) => setChunkAhead(e.target.value)} disabled={breakdown.pending} />
+          <p className="muted">{t("La page actuelle est incluse. Vous pouvez continuer à lire.", "Includes the current page. You can keep reading while it runs.")}</p>
+          {chunkStatus && <div role="status">{chunkStatus}</div>}
+          {chunkProgress && <progress max={chunkProgress.total} value={chunkProgress.done} />}
+        </div>
+      </Sheet>
       <SimplifySheet open={simplify} onClose={() => setSimplify(false)} lessonTitle={lesson.title} text={lesson.text} lang={lang} />
       <AddToPlaylist lesson={adding?.lesson ?? null} all={adding?.all ?? []} onClose={() => setAdding(null)} />
     </div>

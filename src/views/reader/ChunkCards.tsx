@@ -18,7 +18,7 @@ export function ChunkCards({ chunks, text, tokens, first, last, offset, english,
   const rows: ReactNode[][] = [[]];
   let previousEnd = 0;
   chunks.forEach((chunk, position) => {
-    if (position && text.slice(previousEnd, chunk.start).includes("\n")) rows.push([]);
+    if (position && /\n[^\S\n]*\n/u.test(text.slice(previousEnd, chunk.start))) rows.push([]);
     previousEnd = chunk.end;
     const start = offset + chunk.start;
     const end = offset + chunk.end;
@@ -32,7 +32,7 @@ export function ChunkCards({ chunks, text, tokens, first, last, offset, english,
       <div key={chunk.start} className={`reader-chunk${position % 2 === 0 ? " tinted" : ""}${blurEnglish ? " reveal-english" : ""}`}
         tabIndex={blurEnglish ? 0 : undefined}>
         <div className="reader-chunk-source" dir="auto">{knownRuns(parts, blur)}</div>
-        {english && <div className="reader-chunk-english" lang="en" dir="ltr">{chunk.translation}</div>}
+        {english && <div className="reader-chunk-english" lang="en" dir="ltr"><span>{chunk.translation.replace(/(?:\s+\([^()]+\))+[.!?]?$/u, "") || chunk.translation}</span></div>}
       </div>,
     );
   });
