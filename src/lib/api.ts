@@ -116,7 +116,7 @@ export interface Api {
   bookGroup(lang: LangCode, name: string, lessons: number[]): Promise<number>;
   termSet(update: TermUpdate): Promise<void>;
   termsMarkKnown(lang: LangCode, keys: string[], wordsRead: number): Promise<number>;
-  trainingGenerate(lang: LangCode, task: "difficulty" | "definition" | "example", words: { term: string; context: string }[]): Promise<{ index: number; value: string }[]>;
+  trainingGenerate(lang: LangCode, task: "difficulty" | "definition" | "example", words: { term: string; context: string }[]): Promise<{ index: number; value: string; literal: string; note: string; highlight: string }[]>;
   termsList(query: TermQuery): Promise<{ items: Term[]; total: number }>;
   stats(lang: LangCode): Promise<Stats>;
   /** mots lus, écoute et temps actif dans une leçon ; renvoie la série si l'objectif du jour vient d'être atteint */

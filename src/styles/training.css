@@ -58,3 +58,18 @@
 @media (prefers-reduced-motion: reduce) {
   .training-row { transition: none; }
 }
+.training-flashcard {
+  grid-template-columns: minmax(0, 680px);
+  place-content: start center;
+  align-items: start;
+  min-height: 340px;
+  padding: clamp(28px, 6vw, 62px) 24px 32px;
+  gap: 16px;
+}
+.training-example { color: var(--muted); font-size: 17px; }
+.training-example mark { color: var(--text); background: transparent; font-weight: 650; }
+.training-answer { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 18px; font-size: 17px; }
+.training-answer b { color: var(--text); font-size: 23px; }
+.training-answer small { color: var(--muted); }
+.training-archive { margin-inline-start: auto; flex-shrink: 0; }
+.training-shuffle select { width: auto; }

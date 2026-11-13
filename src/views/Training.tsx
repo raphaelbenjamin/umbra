@@ -25,6 +25,17 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
   const [words, setWords] = useState<Term[]>();
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
   const [filter, setFilter] = useState<RecallFilter>("all");
+  const [archived, setArchived] = useState(false);
+  const delay = useApp((s) => s.settings.training_reveal_delay || "0");
+  const revealPicker = (
+    <label className="training-shuffle">
+      {t("Révélation automatique", "Auto-reveal")}
+      <select className="input" value={delay} onChange={(e) => void setSetting("training_reveal_delay", e.target.value).catch((error) => toast(errorText(error), "error"))}>
+        <option value="0">{t("Désactivée", "Off")}</option>
+        {[1, 2, 3, 5].map((seconds) => <option key={seconds} value={seconds}>{seconds} s</option>)}
+      </select>
+    </label>
+  );
   const [shuffle, setShuffle] = useState(false);
   const [drill, setDrill] = useState<Term[] | null>(null);
   const [position, setPosition] = useState(0);
@@ -59,8 +70,13 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
         const batch = targets.slice(start, start + 24);
         const answers = await api().trainingGenerate(lang, task, batch.map(({ term, context }) => ({ term, context })));
         if (run.signal.aborted) break;
-        const updates: [string, TrainingCard][] = answers.flatMap(({ index, value }) =>
-          batch[index] && value ? [[batch[index].term, { [task]: value }]] : []);
+        const updates: [string, TrainingCard][] = answers.flatMap(({ index, value, literal, note, highlight }) => {
+          if (!batch[index] || !value) return [];
+          const patch: TrainingCard = { [task]: value };
+          if (task === "example") Object.assign(patch, { literal, note, highlight });
+          if (task === "definition") patch.concise = true;
+          return [[batch[index].term, patch]];
+        });
         await save(updates);
         omitted += batch.length - updates.length;
         done += updates.length;
@@ -79,8 +95,12 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
     { value: "beginner", label: t("Débutant · A1–A2", "Beginner · A1–A2") },
     { value: "intermediate", label: t("Intermédiaire · B1–B2", "Intermediate · B1–B2") },
     { value: "advanced", label: t("Avancé · C1+", "Advanced · C1+") },
+    { value: "misc", label: t("Divers", "Misc") },
   ] as const;
-  const eligible = (words ?? []).filter(({ term }) => difficulty === "all" || deck[term]?.difficulty === difficulty);
+  const activeWords = (words ?? []).filter(({ term }) => !deck[term]?.archived);
+  const archivedWords = Object.keys(deck).filter((term) => deck[term]?.archived)
+    .map((term) => ({ term, translation: deck[term].definition ?? "" }));
+  const eligible = activeWords.filter(({ term }) => difficulty === "all" || deck[term]?.difficulty === difficulty);
   const matches = eligible.filter(({ term }) => {
     const recalled = deck[term]?.recalled;
     return filter === "all" || (filter === "new" && recalled === undefined) ||
@@ -88,11 +108,25 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
   });
   const practice = matches.filter(({ term, translation }) => deck[term]?.definition || translation);
   const card = drill?.[position];
-  const grade = async (correct: boolean) => {
+  const entry = card ? deck[card.term] : undefined;
+  useEffect(() => {
+    if (!card || ![1, 2, 3, 5].includes(Number(delay))) return;
+    const timer = window.setTimeout(() => setRevealed(true), Number(delay) * 1000);
+    return () => window.clearTimeout(timer);
+  }, [card, position, delay]);
+  const archive = (term: string, value: boolean, translation: string) => save([[term, {
+    archived: value,
+    ...(value && !deck[term]?.definition && translation ? { definition: translation } : {}),
+  }]]).catch((error) => toast(errorText(error), "error"));
+  const grade = async (correct: boolean | "archive") => {
     if (!card || grading.current) return;
     grading.current = true;
     try {
-      await save([[card.term, { recalled: correct }]]);
+      if (correct === "archive") {
+        await save([[card.term, { archived: true, definition: entry?.definition || card.translation }]]);
+      } else {
+        await save([[card.term, { recalled: correct }]]);
+      }
       setRevealed(false);
       setPosition((n) => n + 1);
     } catch (error) {
@@ -106,6 +140,10 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey ||
           (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable]"))) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setRevealed(true);
+      }
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
         void grade(event.key === "ArrowRight");
@@ -127,7 +165,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
     setDrill(cards);
   };
   const actions: { task: TrainingTask; label: string; targets: Term[] }[] = [
-    { task: "difficulty", label: t("Classer les nouveaux mots", "Sort new words"), targets: needsTraining(words ?? [], deck, "difficulty") },
+    { task: "difficulty", label: t("Classer les nouveaux mots", "Sort new words"), targets: needsTraining(activeWords, deck, "difficulty") },
     { task: "definition", label: t("Créer les définitions", "Generate definitions"), targets: needsTraining(eligible, deck, "definition") },
     { task: "example", label: t("Créer les exemples", "Generate examples"), targets: needsTraining(eligible, deck, "example") },
   ];
@@ -135,10 +173,17 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
   return (
     <div className="view training-view">
       <header><h1>{t("Entraînement", "Training")}</h1></header>
+      {!drill && <Segmented id="training-archive" value={archived ? "archive" : "active"}
+        label={t("Cartes", "Cards")} onChange={(v) => { setArchived(v === "archive"); setLimit(100); }}
+        options={[
+          { value: "active", label: t("À étudier", "Study cards") },
+          { value: "archive", label: t("Archives", "Archive") },
+        ]} />}
       {drill ? (
         <section className="training-drill">
           <div className="training-toolbar">
             <button className="btn ghost" onClick={() => setDrill(null)}>{t("Retour aux mots", "Back to words")}</button>
+            {revealPicker}
             <span className="muted">{Math.min(position + 1, drill.length)} / {drill.length}</span>
           </div>
           {card ? (
@@ -146,18 +191,32 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
               <button type="button" key={card.term} className={`training-flashcard${revealed ? " revealed" : ""}`}
                 aria-expanded={revealed} onClick={() => setRevealed((v) => !v)}>
                 <strong lang={lang} dir="auto">{card.term}</strong>
-                <span className="training-answer">
-                  <span lang="en">{deck[card.term]?.definition || card.translation}</span>
-                  {deck[card.term]?.example && <small lang={lang} dir="auto">{deck[card.term].example}</small>}
+                {entry?.example && <span className="training-example" lang={lang} dir="auto">
+                  {highlightExample(entry.example, entry.highlight || card.term)}
+                </span>}
+                <span className="training-answer" lang="en">
+                  <b>{entry?.definition || card.translation}</b>
+                  {entry?.literal && <span>{entry.literal}</span>}
+                  {entry?.note && <small>{entry.note}</small>}
                 </span>
               </button>
               <div className="training-toolbar">
+                <button className="btn ghost" onClick={() => void grade("archive")}>{t("Archiver", "Archive")}</button>
                 <button className="btn soft" onClick={() => void grade(false)}>← {t("Je ne savais pas", "Didn’t know")}</button>
                 <button className="btn primary" onClick={() => void grade(true)}>{t("Je savais", "Knew it")} →</button>
               </div>
             </>
           ) : <p role="status">{t("Entraînement terminé.", "Drill complete.")}</p>}
         </section>
+      ) : archived ? (
+        <div className="training-list"><section>
+          <h2>{t("Cartes archivées", "Archived cards")} <small>{archivedWords.length}</small></h2>
+          {archivedWords.slice(0, limit).map(({ term, translation }) => <div className="training-row" key={term}>
+            <div><strong lang={lang} dir="auto">{term}</strong><span>{translation}</span></div>
+            <button className="btn sm ghost training-archive" onClick={() => void archive(term, false, translation)}>{t("Restaurer", "Restore")}</button>
+          </div>)}
+          {archivedWords.length > limit && <button className="btn ghost" onClick={() => setLimit((n) => n + 100)}>{t("Voir plus", "Show more")}</button>}
+        </section></div>
       ) : (
         <>
           <div className="training-toolbar">
@@ -184,6 +243,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
               <span>{t("Mélanger", "Shuffle")}</span>
               <Switch label={t("Mélanger", "Shuffle")} on={shuffle} onChange={setShuffle} />
             </div>
+            {revealPicker}
             <button className="btn primary" disabled={!practice.length} onClick={start}>{t("S’entraîner", "Start drill")} · {practice.length}</button>
           </div>
           {matches.length > practice.length && <p className="muted">{t("Les mots sans définition attendent dans la liste. Créez leurs définitions pour les ajouter à l’exercice.", "Words without a definition stay in the list. Generate definitions to include them in the drill.")}</p>}
@@ -205,6 +265,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
                       {(entry?.definition || translation) && <span>{entry?.definition || translation}</span>}
                       {entry?.example && <small lang={lang} dir="auto">{entry.example}</small>}
                     </div>
+                    <button className="btn sm ghost training-archive" onClick={() => void archive(term, true, translation)}>{t("Archiver", "Archive")}</button>
                   </motion.div>;
                 })}
                 {group.length > limit && <button className="btn ghost" onClick={() => setLimit((n) => n + 100)}>{t("Voir plus", "Show more")}</button>}
@@ -216,4 +277,11 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
       )}
     </div>
   );
+}
+
+function highlightExample(example: string, target: string) {
+  const index = example.indexOf(target);
+  const start = index >= 0 ? index : example.toLowerCase().indexOf(target.toLowerCase());
+  if (start < 0) return example;
+  return <>{example.slice(0, start)}<mark>{example.slice(start, start + target.length)}</mark>{example.slice(start + target.length)}</>;
 }

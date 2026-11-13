@@ -1,8 +1,8 @@
 import type { Term } from "./types";
 
-export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type Difficulty = "beginner" | "intermediate" | "advanced" | "misc";
 export type TrainingTask = "difficulty" | "definition" | "example";
-export type TrainingCard = Partial<Record<TrainingTask, string>> & { recalled?: boolean };
+export type TrainingCard = Partial<Record<TrainingTask, string>> & { recalled?: boolean; archived?: boolean; literal?: string; note?: string; highlight?: string; concise?: boolean };
 export type TrainingDeck = Record<string, TrainingCard>;
 
 export function readTrainingDeck(raw: string | undefined): TrainingDeck {
@@ -18,5 +18,6 @@ export function readTrainingDeck(raw: string | undefined): TrainingDeck {
 }
 
 export function needsTraining(words: Term[], deck: TrainingDeck, task: TrainingTask) {
-  return words.filter(({ term }) => !deck[term]?.[task]);
+  return words.filter(({ term }) => !deck[term]?.[task] || (task === "example" && !deck[term]?.literal) ||
+    (task === "definition" && !deck[term]?.concise));
 }
