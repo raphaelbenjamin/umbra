@@ -1037,6 +1037,8 @@ export function createMockApi(): Api {
       throw t("NO_VOICE: la voix naturelle fonctionne dans l'application Mac", "NO_VOICE: the natural voice works in the Mac app");
     },
     async lessonVoiceCancel() {},
+    async azureSpeechConfig() { return null; },
+    async azureSpeechClip() { return null; },
     async ttsSay() {
       // l'aperçu navigateur n'a pas le moteur : la voix du système prend le relais
       throw t("NO_VOICE: la voix naturelle fonctionne dans l'application Mac", "NO_VOICE: the natural voice works in the Mac app");
@@ -1044,6 +1046,7 @@ export function createMockApi(): Api {
     async readFile() {
       throw t("La lecture de fichiers fonctionne dans l'application Mac.", "Reading files works in the Mac app.");
     },
+    async importSubtitledMedia() { throw new Error("This import requires the Umbra desktop app."); },
     async importMedia() {
       throw t("La transcription fonctionne dans l'application Mac.", "Transcription works in the Mac app.");
     },

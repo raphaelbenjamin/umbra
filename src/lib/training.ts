@@ -2,7 +2,7 @@ import type { Term } from "./types";
 
 export type Difficulty = "beginner" | "intermediate" | "advanced" | "misc";
 export type TrainingTask = "difficulty" | "definition" | "example";
-export type TrainingCard = Partial<Record<TrainingTask, string>> & { recalled?: boolean; archived?: boolean; literal?: string; note?: string; highlight?: string; concise?: boolean };
+export type TrainingCard = Partial<Record<TrainingTask, string>> & { recalled?: boolean; literal?: string; note?: string; highlight?: string; concise?: boolean };
 export type TrainingDeck = Record<string, TrainingCard>;
 
 export function readTrainingDeck(raw: string | undefined): TrainingDeck {

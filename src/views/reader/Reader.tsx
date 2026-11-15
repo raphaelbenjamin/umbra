@@ -157,7 +157,7 @@ export function Reader() {
   const chunkMode = settings.chunk_mode === "1";
   const [chunkTools, setChunkTools] = useState(false);
   const [chunkAhead, setChunkAhead] = useState("0");
-  const chunkSize = settings.chunk_size === "small" ? 16 : settings.chunk_size === "large" ? 24 : 20;
+  const chunkSize = look.size * (settings.chunk_size === "small" ? 0.85 : settings.chunk_size === "large" ? 1.15 : 1);
   const chunkEnglish = settings.chunk_english !== "0";
   const chunkBlurEnglish = chunkEnglish && settings.chunk_blur_english === "1";
   const paged = look.layout === "pages";
@@ -1241,7 +1241,13 @@ export function Reader() {
     seekLantern.current = false;
     if (sc && (follow || seek)) {
       const sr = sc.getBoundingClientRect();
-      if (r.top < sr.top + 80 || r.bottom > sr.bottom - 120) sc.scrollBy({ top: r.top - sr.top - sr.height * 0.35, behavior: "smooth" });
+      if (chunkMode) {
+        if (r.top < sr.top + 12 || r.bottom > sr.bottom - 12) {
+          sc.scrollBy({ top: r.top - sr.top - sr.height * 0.35, behavior: "instant" });
+        }
+      } else if (r.top < sr.top + 80 || r.bottom > sr.bottom - 120) {
+        sc.scrollBy({ top: r.top - sr.top - sr.height * 0.35, behavior: "smooth" });
+      }
       setLanternOut(0);
     } else setLanternOut(sc ? lanternSide() : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1354,7 +1360,7 @@ export function Reader() {
     const pinyin = showPinyin ? annotation?.pinyin : undefined;
     const gloss = showGloss && annotation?.gloss ? shortChineseGloss(annotation.gloss) : undefined;
     return {
-      known: blurKnown && !selected && (st === 4 || blurLiteral(visible)),
+      known: blurKnown && !selected && !(chunkMode && i === cursor) && (st === 4 || blurLiteral(visible)),
       node: <span key={i} className={cls} data-i={i} title={[pinyin, gloss].filter(Boolean).join(" · ") || undefined} style={illum && st === 0 ? ({ "--d": `${((i - pr.start) / total) * 0.375}s` } as React.CSSProperties) : undefined}>
         {chineseStudy ? <ChineseWord text={visible} pinyin={pinyin} gloss={gloss} /> : visible}
       </span>,
@@ -1456,7 +1462,7 @@ export function Reader() {
       lang={lang}
       dir={li.rtl ? "rtl" : undefined}
     >
-      <motion.div className="lantern" animate={lantern} style={{ opacity: lanternOn ? 1 : 0, transition: "opacity .3s ease" }} />
+      <motion.div className="lantern" animate={lantern} style={{ opacity: lanternOn && !chunkMode ? 1 : 0, transition: "opacity .3s ease" }} />
       {illum && (
         <motion.div
           className="sweep"
@@ -1467,7 +1473,7 @@ export function Reader() {
       )}
       {cards ? (
         <ChunkCards chunks={cards} text={pageText} tokens={tokens} first={pr.start} last={pr.end}
-          offset={pageTextStart} english={chunkEnglish} blurEnglish={chunkBlurEnglish} blur={blurKnown} part={tokenPart} />
+          offset={pageTextStart} english={chunkEnglish} blurEnglish={chunkBlurEnglish} blur={blurKnown} cursor={cursor} part={tokenPart} />
       ) : (
         <>
           {chunkMode && pageText.trim() && (

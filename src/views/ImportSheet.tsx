@@ -451,6 +451,20 @@ export function ImportSheet() {
     if (paths.length) setMediaFiles((m) => [...m, ...paths.filter((p) => !m.includes(p))]);
   };
 
+  const chooseSubtitledMedia = async () => {
+    await run(t("Importation de l’audio et des sous-titres", "Importing audio and subtitles"), async () => {
+      const paths = await pickFiles([{ name: t("Média et SRT", "Media and SRT"), extensions: [...MEDIA_EXT, "srt"] }]);
+      if (!paths.length) return;
+      const media = paths.filter((path) => MEDIA_EXT.includes(extOf(path)));
+      const subtitles = paths.filter((path) => extOf(path) === "srt");
+      if (media.length !== 1 || subtitles.length !== 1 || paths.length !== 2) {
+        throw new Error(t("Sélectionnez un fichier audio ou vidéo et un fichier SRT ensemble.", "Select one audio or video file and one SRT file together."));
+      }
+      const id = await api().importSubtitledMedia(lang, media[0], subtitles[0]);
+      finish([id], t("Leçon synchronisée créée", "Synced lesson created"));
+    });
+  };
+
   const onImportEvent = (e: ImportEvent) => {
     if (e.type === "stage") {
       setBusy(stageText(e.stage));
@@ -797,6 +811,11 @@ export function ImportSheet() {
 
             {tab === "media" && (
               <>
+                <button className="file-drop" onClick={() => void chooseSubtitledMedia()} disabled={!isTauri}>
+                  <Icon name="file" size={24} />
+                  <strong style={{ color: "var(--text)" }}>{t("Média + sous-titres SRT", "Audio or video + SRT")}</strong>
+                  <span>{t("Sélectionnez les deux fichiers ensemble. Les sous-titres suivent le son.", "Select both files together. Umbra uses the SRT timestamps to follow the sound.")}</span>
+                </button>
                 {!asrReady && <AsrMissing />}
                 <button className="file-drop" onClick={chooseMedia} disabled={!isTauri}>
                   <Icon name="wave" size={28} />

@@ -199,55 +199,33 @@
   position: relative;
   z-index: 1;
 }
-.chunk-reader .reader-leaves {
-  grid-template-columns: clamp(30px, 4vw, 62px) minmax(0, 1040px) clamp(30px, 4vw, 62px);
-}
-.chunk-reader .reader-inner {
-  max-width: 1136px;
-}
-.chunk-reader .leaf-measure,
-.chunk-reader .leaf-ghost {
-  max-width: var(--col-w);
-  margin-inline: auto;
-}
 .page.chunk-page {
-  font: var(--chunk-size, 20px)/1.4 var(--font-ui);
-}
-.page.chunk-page:lang(zh) {
-  font-family: var(--font-chinese);
+  font-size: var(--chunk-size, var(--read-size));
 }
 .reader-chunk-row {
   position: relative;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: stretch;
-  margin-block-end: 12px;
+  gap: 0.18em 0.22em;
+  align-items: baseline;
+  margin-block-end: 0.95em;
 }
 .reader-chunk {
   display: grid;
-  align-content: center;
-  gap: 0.42em;
   width: max-content;
-  max-width: min(100%, 21em);
-  padding: 0.55em 0.72em;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-elev) 62%, transparent);
-  text-align: center;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 0.22em;
+  box-shadow: inset 0 0 0 1px var(--border);
+  background: color-mix(in srgb, var(--bg-elev) 45%, transparent);
 }
 .reader-chunk.tinted {
-  background: color-mix(in srgb, var(--bg-elev) 80%, var(--light-soft));
-  border-color: color-mix(in srgb, var(--border) 91%, var(--accent));
+  background: color-mix(in srgb, var(--light-soft) 42%, transparent);
 }
-.chunk-plain .reader-chunk {
-  background: transparent;
-  border-color: var(--border);
-}
+.chunk-plain .reader-chunk { background: transparent; }
 .reader-chunk-source {
   min-width: 0;
-  font-weight: 500;
   overflow-wrap: anywhere;
 }
 .reader-chunk-english {
@@ -255,9 +233,12 @@
   width: 100%;
   contain: inline-size;
   min-width: 0;
-  font-size: 0.81em;
-  line-height: 1.3;
+  padding: 0 0.14em 0.22em;
+  font-family: var(--font-ui);
+  font-size: 0.62em;
+  line-height: 1.25;
   color: var(--muted);
+  text-align: center;
   overflow-wrap: anywhere;
 }
 .reveal-english .reader-chunk-english span {
@@ -2414,4 +2395,15 @@ span.player-voice .icon-btn {
 .wp-explanation strong[lang="zh"] {
   font-family: var(--font-chinese);
   font-size: 1.18em;
+}
+
+.chunk-page .reader-chunk.chunk-spoken {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.page.chunk-page .w.cur {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: none;
+  transition: none;
 }

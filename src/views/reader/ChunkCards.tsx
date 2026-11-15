@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { PassageChunk, Token } from "../../lib/types";
 import { knownRuns, type ReaderPart } from "./knownRuns";
 
-export function ChunkCards({ chunks, text, tokens, first, last, offset, english, blurEnglish, blur, part }: {
+export function ChunkCards({ chunks, text, tokens, first, last, offset, english, blurEnglish, blur, cursor, part }: {
   chunks: PassageChunk[];
   text: string;
   tokens: Token[];
@@ -12,6 +12,7 @@ export function ChunkCards({ chunks, text, tokens, first, last, offset, english,
   english: boolean;
   blurEnglish: boolean;
   blur: boolean;
+  cursor: number;
   part(index: number, text: string): ReaderPart;
 }) {
   let index = first;
@@ -22,6 +23,7 @@ export function ChunkCards({ chunks, text, tokens, first, last, offset, english,
     previousEnd = chunk.end;
     const start = offset + chunk.start;
     const end = offset + chunk.end;
+    const spoken = cursor >= first && cursor < last && tokens[cursor].s >= start && tokens[cursor].s < end;
     while (index < last && tokens[index].e <= start) index++;
     const parts: ReaderPart[] = [];
     for (let i = index; i < last && tokens[i].s < end; i++) {
@@ -29,7 +31,7 @@ export function ChunkCards({ chunks, text, tokens, first, last, offset, english,
       parts.push(part(i, token.t.slice(Math.max(0, start - token.s), end - token.s)));
     }
     rows[rows.length - 1].push(
-      <div key={chunk.start} className={`reader-chunk${position % 2 === 0 ? " tinted" : ""}${blurEnglish ? " reveal-english" : ""}`}
+      <div key={chunk.start} className={`reader-chunk${position % 2 === 0 ? " tinted" : ""}${blurEnglish ? " reveal-english" : ""}${spoken ? " chunk-spoken" : ""}`}
         tabIndex={blurEnglish ? 0 : undefined}>
         <div className="reader-chunk-source" dir="auto">{knownRuns(parts, blur)}</div>
         {english && <div className="reader-chunk-english" lang="en" dir="ltr"><span>{chunk.translation.replace(/(?:\s+\([^()]+\))+[.!?]?$/u, "") || chunk.translation}</span></div>}

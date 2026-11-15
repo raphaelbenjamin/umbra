@@ -24,7 +24,55 @@ struct Segment {
 }
 
 pub fn lesson(raw: &str, lang: &str) -> anyhow::Result<(String, String)> {
-    let Track { mut events } = serde_json::from_str(raw)?;
+    let Track { events } = serde_json::from_str(raw)?;
+    timed_lesson(events, lang)
+}
+
+fn srt_ms(value: &str) -> Option<u64> {
+    let mut parts = value.trim().split([':', ',', '.']);
+    let h: u64 = parts.next()?.parse().ok()?;
+    let m: u64 = parts.next()?.parse().ok()?;
+    let s: u64 = parts.next()?.parse().ok()?;
+    let fraction = parts.next()?;
+    if h > 999 || m >= 60 || s >= 60 || fraction.len() != 3 || parts.next().is_some() {
+        return None;
+    }
+    let ms: u64 = fraction.parse().ok()?;
+    Some(((h * 60 + m) * 60 + s) * 1000 + ms)
+}
+
+pub fn srt_lesson(raw: &str, lang: &str) -> anyhow::Result<(String, String)> {
+    let normalized = raw.trim_start_matches('\u{feff}').replace("\r\n", "\n").replace('\r', "\n");
+    let mut events = Vec::new();
+    let mut lines = normalized.lines().peekable();
+    while let Some(line) = lines.next() {
+        let Some((start, end)) = line.split_once("-->") else { continue };
+        let start = srt_ms(start).ok_or_else(|| anyhow::anyhow!("Invalid SRT start time: {start}"))?;
+        let end = end.split_whitespace().next().and_then(srt_ms)
+            .ok_or_else(|| anyhow::anyhow!("Invalid SRT end time"))?;
+        anyhow::ensure!(end > start, "SRT cue ends before or at its start");
+        let mut text = String::new();
+        while lines.peek().is_some_and(|line| !line.trim().is_empty() && !line.contains("-->")) {
+            if !text.is_empty() { text.push(' '); }
+            text.push_str(lines.next().unwrap().trim());
+        }
+        let mut clean = String::new();
+        let mut markup = false;
+        for c in text.chars() {
+            match c {
+                '<' => markup = true,
+                '>' => markup = false,
+                _ if !markup => clean.push(c),
+                _ => {}
+            }
+        }
+        events.push(Cue { t_start_ms: start, d_duration_ms: Some(end - start),
+            segs: vec![Segment { utf8: clean, t_offset_ms: None }] });
+    }
+    timed_lesson(events, lang)
+}
+
+fn timed_lesson(mut events: Vec<Cue>, lang: &str) -> anyhow::Result<(String, String)> {
     events.retain(|cue| !cue.segs.iter().all(|seg| seg.utf8.trim().is_empty()));
     events.sort_by_key(|cue| cue.t_start_ms);
     let mut body = String::new();
@@ -95,6 +143,19 @@ pub fn lesson(raw: &str, lang: &str) -> anyhow::Result<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn srt_uses_cue_times_and_utf16_word_offsets() {
+        let raw = "\u{feff}1\r\n00:00:01,200 --> 00:00:03,200\r\n<i>📖 שלום עולם.</i>\r\n \r\n2\r\n00:00:06,000 --> 00:00:07,000\r\nכן.";
+        let (text, timing) = srt_lesson(raw, "he").unwrap();
+        let times: Vec<[f64; 4]> = serde_json::from_str(&timing).unwrap();
+        assert!(!text.contains("<i>"));
+        assert_eq!(times.iter().map(|r| (r[2], r[3])).collect::<Vec<_>>(), [(1.2, 2.2), (2.2, 3.2), (6.0, 7.0)]);
+        for (range, token) in times.iter().zip(crate::text::tokenize(&text, "he").into_iter().filter(|t| t.w)) {
+            assert_eq!((range[0] as usize, range[1] as usize), (token.s, token.e));
+        }
+        assert!(srt_lesson("missing subtitles", "he").is_err());
+    }
 
     #[test]
     fn caption_words_keep_offsets_and_segment_times() {

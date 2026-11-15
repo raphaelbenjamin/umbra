@@ -691,7 +691,7 @@ pub struct TrainingAnswer {
 #[tauri::command]
 pub async fn training_generate(state: State<'_, AppState>, lang: String, task: String, mut words: Vec<TrainingWord>) -> R<Vec<TrainingAnswer>> {
     let instruction = match task.as_str() {
-        "difficulty" => "Classify by everyday frequency and usefulness: beginner (A1–A2), intermediate (B1–B2), or advanced (C1+). Use misc for proper names, typos, fragments, transcript artifacts, and other nonstandard entries. Return exactly one of beginner, intermediate, advanced, misc as value.",
+        "difficulty" => "Classify by everyday frequency and usefulness: beginner (A1–A2), intermediate (B1–B2), or advanced (C1+). First verify the entry belongs to the given study language, using context to distinguish shared spellings and inflections. Use misc for foreign-language intrusions, proper names (people, places, brands), nonwords, typos, meaningless fragments, transcription or OCR artifacts, and extremely obscure or unattested forms unlikely to occur in ordinary study. Do not mark a real inflected form or useful advanced word misc merely because it is uncommon. Return exactly one of beginner, intermediate, advanced, misc as value.",
         "definition" => "Give one English word for the primary sense in context (a short phrase only if necessary). If a distinct common sense matters, add another short gloss separated by a slash. No prose or grammar in value.",
         "example" => "Write a short natural example in value, a literal English translation in literal, a brief English tutor note on how the term functions in note, and the exact word or inflected phrase from the example in highlight. Include all four fields in each object.",
         _ => return Err("Unknown training task".into()),
@@ -1262,6 +1262,100 @@ pub async fn tts_say(state: State<'_, AppState>, lang: String, text: String, pre
     Ok(path.to_string_lossy().into_owned())
 }
 
+#[derive(Serialize, serde::Deserialize)]
+struct AzureSpeechCredentials {
+    region: String,
+    key: String,
+}
+
+#[tauri::command]
+pub async fn azure_speech_config(state: State<'_, AppState>, region: Option<String>, key: Option<String>) -> R<Option<String>> {
+    let path = state.data_dir.join("azure-speech.json");
+    if let (Some(region), Some(key)) = (region, key) {
+        let region = region.trim().to_ascii_lowercase();
+        let key = key.trim().to_owned();
+        if region.is_empty() || region.len() > 40 || !region.bytes().all(|b| b.is_ascii_alphanumeric()) ||
+            key.is_empty() || key.len() > 256 || !key.bytes().all(|b| b.is_ascii_graphic()) {
+            return Err(t("Saisissez une région Azure et une clé Speech valides.", "Enter a valid Azure region and Speech key.").into());
+        }
+        let data = serde_json::to_vec(&AzureSpeechCredentials { region: region.clone(), key }).map_err(err)?;
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let temp = path.with_extension("tmp");
+        use std::io::Write;
+        let mut file = options.open(&temp).map_err(err)?;
+        let result = file.write_all(&data).and_then(|_| std::fs::rename(&temp, &path));
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temp);
+        }
+        result.map_err(err)?;
+        return Ok(Some(region));
+    }
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(serde_json::from_slice::<AzureSpeechCredentials>(&bytes).map_err(err)?.region)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(err(error)),
+    }
+}
+
+#[tauri::command]
+pub async fn azure_speech_clip(state: State<'_, AppState>, lang: String, text: String, voice: String, cached_only: bool) -> R<Option<String>> {
+    let text = text.trim();
+    let locale = voice.split('-').take(2).collect::<Vec<_>>().join("-");
+    if text.is_empty() || text.chars().count() > 600 || voice.len() > 100 ||
+        !voice.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b':' || b == b'_') ||
+        locale.split('-').next() != Some(lang.as_str()) || voice.split('-').count() < 3 {
+        return Err(t("Vérifiez la voix et le texte à prononcer.", "Check the Azure voice and text to pronounce.").into());
+    }
+    let dest = state.data_dir.join("media").join("voice").join(format!("azure-{}.mp3", hash(&["v1", &voice, text])));
+    if dest.is_file() {
+        return Ok(Some(dest.to_string_lossy().into_owned()));
+    }
+    if cached_only {
+        return Ok(None);
+    }
+    let _turn = state.voice_lock.lock().await;
+    if dest.is_file() {
+        return Ok(Some(dest.to_string_lossy().into_owned()));
+    }
+    let creds: AzureSpeechCredentials = serde_json::from_slice(
+        &std::fs::read(state.data_dir.join("azure-speech.json")).map_err(|_| {
+            t("Configurez Azure Speech dans Entraînement.", "Set up Azure Speech in Training.").to_string()
+        })?
+    ).map_err(err)?;
+    if creds.region.is_empty() || !creds.region.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return Err("Invalid Azure region".into());
+    }
+    let escaped = text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    let ssml = format!("<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"{locale}\"><voice name=\"{voice}\">{escaped}</voice></speak>");
+    let response = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30)).build().map_err(err)?
+        .post(format!("https://{}.tts.speech.microsoft.com/cognitiveservices/v1", creds.region))
+        .header("Ocp-Apim-Subscription-Key", creds.key)
+        .header("Content-Type", "application/ssml+xml")
+        .header("X-Microsoft-OutputFormat", "audio-24khz-48kbitrate-mono-mp3")
+        .header("User-Agent", "Umbra")
+        .body(ssml).send().await.map_err(err)?;
+    if !response.status().is_success() {
+        return Err(format!("Azure Speech HTTP {}. {}", response.status().as_u16(),
+            t("Vérifiez la clé, la région, la voix et le quota.", "Check your key, region, voice, and quota.")));
+    }
+    let bytes = response.bytes().await.map_err(err)?;
+    if bytes.is_empty() {
+        return Err("Azure Speech returned empty audio".into());
+    }
+    tokio::fs::create_dir_all(dest.parent().ok_or("Missing audio folder")?).await.map_err(err)?;
+    let temp = dest.with_extension("tmp");
+    tokio::fs::write(&temp, bytes).await.map_err(err)?;
+    tokio::fs::rename(&temp, &dest).await.map_err(err)?;
+    Ok(Some(dest.to_string_lossy().into_owned()))
+}
+
 // ---------- import ----------
 
 #[tauri::command]
@@ -1392,6 +1486,34 @@ pub async fn import_media(
     let id = db::lesson_create(&conn, &lesson).map_err(err)?;
     db::lesson_set_timings(&conn, id, &timings, db::TIMING_PRECISE).map_err(err)?;
     Ok(id)
+}
+
+#[tauri::command]
+pub async fn import_subtitled_media(state: State<'_, AppState>, lang: String, path: String, subtitles: String) -> R<i64> {
+    let src = PathBuf::from(&path);
+    let raw = tokio::fs::read_to_string(&subtitles).await.map_err(|_| {
+        t("Impossible de lire le fichier SRT. Enregistrez-le en UTF-8.", "Can’t read the SRT file. Save it as UTF-8.").to_string()
+    })?;
+    let (text, timings) = crate::captions::srt_lesson(&raw, &lang).map_err(|e| format!("SRT: {e}"))?;
+    let title = src.file_stem().and_then(|name| name.to_str()).unwrap_or(t("Enregistrement", "Recording")).to_owned();
+    let ext = src.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase();
+    let video = ["mp4", "mov", "m4v", "mkv", "webm"].contains(&ext.as_str());
+    let stored = media::store_media(&state.data_dir, &src).map_err(err)?;
+    let save = || -> anyhow::Result<i64> {
+        let mut conn = state.db.lock();
+        let tx = conn.transaction()?;
+        let media_path = stored.to_string_lossy().into_owned();
+        let id = db::lesson_create(&tx, &NewLesson {
+            lang, title, collection: String::new(),
+            kind: if video { "video" } else { "audio" }.into(),
+            source: path, text, media_path: Some(media_path.clone()), timings: Some(timings.clone()),
+            video_path: video.then_some(media_path),
+        })?;
+        db::lesson_set_timings(&tx, id, &timings, db::TIMING_LINES)?;
+        tx.commit()?;
+        Ok(id)
+    };
+    save().map_err(|error| { let _ = std::fs::remove_file(&stored); err(error) })
 }
 
 // ---------- import d'un lien : article, vidéo, podcast, Spotify ----------
