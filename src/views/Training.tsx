@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { Segmented, Switch } from "../components/ui";
 import { api, errorText, isTauri } from "../lib/api";
@@ -71,6 +71,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
   const voice = (configuredVoice ?? defaultVoice).trim();
   const player = useRef<HTMLAudioElement | null>(null);
   const playback = useRef<AbortController | null>(null);
+  const [audioError, setAudioError] = useState<string>();
   useEffect(() => {
     if (!isTauri) return;
     let here = true;
@@ -160,14 +161,40 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
   const audioTexts = (term: string, sentence?: string) =>
     [audioMode !== "sentence" ? term : "", audioMode !== "word" ? sentence?.trim() || "" : ""].filter(Boolean);
 
+  const localVoice = useApp((s) => s.settings[`tts_voice_${lang}`] ?? s.settings.tts_voice ?? "0");
+  const audioSource = azureEnabled ? `azure:${voice}` : `local:${localVoice}:${installedVoice}`;
+  const [audioCache, setAudioCache] = useState<{ source: string; texts: Set<string> }>();
+  const readyAudio = audioCache?.source === audioSource ? audioCache.texts : undefined;
+  const clipList = useMemo(() => JSON.stringify([...new Set((words ?? []).flatMap(({ term }) =>
+    [term, deck[term]?.example?.trim()].filter(Boolean)))]), [words, deck]);
+  const markAudioReady = useCallback((texts: string[]) => {
+    setAudioCache((previous) => ({
+      source: audioSource,
+      texts: new Set([...(previous?.source === audioSource ? previous.texts : []), ...texts]),
+    }));
+  }, [audioSource]);
+  useEffect(() => {
+    if (!isTauri) return;
+    let active = true;
+    void api().trainingAudioReady(lang, JSON.parse(clipList), azureEnabled ? voice : null)
+      .then((texts) => { if (active) markAudioReady(texts); })
+      .catch((error) => { if (active) toast(errorText(error), "error"); });
+    return () => { active = false; };
+  }, [lang, clipList, azureEnabled, voice, markAudioReady, toast]);
+
+  const generateClip = (text: string) => azureEnabled
+    ? api().azureSpeechClip(lang, text, voice, false)
+    : api().ttsSay(lang, text, false);
+
   const stopAudio = () => {
     playback.current?.abort();
     player.current?.pause();
     stopPronunciation();
   };
 
-  const playAudio = async (texts: string[], cachedOnly = false) => {
+  const playAudio = async (texts: string[], automatic = false) => {
     stopAudio();
+    setAudioError(undefined);
     if (!texts.length) return;
     const run = new AbortController();
     playback.current = run;
@@ -175,39 +202,57 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
       await pronounce(texts.join(". "), lang);
       return;
     }
-    if (azureEnabled && !voice) {
-      if (!cachedOnly) toast(t("Choisissez une voix Azure.", "Choose an Azure voice in Audio settings."), "error");
-      return;
-    }
-    try {
-      for (const text of texts) {
+    let played = false;
+    for (const text of texts) {
+      if (run.signal.aborted) break;
+      try {
+        const path = await generateClip(text);
         if (run.signal.aborted) break;
-        const path = azureEnabled
-          ? await api().azureSpeechClip(lang, text, voice, cachedOnly)
-          : await api().ttsSay(lang, text, false);
-        if (run.signal.aborted) break;
-        if (!path) continue;
-        const audio = new Audio(api().mediaUrl(path));
-        player.current = audio;
+        if (!path) throw new Error(t("Clip indisponible.", "Audio clip unavailable."));
+        markAudioReady([text]);
+        if (played) {
+          await new Promise<void>((resolve) => {
+            const finish = () => {
+              window.clearTimeout(timer);
+              run.signal.removeEventListener("abort", finish);
+              resolve();
+            };
+            const timer = window.setTimeout(finish, 650);
+            run.signal.addEventListener("abort", finish, { once: true });
+          });
+          if (run.signal.aborted) break;
+        }
+        const audio = player.current ??= new Audio();
         await new Promise<void>((resolve, reject) => {
           const done = () => {
+            audio.removeEventListener("ended", done);
+            audio.removeEventListener("error", failed);
             run.signal.removeEventListener("abort", done);
             resolve();
           };
+          const failed = () => {
+            reject(new Error(t("Lecture audio impossible.", "Couldn’t play audio.")));
+            done();
+          };
           run.signal.addEventListener("abort", done, { once: true });
-          audio.onended = done;
-          audio.onerror = () => { reject(new Error(t("Lecture audio impossible.", "Couldn’t play audio."))); done(); };
+          audio.addEventListener("ended", done, { once: true });
+          audio.addEventListener("error", failed, { once: true });
+          audio.src = api().mediaUrl(path);
           void audio.play().catch((error) => { reject(error); done(); });
         });
+        played = true;
+      } catch (error) {
+        if (run.signal.aborted) break;
+        if (automatic) setAudioError(errorText(error));
+        else toast(errorText(error), "error");
       }
-    } catch (error) {
-      if (!run.signal.aborted && !cachedOnly) toast(errorText(error), "error");
     }
   };
   useEffect(() => {
+    setAudioError(undefined);
     if (card && autoplayAudio) void playAudio(audioTexts(card.term, example), true);
     return () => { if (card) stopAudio(); };
-  }, [card, lang, autoplayAudio, audioMode, example, azureEnabled, voice, canPrepareAudio]);
+  }, [card, lang, autoplayAudio, audioMode, example, azureEnabled, voice, canPrepareAudio, localVoice]);
 
   const saveAzure = async () => {
     if (azureSaving) return;
@@ -223,19 +268,14 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
       setAzureSaving(false);
     }
   };
-  const prepareAudio = async (items: Term[]) => {
-    if (preparingAudio.current || !canPrepareAudio) return;
-    const texts = [...new Set(items.flatMap(({ term }) => audioTexts(term, deck[term]?.example)))];
-    if (!texts.length) {
-      toast(t("Créez d’abord des exemples.", "Generate example sentences first."));
-      return;
-    }
+  const prepareAudio = async (texts: string[]) => {
+    if (preparingAudio.current || !canPrepareAudio || !texts.length) return;
     preparingAudio.current = true;
     setAudioProgress({ done: 0, total: texts.length });
     try {
       for (let i = 0; i < texts.length; i++) {
-        if (azureEnabled) await api().azureSpeechClip(lang, texts[i], voice, false);
-        else await api().ttsSay(lang, texts[i], false);
+        await generateClip(texts[i]);
+        markAudioReady([texts[i]]);
         setAudioProgress({ done: i + 1, total: texts.length });
       }
       toast(t("Audio prêt", "Audio ready"));
@@ -293,6 +333,17 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
         event.preventDefault();
         event.stopPropagation();
         if (!event.repeat) void resetWord(card.term);
+      } else if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat && !grading.current) {
+          if (revealed) void grade(true);
+          else setRevealed(true);
+        }
+      } else if (event.key === ",") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) void grade(false);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         event.stopPropagation();
@@ -351,6 +402,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
           {card ? (
             <>
               <RecallCard key={position} card={card} entry={entry} lang={lang} revealed={revealed} reveal={() => setRevealed(true)} />
+              {audioError && <p className="muted" role="status">{audioError}</p>}
               <div className="training-toolbar">
                 <button className="btn ghost" onClick={() => void playAudio([card.term])}>
                   <Icon name="speaker" size={16} /> {t("Écouter le mot", "Play word")}
@@ -358,11 +410,11 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
                 {example && <button className="btn ghost" onClick={() => void playAudio([example])}>
                   <Icon name="speaker" size={16} /> {t("Écouter l’exemple", "Play example")}
                 </button>}
-                <button className="btn soft" disabled={revealed} onClick={() => setRevealed(true)}>↓ {t("Révéler", "Reveal")}</button>
+                <button className="btn soft" disabled={revealed} onClick={() => setRevealed(true)}>{t("Révéler · Espace / ↓", "Reveal · Space / ↓")}</button>
                 <button className="btn ghost" disabled={!!busy || resetting} onClick={() => void resetWord(card.term)}
                   title={t("Supprime le mot du vocabulaire (Q)", "Remove from vocabulary (Q)")}>{t("Rétablir comme nouveau", "Reset to New")} · Q</button>
-                <button className="btn soft" onClick={() => void grade(false)}>← {t("Je ne savais pas", "Didn’t know")}</button>
-                <button className="btn primary" onClick={() => void grade(true)}>{t("Je savais", "Knew it")} →</button>
+                <button className="btn soft" onClick={() => void grade(false)}>{t("Revoir · , / ←", "Again · , / ←")}</button>
+                <button className="btn primary" onClick={() => void grade(true)}>{t("Connu · Espace / →", "Known · Space / →")}</button>
               </div>
             </>
           ) : <p role="status">{t("Entraînement terminé.", "Drill complete.")}</p>}
@@ -400,7 +452,7 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
               </div>
               <label>{t("Voix pour cette langue", "Voice for this language")} <input className="input" value={configuredVoice ?? defaultVoice}
                 onChange={(e) => void setSetting(`training_azure_voice_${lang}`, e.target.value).catch((error) => toast(errorText(error), "error"))} /></label>
-              <p className="muted">{t("Préparez l’audio avant l’exercice. La lecture automatique Azure utilise les clips enregistrés.", "Choose Word, Sentence, or Both before preparing audio. Azure autoplay uses saved clips only.")}</p>
+              <p className="muted">{t("Les clips manquants sont créés à la lecture et mis en cache. Azure utilise votre quota.", "Missing clips are generated on first play and saved. Azure generation uses your speech quota.")}</p>
             </section></div>
           )}
           <h2 className="training-setup-title">{t("Préparer un exercice", "Set up a drill")}</h2>
@@ -427,6 +479,8 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
             {[...tiers, { value: "unsorted", label: t("Non classés", "Unsorted") }].map(({ value, label }) => {
               const levelWords = eligible.filter(({ term }) => (deck[term]?.difficulty ?? "unsorted") === value);
               if (!levelWords.length) return null;
+              const selectedClips = [...new Set(levelWords.flatMap(({ term }) => audioTexts(term, deck[term]?.example)))];
+              const missingClips = selectedClips.filter((text) => !readyAudio?.has(text));
               const group = matches.filter(({ term }) => (deck[term]?.difficulty ?? "unsorted") === value);
               group.sort((a, b) => Number(deck[a.term]?.recalled === true) - Number(deck[b.term]?.recalled === true));
               return <section key={value}>
@@ -437,8 +491,10 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
                     return <button key={task} className="btn sm soft" disabled={!!busy || resetting || !targets.length}
                       onClick={() => void generate(task, targets)}>{labels[task]} · {targets.length}</button>;
                   })}
-                  {canPrepareAudio && <button className="btn sm soft" disabled={!!audioProgress}
-                    onClick={() => void prepareAudio(levelWords)}>{t("Préparer l’audio", "Prepare audio")}</button>}
+                  {canPrepareAudio && readyAudio && selectedClips.length > 0 && (missingClips.length
+                    ? <button className="btn sm soft" disabled={!!audioProgress}
+                        onClick={() => void prepareAudio(missingClips)}>{t("Préparer l’audio manquant", "Prepare missing audio")} · {missingClips.length}</button>
+                    : <small className="muted">{t("Audio prêt", "Audio ready")}</small>)}
                 </div>
                 {group.slice(0, limit).map(({ term, translation }) => {
                   const entry = deck[term];
@@ -451,6 +507,10 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
                       {(entry?.definition || translation) && <span>{entry?.definition || translation}</span>}
                       {entry?.example && <small lang={lang} dir="auto">{entry.example}</small>}
                     </div>
+                    {readyAudio && <div className="training-audio-status">
+                      <AudioReady label={t("Mot", "Word")} ready={readyAudio.has(term)} />
+                      <AudioReady label={t("Phrase", "Sentence")} ready={!!entry?.example && readyAudio.has(entry.example.trim())} />
+                    </div>}
                     <button className="btn sm ghost training-reset" disabled={!!busy || resetting} onClick={() => void resetWord(term)}
                       title={t("Supprime le mot du vocabulaire", "Remove from vocabulary")}>{t("Rétablir comme nouveau", "Reset to New")}</button>
                   </motion.div>;
@@ -464,6 +524,14 @@ function TrainingDeckView({ lang }: { lang: LangCode }) {
       )}
     </div>
   );
+}
+
+function AudioReady({ label, ready }: { label: string; ready: boolean }) {
+  const status = ready ? t("Audio prêt", "Audio ready") : t("Audio manquant", "Audio missing");
+  return <span className="training-audio-indicator" title={status} aria-label={`${label} · ${status}`} role="img">
+    <span className="training-audio-box" aria-hidden="true">{ready && <Icon name="check" size={10} stroke={2.5} />}</span>
+    {label}
+  </span>;
 }
 
 function RecallCard({ card, entry, lang, revealed, reveal }: {

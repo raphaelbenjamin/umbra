@@ -1238,13 +1238,39 @@ pub async fn lesson_voice(state: State<'_, AppState>, id: i64, on_event: Channel
     Ok(VoicedLesson { media_path, timings, timing_v: version, duration: audio.duration })
 }
 
+fn local_speech_text(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(600).collect()
+}
+
+fn azure_speech_path(data_dir: &std::path::Path, voice: &str, text: &str) -> std::path::PathBuf {
+    data_dir.join("media").join("voice").join(format!("azure-{}.mp3", hash(&["v1", voice, text.trim()])))
+}
+
+#[tauri::command]
+pub async fn training_audio_ready(state: State<'_, AppState>, lang: String, texts: Vec<String>, azure_voice: Option<String>) -> R<Vec<String>> {
+    let ready = match azure_voice {
+        Some(voice) => texts.into_iter()
+            .filter(|text| azure_speech_path(&state.data_dir, &voice, text).is_file())
+            .collect(),
+        None => {
+            let (Ok(model), Ok(voice)) = (voice_model(&state), voice_for(&state, &lang)) else {
+                return Ok(Vec::new());
+            };
+            texts.into_iter()
+                .filter(|text| crate::voice::cached_path(&state.data_dir, model, &lang, &local_speech_text(text), &voice).is_file())
+                .collect()
+        }
+    };
+    Ok(ready)
+}
+
 /// Prononce un mot ou une expression avec la voix naturelle et renvoie le
 /// fichier WAV. `prefetch` : préparation en arrière-plan (au toucher d'un mot),
 /// abandonnée si une demande plus récente arrive entre-temps.
 #[tauri::command]
 pub async fn tts_say(state: State<'_, AppState>, lang: String, text: String, prefetch: bool) -> R<String> {
     let m = voice_model(&state)?;
-    let text: String = text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(600).collect();
+    let text = local_speech_text(&text);
     if text.is_empty() {
         return Err(t("Rien à prononcer.", "Nothing to pronounce.").into());
     }
@@ -1312,7 +1338,7 @@ pub async fn azure_speech_clip(state: State<'_, AppState>, lang: String, text: S
         locale.split('-').next() != Some(lang.as_str()) || voice.split('-').count() < 3 {
         return Err(t("Vérifiez la voix et le texte à prononcer.", "Check the Azure voice and text to pronounce.").into());
     }
-    let dest = state.data_dir.join("media").join("voice").join(format!("azure-{}.mp3", hash(&["v1", &voice, text])));
+    let dest = azure_speech_path(&state.data_dir, &voice, text);
     if dest.is_file() {
         return Ok(Some(dest.to_string_lossy().into_owned()));
     }
@@ -1489,16 +1515,34 @@ pub async fn import_media(
 }
 
 #[tauri::command]
-pub async fn import_subtitled_media(state: State<'_, AppState>, lang: String, path: String, subtitles: String) -> R<i64> {
+pub async fn list_import_folder(path: String) -> R<Vec<String>> {
+    let mut dir = tokio::fs::read_dir(path).await.map_err(err)?;
+    let mut files = Vec::new();
+    while let Some(entry) = dir.next_entry().await.map_err(err)? {
+        if entry.file_type().await.map_err(err)?.is_file() {
+            if let Ok(path) = entry.path().into_os_string().into_string() {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+#[tauri::command]
+pub async fn import_subtitled_media(state: State<'_, AppState>, lang: String, path: String, subtitles: String, on_event: Channel<ImportEvent>) -> R<i64> {
     let src = PathBuf::from(&path);
+    let stage = |stage: &str| { let _ = on_event.send(ImportEvent::Stage { stage: stage.into() }); };
+    stage("subtitles");
     let raw = tokio::fs::read_to_string(&subtitles).await.map_err(|_| {
-        t("Impossible de lire le fichier SRT. Enregistrez-le en UTF-8.", "Can’t read the SRT file. Save it as UTF-8.").to_string()
+        t("Impossible de lire les sous-titres. Enregistrez le fichier en UTF-8.", "Can’t read the subtitle file. Save it as UTF-8.").to_string()
     })?;
-    let (text, timings) = crate::captions::srt_lesson(&raw, &lang).map_err(|e| format!("SRT: {e}"))?;
+    let (text, timings) = crate::captions::subtitle_lesson(&raw, &lang).map_err(err)?;
     let title = src.file_stem().and_then(|name| name.to_str()).unwrap_or(t("Enregistrement", "Recording")).to_owned();
     let ext = src.extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase();
     let video = ["mp4", "mov", "m4v", "mkv", "webm"].contains(&ext.as_str());
-    let stored = media::store_media(&state.data_dir, &src).map_err(err)?;
+    let stored = media::prepare_subtitled_media(&state.data_dir, &src, stage).await.map_err(err)?;
+    stage("lesson");
     let save = || -> anyhow::Result<i64> {
         let mut conn = state.db.lock();
         let tx = conn.transaction()?;

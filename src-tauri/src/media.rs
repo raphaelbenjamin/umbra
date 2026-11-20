@@ -51,10 +51,78 @@ pub fn store_media(data_dir: &Path, src: &Path) -> Result<PathBuf> {
     let dir = media_dir(data_dir);
     std::fs::create_dir_all(&dir)?;
     let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("bin").to_lowercase();
-    let name = format!("{}.{}", chrono::Utc::now().format("%Y%m%d-%H%M%S%3f"), ext);
+    let name = format!("{}.{}", import_file_id()?, ext);
     let dst = dir.join(name);
-    std::fs::copy(src, &dst)?;
+    if let Err(error) = std::fs::copy(src, &dst) {
+        let _ = std::fs::remove_file(&dst);
+        return Err(error.into());
+    }
     Ok(dst)
+}
+
+fn import_file_id() -> Result<String> {
+    let mut bytes = [0; 16];
+    getrandom::fill(&mut bytes).map_err(|error| anyhow!("{error}"))?;
+    Ok(hex::encode(bytes))
+}
+
+/// Normalize containers that the system webview may be unable to play.
+pub async fn prepare_subtitled_media(
+    data_dir: &Path,
+    src: &Path,
+    on_stage: impl Fn(&str),
+) -> Result<PathBuf> {
+    let ext = src.extension().and_then(|ext| ext.to_str()).unwrap_or_default();
+    if !cfg!(target_os = "macos") || !["webm", "mkv"].iter().any(|kind| ext.eq_ignore_ascii_case(kind)) {
+        on_stage("copy");
+        let (dir, src) = (data_dir.to_owned(), src.to_owned());
+        return tokio::task::spawn_blocking(move || store_media(&dir, &src)).await?;
+    }
+
+    on_stage("video");
+    let ffmpeg = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
+        .into_iter()
+        .find(|path| Path::new(path).is_file())
+        .unwrap_or("ffmpeg");
+    let dir = media_dir(data_dir);
+    tokio::fs::create_dir_all(&dir).await?;
+    let id = import_file_id()?;
+    let draft = dir.join(format!("{id}.light-tmp.mp4"));
+    let dest = dir.join(format!("{id}.mp4"));
+    let result = async {
+        let encode = |codec: &[&str]| {
+            let mut cmd = crate::proc::tokio_command(ffmpeg);
+            cmd.args(["-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-xerror", "-threads", "2", "-i"])
+                .arg(src)
+                .args(["-map", "0:V:0", "-map", "0:a:0?", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2"])
+                .args(codec)
+                .args(["-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart"])
+                .arg(&draft)
+                .kill_on_drop(true);
+            cmd
+        };
+        let hardware = encode(&["-c:v", "h264_videotoolbox", "-q:v", "65"])
+            .output().await.map_err(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    anyhow!(crate::i18n::t("Installez FFmpeg pour importer les vidéos WebM ou MKV, ou utilisez un fichier MP4.", "Install FFmpeg to import WebM or MKV videos, or use an MP4 file."))
+                } else {
+                    error.into()
+                }
+            })?;
+        if !hardware.status.success() {
+            let software = encode(&["-c:v", "libx264", "-threads:v", "2", "-preset", "veryfast", "-crf", "21"]).output().await?;
+            if !software.status.success() {
+                let detail = String::from_utf8_lossy(&software.stderr);
+                return Err(anyhow!("{}: {}", crate::i18n::t("Impossible de préparer la vidéo", "Couldn’t prepare the video"), detail.trim()));
+            }
+        }
+        tokio::fs::rename(&draft, &dest).await?;
+        Ok(dest)
+    }.await;
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&draft).await;
+    }
+    result
 }
 
 /// Transcrit avec Whisper (processus `lumen-whisper`). `pcm_out` : y enregistre

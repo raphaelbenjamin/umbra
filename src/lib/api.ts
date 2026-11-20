@@ -154,13 +154,15 @@ export interface Api {
   modelDelete(id: string): Promise<void>;
   /** prononce avec la voix naturelle ; renvoie le chemin du fichier WAV (mis en cache) */
   azureSpeechConfig(region?: string, key?: string): Promise<string | null>;
+  trainingAudioReady(lang: LangCode, texts: string[], azureVoice: string | null): Promise<string[]>;
   azureSpeechClip(lang: LangCode, text: string, voice: string, cachedOnly: boolean): Promise<string | null>;
   ttsSay(lang: LangCode, text: string, prefetch: boolean): Promise<string>;
   /** crée l'audio d'une leçon de texte avec la voix naturelle */
   lessonVoice(id: number, onEvent: (e: ImportEvent) => void): Promise<VoicedLesson>;
   lessonVoiceCancel(id: number): Promise<void>;
   readFile(path: string): Promise<ArrayBuffer>;
-  importSubtitledMedia(lang: LangCode, path: string, subtitles: string): Promise<number>;
+  listImportFolder(path: string): Promise<string[]>;
+  importSubtitledMedia(lang: LangCode, path: string, subtitles: string, onEvent: (event: ImportEvent) => void): Promise<number>;
   importMedia(lang: LangCode, path: string, title: string | null, onEvent: (e: ImportEvent) => void): Promise<number>;
   /** regarde ce qu'il y a derrière un lien : article, vidéo, podcast, Spotify… */
   linkProbe(url: string, onEvent: (e: ImportEvent) => void): Promise<LinkInfo>;
@@ -311,12 +313,14 @@ async function createTauriApi(): Promise<Api> {
     modelCancel: (id) => invoke("model_cancel", { id }),
     modelDelete: (id) => invoke("model_delete", { id }),
     azureSpeechConfig: (region, key) => invoke("azure_speech_config", { region, key }),
+    trainingAudioReady: (lang, texts, azureVoice) => invoke("training_audio_ready", { lang, texts, azureVoice }),
     azureSpeechClip: (lang, text, voice, cachedOnly) => invoke("azure_speech_clip", { lang, text, voice, cachedOnly }),
     ttsSay: (lang, text, prefetch) => invoke("tts_say", { lang, text, prefetch }),
     lessonVoice: (id, onEvent) => invoke("lesson_voice", { id, onEvent: ch<ImportEvent>(onEvent) }),
     lessonVoiceCancel: (id) => invoke("model_cancel", { id: `voice:${id}` }),
     readFile: (path) => invoke<ArrayBuffer>("read_file", { path }),
-    importSubtitledMedia: (lang, path, subtitles) => invoke("import_subtitled_media", { lang, path, subtitles }),
+    listImportFolder: (path) => invoke("list_import_folder", { path }),
+    importSubtitledMedia: (lang, path, subtitles, onEvent) => invoke("import_subtitled_media", { lang, path, subtitles, onEvent: ch<ImportEvent>(onEvent) }),
     importMedia: (lang, path, title, onEvent) =>
       invoke("import_media", { lang, path, title, onEvent: ch<ImportEvent>(onEvent) }),
     linkProbe: (url, onEvent) => invoke("link_probe", { url, onEvent: ch<ImportEvent>(onEvent) }),

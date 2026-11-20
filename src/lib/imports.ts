@@ -25,6 +25,7 @@ export interface JobSpec {
   youtubeCaptions?: boolean;
   videoHeight?: number;
   localMedia?: string;
+  localSubtitles?: { media: string; subtitles: string };
   removeOnSuccess?: boolean;
   /** Large batches use the queue indicator instead of a toast per episode. */
   quiet?: boolean;
@@ -64,6 +65,7 @@ export function stageText(stage: string): string {
     copy: t("Copie du fichier", "Copying the file"),
     tools: t("Installation des composants vidéo", "Installing the video components"),
     captions: t("Recherche des sous-titres", "Getting captions"),
+    subtitles: t("Lecture des sous-titres", "Reading subtitles"),
     download: t("Téléchargement du son", "Downloading the sound"),
     file: t("Téléchargement du fichier", "Downloading the file"),
     video: t("Finalisation de la vidéo", "Finishing the video"),
@@ -200,6 +202,9 @@ async function run(job: Job): Promise<number[]> {
   }
   if (spec.podcast) return [await api().podcastCreate(spec.lang, spec.podcast, onEvent)];
   if (spec.song) return [await api().importSong(spec.lang, spec.song, onEvent)];
+  if (spec.localSubtitles) {
+    return [await api().importSubtitledMedia(spec.lang, spec.localSubtitles.media, spec.localSubtitles.subtitles, onEvent)];
+  }
   if (spec.localMedia) return [await api().importMedia(spec.lang, spec.localMedia, null, onEvent)];
   if (spec.media) {
     let text = spec.text ?? null;
@@ -218,6 +223,15 @@ let pumping = false;
 async function pump() {
   if (pumping) return;
   pumping = true;
+  let imported = false;
+  let batchDirty = false;
+  let batchTimer: ReturnType<typeof setTimeout> | undefined;
+  const refreshBatch = () => {
+    clearTimeout(batchTimer);
+    batchTimer = undefined;
+    if (batchDirty) useApp.getState().bumpLibrary();
+    batchDirty = false;
+  };
   try {
     for (;;) {
       const jobs = useImports.getState().jobs;
@@ -232,15 +246,20 @@ async function pump() {
       const app = useApp.getState();
       try {
         const ids = await run(job);
+        imported = true;
         if (job.spec.removeOnSuccess) {
           useImports.setState((s) => ({ jobs: s.jobs.filter((j) => j.spec.key !== job.spec.key) }));
         } else {
           patch(job.spec.key, { status: "done", lessonId: ids[0], lessons: ids.length, stage: "", progress: null });
         }
         if (job.spec.discoverId && ids.length) void useDiscover.getState().mark(job.spec.lang, job.spec.discoverId, ids[0]);
-        app.bumpLibrary();
-        void app.refreshKnown();
-        if (job.spec.quiet) continue;
+        if (job.spec.quiet) {
+          batchDirty = true;
+          batchTimer ??= setTimeout(refreshBatch, 750);
+          continue;
+        }
+        batchDirty = true;
+        refreshBatch();
         const title = job.spec.title;
         app.toast(
           job.spec.podcast
@@ -258,6 +277,8 @@ async function pump() {
       }
     }
   } finally {
+    refreshBatch();
+    if (imported) void useApp.getState().refreshKnown();
     pumping = false;
   }
 }

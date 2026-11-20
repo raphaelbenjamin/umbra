@@ -250,6 +250,13 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
   }, [remember]);
 
   // ---------- recalage de la lanterne (minutage approximatif), ponctuation oubliée ----------
+  const offsetKey = `lantern_offset_${lesson.id}`;
+  const parsedOffset = Number(settings[offsetKey] ?? "0");
+  const lanternOffset = Number.isFinite(parsedOffset) ? Math.max(-10, Math.min(10, parsedOffset)) : 0;
+  const [timingOpen, setTimingOpen] = useState(false);
+  const changeOffset = (value: number) => {
+    void setSetting(offsetKey, value.toFixed(1)).catch((error) => useApp.getState().toast(errorText(error), "error"));
+  };
   const [resync, setResync] = useState<number | null>(null);
   // transcription d'avant la reprise de la ponctuation : de longs passages sans un point
   // (proposé seulement quand c'est flagrant, et une fois : Whisper n'a peut-être rien à prêter)
@@ -343,12 +350,12 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
         }
         remember(t);
         if (timing) {
-          const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], t + LANTERN_LEAD);
+          const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], t + LANTERN_LEAD - lanternOffset);
           if (k >= 0) {
             const [, , , t1] = timing.raw[k];
             const nextStart = timing.raw[k + 1]?.[2] ?? Infinity;
-            if (t <= t1 + 0.5 || t < nextStart) setCursor(timing.tokIdx[k]);
-          }
+            if (t - lanternOffset <= t1 + 0.5 || t - lanternOffset < nextStart) setCursor(timing.tokIdx[k]);
+          } else setCursor(-1);
         }
         // l'image suit le son : petite correction de vitesse, ou saut si l'écart est grand
         const v = videoRef.current;
@@ -369,7 +376,13 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [hasMedia, playing, timing, setCursor, single, dual, rate, remember]);
+  }, [hasMedia, playing, timing, setCursor, single, dual, rate, remember, lanternOffset]);
+
+  useEffect(() => {
+    if (!hasMedia || !timing || playing) return;
+    const index = lastLE(timing.raw.length, (j) => timing.raw[j][2], time + LANTERN_LEAD - lanternOffset);
+    setCursor(timing.tokIdx[index] ?? -1);
+  }, [hasMedia, timing, playing, time, lanternOffset, setCursor]);
 
   // temps d'écoute
   useEffect(() => {
@@ -480,10 +493,10 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
       if (!timing || !timing.raw.length) return;
       const k = timing.tokIdx.findIndex((t) => t >= i);
       const idx = k === -1 ? timing.tokIdx.length - 1 : k;
-      seekTo(timing.raw[idx][2] - 0.05);
+      seekTo(timing.raw[idx][2] + lanternOffset - 0.05);
       setCursor(timing.tokIdx[idx]);
     },
-    [timing, seekTo, setCursor],
+    [timing, seekTo, setCursor, lanternOffset],
   );
 
   const playMedia = (userInitiated = false) => {
@@ -641,8 +654,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
     if (hasMedia && duration) {
       seekTo(f * duration);
       if (timing) {
-        const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], f * duration);
-        if (k >= 0) setCursor(timing.tokIdx[k]);
+        const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], f * duration + LANTERN_LEAD - lanternOffset);
+        setCursor(timing.tokIdx[k] ?? -1);
       }
     } else if (!hasMedia) {
       const range = pages[pageRef.current];
@@ -691,8 +704,8 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
         if (dual && videoRef.current && videoRef.current.readyState >= 1) videoRef.current.currentTime = p;
         setTime(p);
         if (timing) {
-          const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], p + 0.04);
-          if (k >= 0) setCursor(timing.tokIdx[k]);
+          const k = lastLE(timing.raw.length, (j) => timing.raw[j][2], p + LANTERN_LEAD - lanternOffset);
+          setCursor(timing.tokIdx[k] ?? -1);
         }
       }
       if (autoplayRef.current) {
@@ -786,6 +799,30 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
         >
           <Icon name={follow ? "pageturn" : "pagestay"} size={18} />
         </button>
+        {hasMedia && !!timing?.raw.length && (
+          <div className="lantern-timing-wrap">
+            <button className={`icon-btn ${timingOpen || lanternOffset ? "on" : ""}`} type="button"
+              aria-label={t("Minutage de la lanterne", "Lantern timing")} aria-expanded={timingOpen}
+              title={t("Minutage de la lanterne", "Lantern timing")} onClick={() => setTimingOpen((open) => !open)}>
+              <Icon name="clock" size={17} />
+            </button>
+            {timingOpen && (
+              <div className="lantern-timing-panel" onKeyDown={(e) => {
+                if (e.key === "Escape") { e.stopPropagation(); setTimingOpen(false); }
+              }}>
+                <label htmlFor={`lantern-offset-${lesson.id}`}>{t("Minutage de la lanterne", "Lantern timing")}</label>
+                <output className="num">{lanternOffset > 0 ? "+" : ""}{lanternOffset.toFixed(1)} s</output>
+                <input id={`lantern-offset-${lesson.id}`} className="range" type="range" min="-10" max="10" step="0.1"
+                  value={lanternOffset} onChange={(e) => changeOffset(e.currentTarget.valueAsNumber)} />
+                <div className="lantern-timing-actions">
+                  <button type="button" className="btn sm soft" disabled={lanternOffset <= -10} onClick={() => changeOffset(lanternOffset - 0.1)}>{t("−0,1 s · Avancer", "−0.1 s · Earlier")}</button>
+                  <button type="button" className="btn sm ghost" onClick={() => changeOffset(0)}>{t("Réinitialiser", "Reset")}</button>
+                  <button type="button" className="btn sm soft" disabled={lanternOffset >= 10} onClick={() => changeOffset(lanternOffset + 0.1)}>{t("+0,1 s · Retarder", "+0.1 s · Later")}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {canResync &&
           (resync === null ? (
             punctuate ? (
@@ -806,7 +843,7 @@ export const Player = forwardRef<PlayerHandle, Props>(function Player({ lesson, 
             )
           ) : (
             <span className="player-resync busy num" role="status">
-              <span className="dot busy" /> {punctuate ? t(`Ponctuation ${Math.round(resync)} %`, `Punctuating ${Math.round(resync)}%`) : t(`Calage ${Math.round(resync)} %`, `Aligning ${Math.round(resync)}%`)}
+              <span className="dot busy" /> {resync <= 0 ? t("Préparation de l’audio…", "Preparing audio…") : punctuate ? t(`Ponctuation ${Math.round(resync)} %`, `Punctuating ${Math.round(resync)}%`) : t(`Calage ${Math.round(resync)} %`, `Aligning ${Math.round(resync)}%`)}
             </span>
           ))}
         {(!hasMedia || lesson.media_path?.includes(".voice.")) && naturalVoiceSpeaks(lesson.lang) && <MakeAudio lesson={lesson} again={hasMedia} onVoiced={onVoiced} />}

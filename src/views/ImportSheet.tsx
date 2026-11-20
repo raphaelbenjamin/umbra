@@ -9,6 +9,7 @@ import { cleanTitle, useDiscover } from "../lib/discover";
 import { MEASURED, stageText, useImports, type JobSpec } from "../lib/imports";
 import {
   MEDIA_EXT,
+  matchSubtitledMedia,
   baseName,
   cleanText,
   decodeText,
@@ -451,17 +452,32 @@ export function ImportSheet() {
     if (paths.length) setMediaFiles((m) => [...m, ...paths.filter((p) => !m.includes(p))]);
   };
 
-  const chooseSubtitledMedia = async () => {
-    await run(t("Importation de l’audio et des sous-titres", "Importing audio and subtitles"), async () => {
-      const paths = await pickFiles([{ name: t("Média et SRT", "Media and SRT"), extensions: [...MEDIA_EXT, "srt"] }]);
-      if (!paths.length) return;
-      const media = paths.filter((path) => MEDIA_EXT.includes(extOf(path)));
-      const subtitles = paths.filter((path) => extOf(path) === "srt");
-      if (media.length !== 1 || subtitles.length !== 1 || paths.length !== 2) {
-        throw new Error(t("Sélectionnez un fichier audio ou vidéo et un fichier SRT ensemble.", "Select one audio or video file and one SRT file together."));
+  const chooseSubtitledMedia = async (folder = false) => {
+    await run(t("Recherche des fichiers associés", "Matching media and subtitles"), async () => {
+      let paths: string[];
+      if (folder) {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const directory = await open({ directory: true, multiple: false });
+        if (!directory) return;
+        paths = await api().listImportFolder(directory);
+      } else {
+        paths = await pickFiles([{ name: t("Média et sous-titres", "Media and subtitles"), extensions: [...MEDIA_EXT, "srt", "vtt"] }]);
+        if (!paths.length) return;
       }
-      const id = await api().importSubtitledMedia(lang, media[0], subtitles[0]);
-      finish([id], t("Leçon synchronisée créée", "Synced lesson created"));
+      const media = paths.filter((path) => MEDIA_EXT.includes(extOf(path)));
+      const subtitles = paths.filter((path) => ["srt", "vtt"].includes(extOf(path)));
+      const { pairs, unmatched } = matchSubtitledMedia(media, subtitles, lang, !folder);
+      if (!pairs.length) {
+        throw new Error(t("Aucune paire audio/vidéo et SRT/VTT unique trouvée.", "No unambiguous media and SRT/VTT pairs found."));
+      }
+      queueImports(pairs.map(({ media, subtitles }) => ({
+        key: JSON.stringify(["local-subtitles", lang, media, subtitles]),
+        lang, title: baseName(media), image: "", localSubtitles: { media, subtitles },
+        quiet: pairs.length > 1, removeOnSuccess: true,
+      })));
+      if (unmatched.length) {
+        toast(`${t("Médias sans sous-titres uniques", "Media without a unique subtitle match")} · ${unmatched.length} (${unmatched.slice(0, 3).map(baseName).join(", ")}${unmatched.length > 3 ? ", …" : ""})`);
+      }
     });
   };
 
@@ -813,8 +829,12 @@ export function ImportSheet() {
               <>
                 <button className="file-drop" onClick={() => void chooseSubtitledMedia()} disabled={!isTauri}>
                   <Icon name="file" size={24} />
-                  <strong style={{ color: "var(--text)" }}>{t("Média + sous-titres SRT", "Audio or video + SRT")}</strong>
-                  <span>{t("Sélectionnez les deux fichiers ensemble. Les sous-titres suivent le son.", "Select both files together. Umbra uses the SRT timestamps to follow the sound.")}</span>
+                  <strong style={{ color: "var(--text)" }}>{t("Média + sous-titres SRT/VTT", "Audio or video + SRT/VTT")}</strong>
+                  <span>{t("Sélectionnez le média et ses sous-titres.", "Select the media and subtitle files together.")}</span>
+                </button>
+                <button className="btn soft" onClick={() => void chooseSubtitledMedia(true)} disabled={!isTauri}>
+                  <Icon name="file" size={16} />
+                  {t("Importer un dossier de médias et sous-titres", "Import folder of media and subtitles")}
                 </button>
                 {!asrReady && <AsrMissing />}
                 <button className="file-drop" onClick={chooseMedia} disabled={!isTauri}>
@@ -826,7 +846,7 @@ export function ImportSheet() {
                   <div className="file-list">
                     {mediaFiles.map((f) => (
                       <div key={f} className="file-item">
-                        <Icon name={["mp4", "mov", "m4v", "mkv"].includes(extOf(f)) ? "video" : "wave"} size={16} />
+                        <Icon name={["mp4", "mov", "m4v", "mkv", "webm"].includes(extOf(f)) ? "video" : "wave"} size={16} />
                         <span className="grow">{baseName(f)}</span>
                         <button className="icon-btn" aria-label={t("Retirer", "Remove")} onClick={() => setMediaFiles((m) => m.filter((x) => x !== f))}>
                           <Icon name="close" size={14} />

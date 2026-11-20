@@ -491,7 +491,7 @@ export function decodeText(data: ArrayBuffer): string {
   return new TextDecoder("windows-1252").decode(data);
 }
 
-export const MEDIA_EXT = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "mp4", "m4v", "mov", "mkv", "aiff", "aif", "caf"];
+export const MEDIA_EXT = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "mp4", "m4v", "mov", "mkv", "webm", "aiff", "aif", "caf"];
 export const TEXT_EXT = ["txt", "md", "epub", "pdf", "srt", "vtt", "html", "htm"];
 
 export function extOf(path: string): string {
@@ -502,6 +502,39 @@ export function extOf(path: string): string {
 export function baseName(path: string): string {
   const name = path.split(/[\\/]/).pop() ?? path;
   return name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+}
+
+export function matchSubtitledMedia(media: string[], subtitles: string[], lang: string, allowSinglePair: boolean) {
+  if (allowSinglePair && media.length === 1 && subtitles.length === 1) {
+    return { pairs: [{ media: media[0], subtitles: subtitles[0] }], unmatched: [] };
+  }
+  const stem = (path: string) => (path.split(/[\\/]/).pop() ?? path).replace(/\.[^.]+$/, "").normalize("NFC").toLowerCase();
+  const mediaByStem = new Map<string, string[]>();
+  const candidates = new Map<string, { path: string; rank: number }[]>();
+  for (const path of media) {
+    const name = stem(path);
+    mediaByStem.set(name, [...(mediaByStem.get(name) ?? []), path]);
+  }
+  for (const path of subtitles) {
+    const name = stem(path);
+    const suffix = /\.([a-z]{2,3})(?:-[a-z0-9]{2,8})*$/i.exec(name);
+    const exact = mediaByStem.has(name);
+    const key = exact ? name : suffix ? name.slice(0, suffix.index) : "";
+    if (!mediaByStem.has(key)) continue;
+    const rank = exact ? 0 : suffix?.[1] === lang ? 1 : 2;
+    candidates.set(key, [...(candidates.get(key) ?? []), { path, rank }]);
+  }
+  const pairs: { media: string; subtitles: string }[] = [];
+  const unmatched: string[] = [];
+  for (const [key, files] of mediaByStem) {
+    const options = (candidates.get(key) ?? []).sort((a, b) => a.rank - b.rank);
+    if (files.length === 1 && options[0] && options[0].rank !== options[1]?.rank) {
+      pairs.push({ media: files[0], subtitles: options[0].path });
+    } else {
+      unmatched.push(...files);
+    }
+  }
+  return { pairs, unmatched };
 }
 
 // japonais et chinois s'écrivent sans espaces : chaque caractère compte, comme dans le lecteur
